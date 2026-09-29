@@ -1,8 +1,9 @@
 import "server-only";
-import { headers } from "next/headers";
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { cookies } from "next/headers";
 import { cached } from "@/lib/cache";
+import { readSession, SESSION_COOKIE } from "@/lib/session";
 import { dbConfigured, q } from "./db";
+import { isAllowed, isBootstrapAdmin } from "./access";
 
 export type Role = "viewer" | "editor" | "admin";
 export interface User { email: string; name: string; role: Role }
@@ -12,47 +13,30 @@ export class AuthError extends Error {
   constructor(public status: 401 | 403, message: string) { super(message); }
 }
 
-const csv = (v?: string) => (v ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
-const g = globalThis as unknown as { __jwks?: ReturnType<typeof createRemoteJWKSet> };
-
 async function identify(): Promise<string | null> {
-  const h = await headers();
-  const mode = process.env.AUTH_MODE ?? "cloudflare";
-  if (mode === "dev") {
+  if ((process.env.AUTH_MODE ?? "google") === "dev") {
     // never allow the dev identity in production unless explicitly forced (e.g. an internal-only preview)
     if (process.env.NODE_ENV === "production" && process.env.ALLOW_DEV_AUTH !== "true") return null;
     return process.env.DEV_USER_EMAIL?.toLowerCase() ?? "dev@snitch.com";
   }
-
-  const team = process.env.CF_ACCESS_TEAM_DOMAIN;
-  const aud = process.env.CF_ACCESS_AUD;
-  if (team && aud) {
-    const token = h.get("cf-access-jwt-assertion");
-    if (!token) return null;
-    g.__jwks ??= createRemoteJWKSet(new URL(`${team.replace(/\/$/, "")}/cdn-cgi/access/certs`));
-    try {
-      const { payload } = await jwtVerify(token, g.__jwks, { issuer: team.replace(/\/$/, ""), audience: aud });
-      return typeof payload.email === "string" ? payload.email.toLowerCase() : null;
-    } catch {
-      return null;
-    }
-  }
-  // Without AUD configured we trust the header set by Cloudflare Access (the origin must only be reachable via Access).
-  return h.get("cf-access-authenticated-user-email")?.toLowerCase() ?? null;
+  const session = await readSession((await cookies()).get(SESSION_COOKIE)?.value);
+  return session?.email.toLowerCase() ?? null;
 }
 
 export async function getUser(): Promise<User | null> {
   const email = await identify();
   if (!email) return null;
-  const domains = csv(process.env.ALLOWED_EMAIL_DOMAINS);
-  if (domains.length && !domains.includes(email.split("@")[1])) return null;
-  return cached(`user:${email}`, 60, () => loadUser(email));
+  // re-checked every minute so removing someone from the allowlist takes effect without waiting for session expiry
+  return cached(`user:${email}`, 60, async () => {
+    if (process.env.AUTH_MODE !== "dev" && !(await isAllowed(email))) throw new AuthError(403, `${email} is not on the allowed list.`);
+    return loadUser(email);
+  });
 }
 
 async function loadUser(email: string): Promise<User> {
-  const isBootstrapAdmin = csv(process.env.ADMIN_EMAILS).includes(email);
+  const admin = isBootstrapAdmin(email);
   const name = email.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  const fallback: User = { email, name, role: isBootstrapAdmin ? "admin" : "viewer" };
+  const fallback: User = { email, name, role: admin ? "admin" : "viewer" };
   if (!dbConfigured()) return fallback;
   let rows;
   try {
@@ -61,7 +45,7 @@ async function loadUser(email: string): Promise<User> {
        on conflict (email) do update set last_seen_at = now(),
          role = case when $3 = 'admin' then 'admin' else app_users.role end
        returning email, name, role, active`,
-      [email, name, isBootstrapAdmin ? "admin" : "viewer"],
+      [email, name, admin ? "admin" : "viewer"],
     );
   } catch (e) {
     // Postgres unavailable: keep dashboards readable (Snowflake-only) rather than locking everyone out

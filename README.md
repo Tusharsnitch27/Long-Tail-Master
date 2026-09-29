@@ -6,7 +6,7 @@ SKU performance, and an action centre of exceptions.
 - **Next.js 16** (App Router, server components), TypeScript, Tailwind v4, Recharts, TanStack Virtual
 - **Snowflake** is the analytical source of truth. It is queried server-side only and results are cached in memory.
 - **PostgreSQL** holds application data: target overrides and history, users and roles, settings, saved views, and the audit log.
-- **Auth** uses Cloudflare Access (Snitch SSO), the same pattern as SKU Bible and Offline Master.
+- **Auth** is Sign in with Google, limited to allowed email addresses (any Gmail or Workspace account on the list).
 
 See [docs/DATA_MODEL.md](docs/DATA_MODEL.md) for the source-table audit, joins, data-quality findings and metric definitions.
 
@@ -64,18 +64,20 @@ npm run dev
 1. Push this repo to GitHub, then in Coolify choose **New Resource → Application → GitHub** with the **Dockerfile** build pack. Port: `3000`.
 2. Add a **PostgreSQL** resource in the same project and set `DATABASE_URL` to its internal connection string. Migrations run on boot.
 3. Set the environment variables from `.env.example`:
-   - `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USERNAME`, `SNOWFLAKE_ROLE`, `SNOWFLAKE_WAREHOUSE`, `SNOWFLAKE_DATABASE`, `SNOWFLAKE_SCHEMA`
-   - `SNOWFLAKE_PAT`. This account's auth policy rejects key-pair auth for `N8N_OPS`, so the PAT is required.
-   - `AUTH_MODE=cloudflare`, `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` (the Access application's AUD tag), `ALLOWED_EMAIL_DOMAINS=snitch.com`, `ADMIN_EMAILS`
-4. Put the domain (e.g. `longtail.snitch-offline.com`) behind a **Cloudflare Access** application, the same way SKU Bible is set up.
-   With `CF_ACCESS_AUD` set, the app verifies the `Cf-Access-Jwt-Assertion` JWT itself. Without it, the app trusts the
-   `Cf-Access-Authenticated-User-Email` header, so the origin must not be reachable except through Access.
+   - `SNOWFLAKE_*`, including `SNOWFLAKE_PAT`. This account's auth policy rejects key-pair auth for `N8N_OPS`.
+   - `AUTH_MODE=google`, `NEXTAUTH_URL` (the public https URL), `NEXTAUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+   - `ADMIN_EMAILS`, `ALLOWED_EMAILS`, and optionally `ALLOWED_EMAIL_DOMAINS`
+4. In Google Cloud Console, open the OAuth client (type **Web application**) and add the authorised redirect URI
+   `https://<your-domain>/api/auth/callback/google`.
 5. The health check is `GET /api/health`, which is already wired into the Dockerfile.
 
 `docker-compose.yml` runs the app together with Postgres, for a single-box or Compose-based deployment.
 
 ## Roles
 
-- **viewer**: anyone allowed in by Access. This is the default on first visit.
+Sign-in is limited to `ADMIN_EMAILS`, `ALLOWED_EMAILS`, `ALLOWED_EMAIL_DOMAINS`, and users an admin adds in **Users & Access**.
+Revoking someone (removing them from the list, or clicking Disable) takes effect within a minute.
+
+- **viewer**: the default for any allowed user.
 - **editor**: can create, override and upload targets.
 - **admin**: can manage settings and users. Bootstrap admins with `ADMIN_EMAILS`.

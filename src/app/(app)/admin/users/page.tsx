@@ -9,8 +9,8 @@ export default async function UsersPage() {
   const users = dbConfigured() ? await q<{ email: string; role: string; active: boolean; last_seen_at: string | null }>("select email, role, active, last_seen_at::text from app_users order by role desc, email") : [];
   return (
     <>
-      <PageHeader title="Users & Access" subtitle="Sign-in is via Cloudflare Access (Snitch SSO). Anyone allowed in is a viewer by default; grant editor to manage targets, admin to change settings." />
-      {!dbConfigured() && <Notice tone="warn">DATABASE_URL is not configured — roles come only from ADMIN_EMAILS.</Notice>}
+      <PageHeader title="Users & Access" subtitle="People sign in with Google. Only emails listed here (or in ALLOWED_EMAILS / ADMIN_EMAILS) can get in. New users are viewers; grant editor to manage targets, admin to change settings. Disable to revoke access." />
+      {!dbConfigured() && <Notice tone="warn">DATABASE_URL is not configured — only ADMIN_EMAILS / ALLOWED_EMAILS can sign in.</Notice>}
       <UsersForm users={users} me={me.email} readOnly={!dbConfigured()} />
     </>
   );

@@ -52,17 +52,28 @@ async function loadUser(username: string): Promise<User> {
 }
 
 /** Creates the ADMIN_USERNAME account on first use if it doesn't exist yet (password from ADMIN_PASSWORD). */
+let bootstrapped = false;
 export async function ensureBootstrapAdmin() {
+  if (bootstrapped) return;
   const boot = envAdmin();
   if (!boot || !dbConfigured()) return;
   const exists = await q("select 1 from app_users where username = $1", [boot.username]);
-  if (exists.length) return;
+  if (exists.length && process.env.ADMIN_RESET_PASSWORD === "true") {
+    // recovery switch: force the env admin back to an active admin with ADMIN_PASSWORD (remove the flag afterwards)
+    await q("update app_users set password_hash = $2, role = 'admin', active = true, password_changed_at = now() where username = $1", [boot.username, await hashPassword(boot.password)]);
+    invalidate(`user:${boot.username}`);
+    console.log(`[auth] ADMIN_RESET_PASSWORD: password for "${boot.username}" reset from ADMIN_PASSWORD`);
+    bootstrapped = true;
+    return;
+  }
+  if (exists.length) { bootstrapped = true; return; }
   await q(
     `insert into app_users(username, name, role, active, password_hash, created_by, password_changed_at) values ($1, 'Admin', 'admin', true, $2, 'bootstrap', now())
      on conflict (username) do nothing`,
     [boot.username, await hashPassword(boot.password)],
   );
   console.log(`[auth] bootstrap admin "${boot.username}" created`);
+  bootstrapped = true;
 }
 
 /** Returns the user on valid credentials, null otherwise (same response for unknown user / wrong password). */

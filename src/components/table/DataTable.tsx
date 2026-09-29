@@ -9,7 +9,7 @@ import { inr, num, pct, signedPct } from "@/lib/format";
 import { fmtDate } from "@/lib/dates";
 import { STATUS_META, type TargetStatus } from "@/lib/metrics";
 
-export type ColType = "text" | "inr" | "inrFull" | "num" | "dec" | "pct" | "delta" | "ach" | "status" | "date" | "image" | "code";
+export type ColType = "text" | "inr" | "inrFull" | "num" | "dec" | "pct" | "delta" | "ach" | "status" | "date" | "image" | "code" | "split";
 export interface Col {
   key: string;
   label: string;
@@ -22,8 +22,10 @@ export interface Col {
   /** for delta: lower is better */
   invert?: boolean;
   width?: number;
-  /** show a secondary field under the value (e.g. store city) */
+  /** show a secondary field next to / under the value (e.g. store city, SKU code) */
   sub?: string;
+  /** field holding an image URL shown as a thumbnail before the value */
+  image?: string;
 }
 type Row = Record<string, unknown>;
 
@@ -97,7 +99,7 @@ export function DataTable({
   }, [rows, columns]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const rowH = dense ? 34 : 44;
+  const rowH = dense ? 34 : 46;
   const virt = useVirtualizer({ count: data.length, getScrollElement: () => scrollRef.current, estimateSize: () => rowH, overscan: 12 });
   const items = virt.getVirtualItems();
   const padTop = items.length ? items[0].start : 0;
@@ -143,17 +145,17 @@ export function DataTable({
   const onSort = (k: string) => setSort((s) => (s?.key === k ? (s.desc ? { key: k, desc: false } : null) : { key: k, desc: true }));
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white">
-      <div className="flex flex-wrap items-center gap-2 border-b border-zinc-100 px-3 py-2">
-        {title && <div className="mr-2 text-[13.5px] font-semibold">{title}</div>}
-        <div className="flex h-8 items-center gap-1.5 rounded-md border border-zinc-300 px-2">
+    <div className="rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(17,17,20,.03)]">
+      <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+        {title && <div className="mr-2 text-[12.5px] font-semibold text-zinc-800">{title}</div>}
+        <div className="flex h-7 items-center gap-1.5 rounded-md border border-line px-2 focus-within:border-zinc-400">
           <Search className="size-3.5 text-zinc-400" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" className="w-44 text-[13px] outline-none" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" className="w-40 text-[12.5px] outline-none" />
         </div>
-        <span className="text-[12px] text-zinc-500">{data.length.toLocaleString("en-IN")} rows</span>
+        <span className="text-[11.5px] text-zinc-400">{data.length.toLocaleString("en-IN")} rows</span>
         {toolbar}
         <div className="relative ml-auto">
-          <button onClick={() => setColMenu((v) => !v)} className="flex h-8 items-center gap-1 rounded-md px-2 text-[12.5px] text-zinc-600 hover:bg-zinc-100">
+          <button onClick={() => setColMenu((v) => !v)} className="flex h-7 items-center gap-1 rounded-md px-2 text-[12px] text-zinc-600 hover:bg-zinc-100">
             <Columns3 className="size-3.5" /> Columns
           </button>
           {colMenu && (
@@ -167,13 +169,13 @@ export function DataTable({
             </div>
           )}
         </div>
-        <button onClick={exportCsv} className="flex h-8 items-center gap-1 rounded-md bg-emerald-600 px-2.5 text-[12.5px] font-medium text-white hover:bg-emerald-700">
+        <button onClick={exportCsv} className="flex h-7 items-center gap-1 rounded-md border border-line px-2 text-[12px] text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50">
           <Download className="size-3.5" /> CSV
         </button>
       </div>
       <div ref={scrollRef} className="overflow-auto scroll-thin" style={{ maxHeight: height }}>
         <table className="w-full border-separate border-spacing-0 text-[12.5px]">
-          <thead className="sticky top-0 z-20 bg-zinc-50">
+          <thead className="sticky top-0 z-20 bg-white">
             {groups && (
               <tr>
                 {groups.map((g, i) => (
@@ -184,7 +186,7 @@ export function DataTable({
             <tr>
               {cols.map((c, i) => (
                 <th key={c.key} onClick={() => onSort(c.key)} style={{ minWidth: c.width }}
-                  className={cn("cursor-pointer select-none whitespace-nowrap border-b border-zinc-200 bg-zinc-50 px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-600 hover:text-zinc-900",
+                  className={cn("cursor-pointer select-none whitespace-nowrap border-b border-line bg-white px-3 py-2 text-[11px] font-medium text-zinc-500 hover:text-ink",
                     RIGHT.includes(c.type ?? "text") ? "text-right" : "text-left", i === 0 && "sticky left-0 z-10")}>
                   <span className="inline-flex items-center gap-1">
                     {c.label}
@@ -202,7 +204,7 @@ export function DataTable({
               const h = href(r);
               return (
                 <tr key={vi.key} onClick={h ? () => router.push(h) : undefined} style={{ height: rowH }}
-                  className={cn("group", h && "cursor-pointer", vi.index % 2 ? "bg-zinc-50/40" : "bg-white", "hover:bg-brand-50/60")}>
+                  className={cn("group bg-white transition-colors", h && "cursor-pointer", "hover:bg-zinc-50")}>
                   {cols.map((c, i) => <Cell key={c.key} c={c} r={r} first={i === 0} max={maxes[c.key]} />)}
                 </tr>
               );
@@ -214,9 +216,9 @@ export function DataTable({
           </tbody>
           {totals && data.length > 0 && (
             <tfoot className="sticky bottom-0 z-20">
-              <tr className="bg-brand-50 font-semibold">
+              <tr className="bg-zinc-50 font-semibold">
                 {cols.map((c, i) => (
-                  <td key={c.key} className={cn("tabular whitespace-nowrap border-t border-brand-100 bg-brand-50 px-2.5 py-2", RIGHT.includes(c.type ?? "text") ? "text-right" : "text-left", i === 0 && "sticky left-0")}>
+                  <td key={c.key} className={cn("tabular whitespace-nowrap border-t border-line bg-zinc-50 px-3 py-2", RIGHT.includes(c.type ?? "text") ? "text-right" : "text-left", i === 0 && "sticky left-0")}>
                     {i === 0 ? String(totals[c.key] ?? "Total") : totals[c.key] == null ? "" : fmt(totals[c.key], c.type)}
                   </td>
                 ))}
@@ -232,10 +234,21 @@ export function DataTable({
 function Cell({ c, r, first, max }: { c: Col; r: Row; first: boolean; max?: number }) {
   const v = r[c.key];
   const t = c.type ?? "text";
-  const base = cn("tabular whitespace-nowrap border-b border-zinc-100 px-2.5 py-1", RIGHT.includes(t) ? "text-right" : "text-left",
-    first && "sticky left-0 z-[1] bg-inherit font-medium group-hover:bg-brand-50");
+  const base = cn("tabular whitespace-nowrap border-b border-zinc-100 px-3 py-1", RIGHT.includes(t) ? "text-right" : "text-left",
+    first && "sticky left-0 z-[1] bg-inherit font-medium group-hover:bg-zinc-50");
   if (t === "image") {
     return <td className={base}>{v ? <img src={String(v)} alt="" loading="lazy" className="size-8 rounded object-cover" /> : <div className="size-8 rounded bg-zinc-100" />}</td>;
+  }
+  if (t === "split") {
+    // [stores, online, marketplace] shares → compact stacked bar
+    const parts = (Array.isArray(v) ? v : []) as (number | null)[];
+    const colors = ["#5046e5", "#8f89ee", "#cbc8f6"], names = ["Stores", "Online", "Marketplace"];
+    const tip = parts.map((x, i) => `${names[i]} ${x == null ? "—" : Math.round(x * 100) + "%"}`).join(" · ");
+    return (
+      <td className={base} title={tip}>
+        {parts.some((x) => x) ? <span className="flex h-1.5 w-24 overflow-hidden rounded-full bg-zinc-100">{parts.map((x, i) => <span key={i} style={{ width: `${(x ?? 0) * 100}%`, background: colors[i] }} />)}</span> : <span className="text-zinc-400">—</span>}
+      </td>
+    );
   }
   if (t === "status") {
     const m = STATUS_META[(v as TargetStatus) ?? "no_target"];
@@ -263,6 +276,17 @@ function Cell({ c, r, first, max }: { c: Col; r: Row; first: boolean; max?: numb
     );
   }
   const sub = c.sub ? r[c.sub] : null;
+  if (c.image) {
+    const img = r[c.image] as string | null;
+    return (
+      <td className={base}>
+        <span className="flex max-w-[280px] items-center gap-2.5">
+          {img ? <span className="thumb inline-block size-8 shrink-0"><img src={img} alt="" loading="lazy" className="size-full rounded-md border border-line bg-white object-cover" /><img src={img} alt="" loading="lazy" className="preview" /></span> : <span className="size-8 shrink-0 rounded-md bg-zinc-100" />}
+          <span className="min-w-0 leading-tight"><span className="block truncate">{fmt(v, t)}</span>{sub != null && sub !== "" && <span className="block font-mono text-[10.5px] font-normal text-zinc-400">{String(sub)}</span>}</span>
+        </span>
+      </td>
+    );
+  }
   const content = (
     <>
       <span className={cn(t === "code" && "font-mono text-[11.5px] text-zinc-600")}>{fmt(v, t)}</span>
@@ -273,7 +297,7 @@ function Cell({ c, r, first, max }: { c: Col; r: Row; first: boolean; max?: numb
     const w = (Math.abs(Number(v) || 0) / max) * 100;
     return (
       <td className={cn(base, "relative")}>
-        <span className="absolute inset-y-1 right-0 rounded-l bg-brand-100/70" style={{ width: `${w}%` }} />
+        <span className="absolute inset-y-1.5 right-0 rounded-l bg-zinc-100" style={{ width: `${w}%` }} />
         <span className="relative">{content}</span>
       </td>
     );

@@ -1,5 +1,6 @@
 import "server-only";
 import { sfCached } from "../snowflake";
+import { productCode } from "./warehouse";
 
 /**
  * Inventory is a SNAPSHOT metric: never sum across snapshots.
@@ -31,26 +32,33 @@ export function getNetworkInventory(): Promise<NetworkInv[]> {
   ).then((rows) => rows.map((r) => ({ ...r, offline: +r.offline || 0, online: +r.online || 0 })));
 }
 
-/** Latest store snapshot for long-tail SKUs only (SKU groups known to the product masters). */
-export function getStoreInventory(skuGroups: string[]): Promise<StoreInv[]> {
-  const list = Array.from(new Set(skuGroups)).sort();
-  if (!list.length) return Promise.resolve([]);
-  return sfCached<StoreInv>(
-    `inv:store:${list.length}`,
+/**
+ * Latest store snapshot for long-tail products. SKUGROUP is NULL for newer SKUs in this feed (e.g. 4MSFR0942-01-01),
+ * so the product is derived from the size-level SKU code against the known product list — never filtered on SKUGROUP.
+ */
+export async function getStoreInventory(skuGroups: string[]): Promise<StoreInv[]> {
+  const known = new Set(skuGroups);
+  if (!known.size) return [];
+  const prefixes = Array.from(new Set([...known].map((k) => k.slice(0, 4)))).sort();
+  const rows = await sfCached<{ b: string; store: string; sku: string; grp: string | null; units: number; saved_date: string }>(
+    `inv:store:v2:${prefixes.join(",")}`,
     `with latest as (
        select branch_code, max(saved_date) d from ${S}.SPEED_INVENTORY where saved_date >= dateadd(day, -14, current_date) group by 1)
-     select s.branch_code b, max(s.store) store, s.skugroup sku, s.sku size_sku, sum(s.total) units, to_varchar(l.d) saved_date
+     select s.branch_code b, max(s.store) store, s.sku sku, max(s.skugroup) grp, sum(s.total) units, to_varchar(l.d) saved_date
      from ${S}.SPEED_INVENTORY s join latest l on l.branch_code = s.branch_code and s.saved_date = l.d
-     where s.skugroup in (select value::string from table(flatten(parse_json(?))))
-     group by s.branch_code, s.skugroup, s.sku, l.d`,
-    [JSON.stringify(list)],
+     where left(s.sku, 4) in (select value::string from table(flatten(parse_json(?))))
+     group by s.branch_code, s.sku, l.d`,
+    [JSON.stringify(prefixes)],
     900,
-  ).then((rows) =>
-    rows.map((r) => {
-      const raw = r as unknown as { size_sku: string };
-      return { b: String(r.b), store: r.store, sku: r.sku, size: raw.size_sku.startsWith(r.sku + "-") ? raw.size_sku.slice(r.sku.length + 1) : raw.size_sku, units: +r.units || 0, saved_date: r.saved_date };
-    }),
   );
+  const out: StoreInv[] = [];
+  for (const r of rows) {
+    const code = String(r.sku);
+    const product = r.grp && known.has(r.grp) ? r.grp : productCode(code, known);
+    if (!known.has(product)) continue;
+    out.push({ b: String(r.b), store: r.store, sku: product, size: code.startsWith(product + "-") ? code.slice(product.length + 1) : "One size", units: +r.units || 0, saved_date: r.saved_date });
+  }
+  return out;
 }
 
 /** Stores present in the store-level inventory feed (coverage disclosure). */

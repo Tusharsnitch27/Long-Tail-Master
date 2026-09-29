@@ -2,107 +2,105 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { pageContext, loadFacts, withQs, type SP } from "@/server/context";
-import { summarize, monthOutlook, storeRows } from "@/server/analytics";
+import { summarize, monthOutlook } from "@/server/analytics";
 import { trendByCategory, catColor, catLabel } from "@/server/views";
-import { loadSkus } from "@/server/skus";
-import { PageHeader, Kpi, KpiGrid, Section, StatusBadge, Delta } from "@/components/ui";
+import { getSkuFacts } from "@/server/data/sku";
+import { getProductMap } from "@/server/data/products";
+import { getStoreInventory } from "@/server/data/inventory";
+import { buildActions, actionStatuses } from "@/server/actions";
+import { PageHeader, Kpi, KpiGrid, Section, Delta, Meter, ProductCell } from "@/components/ui";
+import { ActionCard } from "@/components/ActionCard";
 import { TrendChart } from "@/components/charts/TrendChart";
 import { DataTable, type Col } from "@/components/table/DataTable";
 import { inr, num, pct } from "@/lib/format";
-import { addDays, diffDays, fmtRange } from "@/lib/dates";
+import { addDays, diffDays, fmtDate, fmtRange } from "@/lib/dates";
 import { growth, safeDiv, targetStatus } from "@/lib/metrics";
 
 export default async function StoreDetail({ params, searchParams }: { params: Promise<{ code: string }>; searchParams: Promise<SP> }) {
   const { code } = await params;
-  const ctx = await pageContext(searchParams);
-  const store = ctx.byCode.get(decodeURIComponent(code));
+  const base = await pageContext(searchParams);
+  const store = base.byCode.get(decodeURIComponent(code));
   if (!store) notFound();
-  // Scope everything to this store (keep category + date filters)
-  const sctx = { ...ctx, filters: { ...ctx.filters, stores: [store.branch_code], region: [], state: [], city: [], om: [], sst: [], am: [], ct: [], lt: [] } };
-  const trendRange = { from: addDays(ctx.asOf, -29), to: ctx.asOf };
-  const netCtx = { ...ctx, filters: { ...ctx.filters, stores: [], region: [], state: [], city: [], om: [], sst: [], am: [], ct: [], lt: [] } };
-  const [facts, netFacts, sku] = await Promise.all([loadFacts(sctx, [trendRange]), loadFacts(netCtx, [trendRange]), loadSkus({ ...sctx, filters: { ...sctx.filters, ch: "store" } })]);
+  const ctx = { ...base, filters: { ...base.filters, stores: [store.branch_code] } };
   const { range, compare } = ctx.period;
+  const trendRange = { from: addDays(ctx.asOf, -29), to: ctx.asOf };
+  const [facts, skus, pm, act, statuses] = await Promise.all([
+    loadFacts(ctx, [trendRange]), getSkuFacts({ range, compare, asOf: ctx.asOf, cats: ctx.filters.cats, ch: "store" }), getProductMap(), buildActions(base), actionStatuses(),
+  ]);
+  const inv = (await getStoreInventory([...pm.keys()])).filter((r) => r.b === store.branch_code);
+  const inFeed = inv.length > 0;
+  const stock = new Map<string, number>();
+  for (const r of inv) stock.set(r.sku, (stock.get(r.sku) ?? 0) + r.units);
+  const cats = new Set(ctx.filters.cats);
+  const mine = skus.filter((f) => f.ch.toUpperCase() === store.store_name.toUpperCase() && cats.has(f.c));
+  const m = summarize(facts, range), p = summarize(facts, compare), mo = monthOutlook(facts, ctx.asOf);
   const th = ctx.settings.thresholds;
-  const m = summarize(facts, range), p = summarize(facts, compare);
-  const mo = monthOutlook(facts, ctx.asOf);
-  const net = summarize(netFacts, range);
-  const netPerStoreDay = net.salesPerStoreDay;
-  const rank = storeRows(netFacts, range, compare, ctx.byCode, th, ctx.filters.cats).find((r) => r.branch_code === store.branch_code)?.rank;
+  const catRows = ctx.filters.cats.map((c) => { const fs = facts.filter((f) => f.c === c); const cm = summarize(fs, range), cp = summarize(fs, compare); return { c, cm, g: growth(cm.sales, cp.sales), share: safeDiv(cm.sales, m.sales) }; });
+  const prodRows = mine.map((f) => {
+    const pr = pm.get(f.sku);
+    return { sku: f.sku, name: pr?.name ?? f.sku, image: pr?.image ?? null, category: catLabel(f.c), revenue: f.rs, units: f.rq, growth: growth(f.rs, f.ps), l7: f.l7q, l30: f.l30q,
+      stock: inFeed ? stock.get(f.sku) ?? 0 : null, cover: inFeed && f.l30q > 0 ? (stock.get(f.sku) ?? 0) / (f.l30q / 30) : null, last: f.last, days: f.last ? diffDays(f.last, ctx.asOf) : null };
+  });
+  const top = [...prodRows].filter((r) => r.units > 0).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+  const low = [...prodRows].filter((r) => r.l30 > 0 || (r.growth != null && r.growth < 0)).sort((a, b) => (a.growth ?? 0) - (b.growth ?? 0)).slice(0, 5);
+  const opps = act.actions.filter((a) => a.store?.code === store.branch_code);
+  const cols: Col[] = [
+    { key: "name", label: "Product", image: "image", sub: "sku", width: 240 }, { key: "category", label: "Category" },
+    { key: "revenue", label: "Revenue", type: "inr", bar: true }, { key: "units", label: "Units", type: "num" }, { key: "growth", label: "Growth", type: "delta" },
+    { key: "l7", label: "L7 units", type: "num" }, { key: "l30", label: "L30 units", type: "num" },
+    { key: "stock", label: "Store stock", type: "num", tip: "Latest store-inventory snapshot" }, { key: "cover", label: "Days of cover", type: "num" },
+    { key: "last", label: "Last sale", type: "date" },
+  ];
+  const meta = [store.city, store.state, store.region, store.operating_model, store.store_status].filter(Boolean).join(" · ");
   const trend = trendByCategory(facts, trendRange, ctx.filters.cats);
 
-  const catRows = ctx.filters.cats.map((c) => {
-    const fs = facts.filter((f) => f.c === c);
-    const cm = summarize(fs, range), cp = summarize(fs, compare), co = monthOutlook(fs, ctx.asOf);
-    const nm = summarize(netFacts.filter((f) => f.c === c), range);
-    return { c, cm, cp, co, share: safeDiv(cm.sales, m.sales), vsNet: safeDiv(safeDiv(cm.sales, cm.days), nm.salesPerStoreDay) };
-  });
-
-  const skuRows = sku.rows.map((r) => ({
-    sku: r.sku, name: sku.products.get(r.sku)?.name ?? null, image: sku.products.get(r.sku)?.image ?? null, category: catLabel(r.c),
-    qty: r.rq, sales: r.rs, asp: safeDiv(r.rs, r.rq), last: r.last, daysSince: r.last ? diffDays(r.last, ctx.asOf) : null,
-    l7: r.l7s, l7q: r.l7q, l30: r.l30s, l30q: r.l30q, mtd: r.mtds, mtdq: r.mtdq, prev: r.ps, growth: growth(r.rs, r.ps),
-  }));
-  const skuCols: Col[] = [
-    { key: "image", label: "", type: "image" },
-    { key: "sku", label: "SKU", type: "code" },
-    { key: "name", label: "Product", width: 180 },
-    { key: "category", label: "Category" },
-    { key: "qty", label: "Units", type: "num", group: "Selected period" },
-    { key: "sales", label: "Revenue", type: "inr", bar: true, group: "Selected period" },
-    { key: "asp", label: "ASP", type: "inrFull", group: "Selected period" },
-    { key: "growth", label: "vs prev", type: "delta", group: "Selected period" },
-    { key: "l7", label: "L7 sales", type: "inr", group: "Windows (to as-of date)" },
-    { key: "l7q", label: "L7 units", type: "num", group: "Windows (to as-of date)" },
-    { key: "l30", label: "L30 sales", type: "inr", group: "Windows (to as-of date)" },
-    { key: "l30q", label: "L30 units", type: "num", group: "Windows (to as-of date)" },
-    { key: "mtd", label: "MTD sales", type: "inr", group: "Windows (to as-of date)" },
-    { key: "last", label: "Last sale", type: "date" },
-    { key: "daysSince", label: "Days since", type: "num", tip: "Days since last sale (90-day lookback)" },
-  ];
-
-  const meta = [store.city, store.state, store.region, store.operating_model, store.location_type, store.store_status].filter(Boolean).join(" · ");
   return (
     <>
-      <Link href={withQs(ctx, "/stores")} className="mb-2 inline-flex items-center gap-1 text-[12.5px] text-zinc-500 hover:text-zinc-900"><ChevronLeft className="size-3.5" />All stores</Link>
-      <PageHeader title={store.short_name} subtitle={<>{meta} · Branch {store.branch_code} · AM {store.am ?? "—"} · RM {store.rm ?? "—"}{store.partner && store.partner !== "COCO" ? ` · Partner ${store.partner}` : ""}</>}
-        right={<div className="text-right text-[12px] text-zinc-500">{fmtRange(range)}<br />{rank ? `Rank #${rank} of network by revenue` : ""}</div>} />
-      <KpiGrid>
+      <Link href={withQs(base, "/stores")} className="mb-2 inline-flex items-center gap-1 text-[12px] text-zinc-500 hover:text-ink"><ChevronLeft className="size-3.5" />Stores</Link>
+      <PageHeader title={store.short_name} subtitle={<>{meta} · AM {store.am ?? "—"} · {fmtRange(range)}</>} />
+      <KpiGrid cols={6}>
         <Kpi label="Revenue" value={inr(m.sales)} delta={growth(m.sales, p.sales)} deltaLabel={ctx.period.compareLabel} />
-        <Kpi label="Target" value={inr(m.target)} status={<StatusBadge status={targetStatus(m.sales, m.target, th)} ach={m.ach} />} />
-        <Kpi label="Gap" value={m.gap == null ? "—" : m.gap > 0 ? inr(m.gap) : `+${inr(-m.gap)}`} sub={m.gap != null && m.gap <= 0 ? "above target" : "to go"} />
-        <Kpi label="Units" value={num(m.qty)} sub={`${num(m.bills)} bills · UPT ${num(m.upt, 2)}`} />
-        <Kpi label="Avg daily sales" value={inr(safeDiv(m.sales, m.days))} sub={<>network avg {inr(netPerStoreDay)} · <Delta v={growth(safeDiv(m.sales, m.days), netPerStoreDay)} /></>} />
-        <Kpi label="Month outlook" value={pct(safeDiv(mo.mtdSales, mo.mtdTarget), 0)} sub={`MTD ach · projected ${inr(mo.projected)} · need ${inr(mo.requiredRunRate)}/day`} />
+        <Kpi label="Units" value={num(m.qty)} sub={`${num(m.bills)} bills`} />
+        <Kpi label="Target" value={inr(m.target)} sub={<><span className="font-medium text-zinc-800">{pct(m.ach, 0)}</span> · {targetStatus(m.sales, m.target, th).replace("_", " ")}</>} />
+        <Kpi label="Sales / day" value={inr(safeDiv(m.sales, m.days))} />
+        <Kpi label="Month outlook" value={pct(mo.projectedAch, 0)} sub={`need ${inr(mo.requiredRunRate)}/day`} tip="Projected month-end achievement at the current MTD rate" />
+        <Kpi label="Current inventory" value={inFeed ? num([...stock.entries()].filter(([s]) => cats.has(pm.get(s)?.category ?? "")).reduce((a, [, v]) => a + v, 0)) : "—"} sub={inFeed ? `as of ${fmtDate(inv[0].saved_date)}` : "not in the store-inventory feed"} />
       </KpiGrid>
-      <div className="mt-4 grid gap-4 xl:grid-cols-[1.4fr_1fr]">
+      <div className="mt-3 grid gap-3 xl:grid-cols-[1.6fr_1fr]">
         <Section title="Daily sales — last 30 days">
-          <TrendChart data={trend} height={250} series={[...ctx.filters.cats.map((c) => ({ key: c, label: catLabel(c), color: catColor(c), stack: "s" })), { key: "target", label: "Target", color: "#18181b", type: "line" as const, dashed: true }]} />
+          <TrendChart data={trend} height={220} series={[...ctx.filters.cats.map((c) => ({ key: c, label: catLabel(c), color: catColor(c), stack: "s" })), { key: "target", label: "Target", color: "#111114", type: "line" as const, dashed: true }]} />
         </Section>
-        <Section title="Category split" pad={false}>
-          <table className="w-full whitespace-nowrap text-[12.5px]">
-            <thead><tr className="border-b border-zinc-200 text-[11px] uppercase tracking-wide text-zinc-500">
-              <th className="px-4 py-2 text-left">Category</th><th className="px-2 text-right">Sales</th><th className="px-2 text-right">Mix</th><th className="px-2 text-right">Units</th><th className="px-2 text-right">Target</th><th className="px-2 text-right">Growth</th><th className="px-4 text-right" title="Store's sales/day ÷ network average per store/day">vs network</th>
-            </tr></thead>
-            <tbody>{catRows.map((r) => (
-              <tr key={r.c} className="border-b border-zinc-100">
-                <td className="px-4 py-2"><span className="mr-1.5 inline-block size-2 rounded-full" style={{ background: catColor(r.c) }} />{catLabel(r.c)}<div className="mt-0.5"><StatusBadge status={targetStatus(r.cm.sales, r.cm.target, th)} ach={r.cm.ach} /></div></td>
-                <td className="tabular px-2 text-right font-medium">{inr(r.cm.sales)}</td>
-                <td className="tabular px-2 text-right">{pct(r.share, 0)}</td>
-                <td className="tabular px-2 text-right">{num(r.cm.qty)}</td>
-                <td className="tabular px-2 text-right">{inr(r.cm.target)}</td>
-                <td className="px-2 text-right"><Delta v={growth(r.cm.sales, r.cp.sales)} /></td>
-                <td className="tabular px-4 text-right">{r.vsNet == null ? "—" : `${(r.vsNet * 100).toFixed(0)}%`}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-          <p className="px-4 py-2 text-[11.5px] text-zinc-500">“vs network” = this store’s sales per day ÷ average store’s sales per day (100% = average).</p>
+        <Section title="Category mix">
+          <div className="space-y-3">
+            {catRows.map((r) => (
+              <div key={r.c}>
+                <div className="flex items-baseline justify-between text-[12.5px]"><span className="flex items-center gap-2 font-medium"><span className="size-2 rounded-full" style={{ background: catColor(r.c) }} />{catLabel(r.c)}</span><span className="tabular font-semibold">{inr(r.cm.sales)}</span></div>
+                <div className="mt-1.5 flex items-center gap-3 text-[11.5px] text-zinc-500"><Meter value={r.share} color={catColor(r.c)} className="w-28" /><span className="tabular w-8">{pct(r.share, 0)}</span><Delta v={r.g} /><span className="tabular ml-auto">{pct(r.cm.ach, 0)} of target</span></div>
+              </div>
+            ))}
+          </div>
         </Section>
       </div>
-      <div className="mt-4">
-        <DataTable title="SKU performance in this store" rows={skuRows} columns={skuCols} defaultSort={{ key: "sales" }} rowHref="/products/skus/{sku}" csvName={`store-${store.branch_code}-skus`} height={560}
-          emptyText="No SKU sales for this store in the lookback window." />
-        <p className="mt-2 text-[11.5px] text-zinc-500">SKU revenue is gross line value from HORIZONTAL_SALES_CATEGORIES and can differ slightly from DSR net sales above. Store-level inventory is not available in the source tables.</p>
+      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <Section title="Top products">
+          <ul className="space-y-1.5">{top.map((r) => (
+            <li key={r.sku} className="flex items-center justify-between gap-3"><ProductCell name={r.name} sku={r.sku} image={r.image} href={withQs(base, `/products/${encodeURIComponent(r.sku)}`)} /><span className="tabular shrink-0 text-right text-[12px]"><b className="font-semibold">{inr(r.revenue)}</b><span className="block text-[11px] text-zinc-500">{r.units} units</span></span></li>
+          ))}</ul>
+        </Section>
+        <Section title="Low-performing products" tip="Largest declines vs the comparison period among products this store sells">
+          <ul className="space-y-1.5">{low.map((r) => (
+            <li key={r.sku} className="flex items-center justify-between gap-3"><ProductCell name={r.name} sku={r.sku} image={r.image} href={withQs(base, `/products/${encodeURIComponent(r.sku)}`)} /><span className="shrink-0 text-right text-[12px]"><Delta v={r.growth} /><span className="block text-[11px] text-zinc-500">{inr(r.revenue)} · stock {r.stock ?? "—"}</span></span></li>
+          ))}</ul>
+        </Section>
+      </div>
+      <div className="mt-3">
+        <Section title={`Inventory & action opportunities${opps.length ? ` · ${opps.length}` : ""}`} tip="Fast sellers with low store stock where the warehouse has units, plus other open actions for this store">
+          {opps.length ? <div className="grid gap-2 xl:grid-cols-2">{opps.slice(0, 10).map((a) => <ActionCard key={a.key} a={a} qs={base.qs} status={statuses.get(a.key) ?? "open"} />)}</div>
+            : <div className="py-4 text-center text-[12.5px] text-zinc-500">{inFeed ? "No open opportunities for this store." : "Store-level stock isn’t available for this store, so allocation opportunities can’t be computed."}</div>}
+        </Section>
+      </div>
+      <div className="mt-3">
+        <DataTable title="Products at this store" rows={prodRows} columns={cols} defaultSort={{ key: "revenue" }} rowHref="/products/{sku}" csvName={`store-${store.branch_code}-products`} height={520} dense={false} />
       </div>
     </>
   );

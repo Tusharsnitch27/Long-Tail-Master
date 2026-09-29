@@ -18,12 +18,12 @@ interface Step { id: string; label: string; state: "start" | "done" | "error"; d
 interface Turn { key: string; question: string; running: boolean; status?: string; steps: Step[]; answer?: Answer; error?: string; turnId?: string | null; feedback?: number }
 
 const SUGGESTED = [
-  "How are perfumes performing this week?",
-  "Which stores missed perfume target yesterday?",
-  "Show top shoe SKUs this month",
-  "Where are Classic Chelsea Boots currently available?",
-  "What should we focus on for perfumes this week?",
-  "Why did perfume sales fall last week?",
+  "How is Shoes performing this week?",
+  "How much Stryker inventory do we have?",
+  "Where should Stryker be allocated?",
+  "Which perfume SKUs need attention?",
+  "Why are marketplace sales down?",
+  "Which SKUs have high warehouse inventory but low sales?",
 ];
 
 /** Minimal safe markdown: paragraphs, "- " bullets, **bold**. Rendered as React text (no HTML injection). */
@@ -113,7 +113,7 @@ export function Copilot({ firstName }: { firstName: string }) {
 
   const composer = (
     <form onSubmit={(e) => { e.preventDefault(); ask(input); }} className="flex items-end gap-2 rounded-xl border border-zinc-300 bg-white p-2 shadow-sm focus-within:border-brand-500">
-      <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={1} placeholder="Ask anything about perfume & shoe performance, stores, SKUs, targets or inventory…"
+      <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={1} placeholder="Ask about categories, stores, channels, products, inventory, returns or targets…"
         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(input); } }}
         className="max-h-40 min-h-9 flex-1 resize-none bg-transparent px-2 py-1.5 text-[14px] outline-none" aria-label="Question" />
       <button type="submit" disabled={busy || input.trim().length < 2} aria-label="Ask" className="flex size-9 items-center justify-center rounded-lg bg-zinc-900 text-white disabled:opacity-30">
@@ -125,7 +125,7 @@ export function Copilot({ firstName }: { firstName: string }) {
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col">
       <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2"><Sparkles className="size-5 text-brand-500" /><h1 className="text-[20px] font-semibold tracking-tight">AI Business Copilot</h1></div>
+        <div className="flex items-center gap-2"><span className="flex size-7 items-center justify-center rounded-lg bg-ink"><Sparkles className="size-4 text-white" /></span><h1 className="text-[19px] font-semibold tracking-[-0.015em]">Mitra</h1></div>
         <div className="relative flex gap-1">
           <button onClick={() => setShowHistory((s) => !s)} className="flex items-center gap-1 rounded-md px-2 py-1.5 text-[12.5px] text-zinc-600 hover:bg-zinc-100"><History className="size-3.5" />History</button>
           <button onClick={newChat} className="flex items-center gap-1 rounded-md px-2 py-1.5 text-[12.5px] text-zinc-600 hover:bg-zinc-100"><MessageSquarePlus className="size-3.5" />New chat</button>
@@ -139,9 +139,9 @@ export function Copilot({ firstName }: { firstName: string }) {
       </div>
 
       {turns.length === 0 ? (
-        <div className="rounded-2xl border border-zinc-200 bg-white p-6">
-          <div className="text-[15px] font-medium">Hi {firstName} — ask anything about your business data</div>
-          <p className="mt-1 text-[12.5px] text-zinc-500">Answers come only from governed Snowflake data (store DSR, targets, SKU sales, product master, inventory snapshots) with the period and snapshot time stated.</p>
+        <div className="rounded-xl border border-line bg-white p-6 shadow-[0_1px_2px_rgba(17,17,20,.03)]">
+          <div className="text-[15px] font-medium">Ask Category Mitra anything about your business.</div>
+          <p className="mt-1 text-[12.5px] text-zinc-500">Hi {firstName}. Answers come only from governed data (stores DSR, Shopify, marketplaces, Product Master, store & warehouse inventory) with the period and snapshot time stated.</p>
           <div className="mt-4">{composer}</div>
           <div className="mt-5 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Suggested</div>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -153,7 +153,7 @@ export function Copilot({ firstName }: { firstName: string }) {
           {turns.map((t) => (
             <div key={t.key} className="space-y-3">
               <div className="flex justify-end"><div className="max-w-[80%] rounded-2xl rounded-br-sm bg-zinc-900 px-4 py-2 text-[13.5px] text-white">{t.question}</div></div>
-              <div className="rounded-2xl border border-zinc-200 bg-white p-4">
+              <div className="rounded-xl border border-line bg-white p-4">
                 {(t.running || (!t.answer && t.steps.length > 0)) && (
                   <div className="space-y-1">
                     {t.steps.map((s) => (
@@ -180,7 +180,7 @@ export function Copilot({ firstName }: { firstName: string }) {
           <div ref={endRef} />
         </div>
       )}
-      {turns.length > 0 && <div className="sticky bottom-0 z-30 -mx-1 bg-gradient-to-t from-[#f7f7f8] via-[#f7f7f8] to-transparent px-1 pb-3 pt-6">{composer}</div>}
+      {turns.length > 0 && <div className="sticky bottom-0 z-30 -mx-1 bg-gradient-to-t from-canvas via-canvas to-transparent px-1 pb-3 pt-6">{composer}</div>}
     </div>
   );
 }

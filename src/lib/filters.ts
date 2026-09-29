@@ -1,11 +1,23 @@
 import type { Preset } from "./dates";
+import type { Channel } from "./categories";
 
+/**
+ * Global context: Category (single, default Overall), Period, Channel (+ marketplace), Store (only where relevant).
+ * Options shown in the UI are built from values present in the data.
+ */
 export interface Filters {
   preset: Preset;
   from?: string;
   to?: string;
+  /** selected category key, or null = Overall */
+  cat: string | null;
+  /** categories in scope (Overall = all enabled) */
   cats: string[];
+  channel: Channel;
+  /** marketplace when channel = marketplace (null = all marketplaces) */
+  mp: string | null;
   stores: string[];
+  // store dimensions (not exposed as global filters; kept for scoped queries)
   state: string[];
   region: string[];
   city: string[];
@@ -14,7 +26,7 @@ export interface Filters {
   am: string[];
   ct: string[];
   lt: string[];
-  /** sales channel for SKU views */
+  /** SKU-sales channel for store × SKU queries */
   ch: "store" | "shopify" | "marketplace" | "all";
   pb: string[];
 }
@@ -39,32 +51,29 @@ export const PRICE_BANDS = [
 ];
 
 type SP = Record<string, string | string[] | undefined>;
-const list = (v: string | string[] | undefined) =>
-  (Array.isArray(v) ? v.join(",") : v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+const list = (v: string | string[] | undefined) => (Array.isArray(v) ? v.join(",") : v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+const one = (sp: SP, k: string) => (Array.isArray(sp[k]) ? (sp[k] as string[])[0] : (sp[k] as string | undefined));
 
 export function parseFilters(sp: SP, enabledCats: string[]): Filters {
-  const one = (k: string) => (Array.isArray(sp[k]) ? (sp[k] as string[])[0] : (sp[k] as string | undefined));
-  const cats = list(sp.cat).filter((c) => enabledCats.includes(c));
-  const ch = one("ch");
+  const c = one(sp, "cat");
+  const cat = c && enabledCats.includes(c) ? c : null;
+  const chan = one(sp, "ch");
+  const channel: Channel = chan === "stores" || chan === "online" || chan === "marketplace" ? chan : "all";
   return {
-    preset: (one("p") as Preset) || "mtd",
-    from: one("from"),
-    to: one("to"),
-    cats: cats.length ? cats : enabledCats,
+    preset: (one(sp, "p") as Preset) || "mtd",
+    from: one(sp, "from"),
+    to: one(sp, "to"),
+    cat,
+    cats: cat ? [cat] : enabledCats,
+    channel,
+    mp: channel === "marketplace" ? one(sp, "mp") ?? null : null,
     stores: list(sp.store),
-    state: list(sp.state),
-    region: list(sp.region),
-    city: list(sp.city),
-    om: list(sp.om),
-    sst: list(sp.sst),
-    am: list(sp.am),
-    ct: list(sp.ct),
-    lt: list(sp.lt),
-    ch: ch === "shopify" || ch === "marketplace" || ch === "all" ? ch : "store",
-    pb: list(sp.pb),
+    state: [], region: [], city: [], om: [], sst: [], am: [], ct: [], lt: [],
+    ch: "store",
+    pb: [],
   };
 }
 
 export function hasStoreFilters(f: Filters) {
-  return f.stores.length > 0 || STORE_DIMS.some((d) => (f[d.key as keyof Filters] as string[]).length > 0);
+  return f.stores.length > 0;
 }

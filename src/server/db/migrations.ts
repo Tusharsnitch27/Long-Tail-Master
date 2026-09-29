@@ -126,4 +126,35 @@ alter table ai_turns rename column owner_email to owner;
 alter table saved_views rename column owner_email to owner;
 `,
   },
+  {
+    version: 4,
+    name: "action_tracking",
+    sql: `
+create table action_status (
+  key text primary key,
+  status text not null check (status in ('open','done','dismissed')),
+  note text,
+  updated_by text not null,
+  updated_at timestamptz not null default now()
+);
+`,
+  },
+  {
+    version: 5,
+    name: "channel_targets",
+    sql: `
+-- Month targets for channels without a Snowflake target (Online, Marketplace). Never inferred — admins set them.
+create table channel_targets (
+  id bigserial primary key,
+  channel text not null check (channel in ('online','marketplace')),
+  category text not null, -- registry key or '*' for all categories
+  month date not null,
+  target numeric(14,2) not null check (target >= 0),
+  note text,
+  updated_by text not null,
+  updated_at timestamptz not null default now(),
+  unique (channel, category, month)
+);
+`,
+  },
 ];

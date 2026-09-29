@@ -37,6 +37,9 @@ const LABEL: Record<string, (i: Record<string, unknown>) => string> = {
   get_current_inventory: (i) => `Current inventory (${i.level})`,
   get_exceptions: (i) => `Exceptions: ${String(i.type).replaceAll("_", " ")}`,
   explain_change: () => "Decomposing the change",
+  get_channel_performance: (i) => `Channel performance by ${i.group_by}`,
+  get_actions: (i) => `Action Centre${i.group && i.group !== "all" ? ` · ${i.group}` : ""}`,
+  get_product_summary: () => "Product Master details",
   submit_answer: () => "Writing the answer",
 };
 

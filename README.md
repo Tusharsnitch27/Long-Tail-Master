@@ -10,23 +10,20 @@ SKU performance, and an action centre of exceptions.
 
 See [docs/DATA_MODEL.md](docs/DATA_MODEL.md) for the source-table audit, joins, data-quality findings and metric definitions.
 
-## Views
+## Category Mitra
 
-| Area | Routes |
-|---|---|
-| Performance | `/` executive overview · `/performance/daily` · `/performance/weekly` · `/performance/mtd` |
-| Stores | `/stores` · `/stores/[branch]` detail · `/stores/matrix` (store × category) · `/stores/sku` |
-| Products | `/products/skus` · `/products/skus/[sku]` · `/products/bible` · `/products/categories` · `/products/ai` (AI Bot) |
-| Targets | `/targets` · `/targets/stores` · `/targets/daily` (store × day heatmap) · `/targets/weekly` · `/targets/setup` (admin) |
-| Action Centre | `/exceptions` (stores) · `/exceptions/skus` · `/exceptions/targets` · `/exceptions/zero-sale` |
-| Admin | `/admin/settings` · `/admin/users` |
+A category operating system for leadership, category owners and execution teams. See [docs/CATEGORY_MITRA.md](docs/CATEGORY_MITRA.md) for
+the source map, metric dictionary, product grain, channel mapping, inventory logic and the question each page answers.
 
-Global filters live in the URL (`?p=mtd&cat=shoes&region=South…`). They carry across the sidebar and into drill-downs. Every
-table supports search, sort, a column picker, a sticky header and CSV export.
+Pages: Executive Summary `/` · Overview · Mitra · Category Overview · Channel Overview · Store Overview (Summary / Stores / DSR) ·
+Online Overview · Marketplace Overview · Merchandising Overview · Action Centre · Settings (targets incl. channel targets, users, rules).
 
-## AI Business Copilot
+Global context is Category (Overall + categories with data), Period and Channel (only where relevant). Marketplace and store
+selectors list only values present in the data.
 
-`/products/ai` answers natural-language questions with Claude (`AI_MODEL`, default `claude-opus-5-5`). By default Claude runs
+## Mitra (AI)
+
+`/mitra` answers natural-language questions with Claude (`AI_MODEL`, default `claude-opus-5-5`). By default Claude runs
 through **Snowflake Cortex's Anthropic-compatible endpoint**, authenticated with the same `SNOWFLAKE_PAT` and billed to Snowflake
 credits, so no Anthropic API key is needed (`AI_PROVIDER=snowflake`). Set `AI_PROVIDER=anthropic` with `ANTHROPIC_API_KEY` to call
 Anthropic directly. The model never queries Snowflake itself: it calls approved tools that run governed queries.

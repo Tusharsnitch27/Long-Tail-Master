@@ -1,98 +1,173 @@
 import Link from "next/link";
-import { pageContext, loadFacts, withQs, type SP } from "@/server/context";
-import { summarize, monthOutlook, storeRows, statusCounts } from "@/server/analytics";
-import { categoryComparison, trendByCategory, pulse, catColor, catLabel } from "@/server/views";
-import { loadSkus } from "@/server/skus";
-import { PageHeader, Kpi, KpiGrid, Section, Delta, StatusBadge, Notice } from "@/components/ui";
-import { CompareTable } from "@/components/ui/CompareTable";
-import { TrendChart } from "@/components/charts/TrendChart";
-import { BarList } from "@/components/charts/BarList";
-import { inr, num, pct } from "@/lib/format";
-import { addDays, fmtRange } from "@/lib/dates";
-import { growth, safeDiv, targetStatus } from "@/lib/metrics";
+import { pageContext, withQs, type SP } from "@/server/context";
+import { loadScope, productPerformance } from "@/server/scope";
+import { channelMetrics, channelBreakdown, type ChKey } from "@/server/channelData";
+import { buildActions } from "@/server/actions";
+import { computePlan, cumulativeCurves, EXEC_LABEL, type PlanChannel } from "@/server/plan";
+import { drivers, risks, opportunities, leadershipActions } from "@/server/executive";
+import { getChannelTargets } from "@/server/data/channelTargets";
+import { summarize } from "@/server/analytics";
+import { catColor, catLabel } from "@/server/views";
+import { PageHeader, Kpi, KpiGrid, Section, Delta, Meter, Notice, Tabs, Tip } from "@/components/ui";
+import { InsightList } from "@/components/Insights";
+import { ExecTrend } from "@/components/charts/ExecTrend";
+import { compactNum, inr, num, pct } from "@/lib/format";
+import { addDays, addMonths, fmtDate, fmtRange, startOfMonth } from "@/lib/dates";
+import { growth, safeDiv } from "@/lib/metrics";
+import { CH_COLORS } from "@/lib/colors";
+import { cn } from "@/lib/cn";
 
-export default async function Overview({ searchParams }: { searchParams: Promise<SP> }) {
+const STATUS_CLS = { ahead: "bg-emerald-50 text-emerald-800 ring-emerald-200", on_track: "bg-sky-50 text-sky-800 ring-sky-200", at_risk: "bg-amber-50 text-amber-800 ring-amber-200", behind: "bg-rose-50 text-rose-800 ring-rose-200", no_target: "bg-zinc-100 text-zinc-600 ring-zinc-200" };
+
+export default async function ExecutiveSummary({ searchParams }: { searchParams: Promise<SP> }) {
   const ctx = await pageContext(searchParams);
-  const trendRange = { from: addDays(ctx.asOf, -29), to: ctx.asOf };
-  const [facts, sku] = await Promise.all([loadFacts(ctx, [trendRange, { from: addDays(ctx.asOf, -8), to: ctx.asOf }]), loadSkus(ctx)]);
   const { range, compare } = ctx.period;
-  const m = summarize(facts, range);
-  const p = summarize(facts, compare);
-  const mo = monthOutlook(facts, ctx.asOf);
-  const cmp = categoryComparison(ctx, facts);
-  const trend = trendByCategory(facts, trendRange, ctx.filters.cats);
-  const pul = pulse(ctx, facts);
-  const counts = statusCounts(facts, range, ctx.settings.thresholds);
-  const stores = storeRows(facts, range, compare, ctx.byCode, ctx.settings.thresholds, ctx.filters.cats).filter((s) => (s.target ?? 0) > 0);
-  const byAch = [...stores].filter((s) => s.ach != null).sort((a, b) => (b.ach ?? 0) - (a.ach ?? 0));
-  const status = targetStatus(m.sales, m.target, ctx.settings.thresholds);
-  const selling = sku.skus.filter((s) => s.qty > 0);
-  const liveNoSale = [...sku.products.values()].filter((pr) => pr.category && ctx.filters.cats.includes(pr.category) && pr.inBible && pr.lifecycle === "LIVE" && (pr.invOffline ?? 0) > 0)
-    .filter((pr) => !selling.some((s) => s.sku === pr.sku)).length;
+  const ch: PlanChannel = ctx.filters.channel === "all" ? "all" : ctx.filters.channel;
+  const ms = startOfMonth(ctx.asOf);
+  const sc = await loadScope(ctx, [{ from: addMonths(ms, -1), to: addDays(ms, -1) }]);
+  const whUnits = (s: string) => sc.wh.bySku.get(s)?.units ?? 0;
+  const [act, chTargets, perf] = await Promise.all([buildActions(ctx), getChannelTargets(ms), productPerformance(ctx, sc.pm, whUnits, "all", null)]);
+  const plan = computePlan(sc.facts, sc.uc, ctx.asOf, ch, chTargets, ctx.filters.cats, ctx.settings.thresholds);
+  const curves = cumulativeCurves(sc.facts, sc.uc, ctx.asOf, ch, plan);
+  const m = channelMetrics(sc.facts, sc.uc, range, ch), p = channelMetrics(sc.facts, sc.uc, compare, ch);
+  const chanRows = channelBreakdown(sc.facts, sc.uc, range, compare).map((c) => ({ ...c, plan: computePlan(sc.facts, sc.uc, ctx.asOf, c.key, chTargets, ctx.filters.cats, ctx.settings.thresholds) }));
+  const cats = ctx.filters.cats.map((c) => {
+    const f = sc.facts.filter((x) => x.c === c), u = sc.uc.filter((x) => x.c === c);
+    const cm = channelMetrics(f, u, range, ch), cp = channelMetrics(f, u, compare, ch);
+    const cplan = computePlan(f, u, ctx.asOf, ch, chTargets, [c], ctx.settings.thresholds);
+    const prods = sc.products.filter((x) => x.category === c);
+    return { c, revenue: cm.revenue, growth: growth(cm.revenue, cp.revenue), ach: cplan.achievement, inv: prods.reduce((a, x) => a + (x.invOffline ?? 0) + whUnits(x.sku), 0) };
+  });
+  const catTotal = cats.reduce((a, x) => a + x.revenue, 0);
+  const fastWh = perf.rows.filter((r) => r.l30Units / 30 >= 1).reduce((a, r) => a + r.whInv, 0);
+  const drv = drivers(ctx, sc.facts, sc.uc, range, compare, ch);
+  const rsk = risks(ctx, plan, sc.facts, sc.uc, range, act.actions);
+  const opp = opportunities(act.actions, fastWh);
+  const lead = leadershipActions(plan, act.actions);
+  const hasT = plan.monthTarget != null;
+  // when only some channels carry a target, every target metric says which ones
+  const basis = hasT && plan.missing.length ? plan.covered.map((k) => ({ stores: "Stores", online: "Online", marketplace: "Marketplace" })[k]).join(" + ") : null;
+  const on = basis ? ` · ${basis}` : "";
+  const chTabs = [{ k: "all", l: "Overall" }, { k: "stores", l: "Stores" }, { k: "online", l: "Online" }, { k: "marketplace", l: "Marketplace" }];
 
   return (
     <>
-      <PageHeader title="Executive Overview"
-        subtitle={<>{ctx.filters.cats.map(catLabel).join(" & ")} · {fmtRange(range)} · <span className="text-zinc-400">{ctx.period.compareLabel} ({fmtRange(compare)})</span></>} />
-      {ctx.period.partial && <Notice tone="warn">Includes today — data is still arriving through the day, so today’s numbers are partial.</Notice>}
+      <PageHeader title="Executive Summary"
+        subtitle={<>{ctx.filters.cat ? catLabel(ctx.filters.cat) : "All categories"} · {fmtRange(range)} <span className="text-zinc-400">· {ctx.period.compareLabel} · plan as of {fmtDate(ctx.asOf, true)}</span></>}
+        right={<span className={cn("rounded-lg px-3 py-1.5 text-[13px] font-semibold ring-1", STATUS_CLS[plan.status])}>{EXEC_LABEL[plan.status]}{plan.projectedAch != null ? ` · ${pct(plan.projectedAch, 0)} projected` : ""}</span>} />
+      <Tabs active={ch} tabs={chTabs.map((t) => ({ key: t.k, label: t.l, href: withQs(ctx, "/", { ch: t.k === "all" ? null : t.k }) }))} />
+      {plan.targetNote && <Notice tone={hasT ? "info" : "warn"}>{plan.targetNote}.{" "}{ctx.user?.role === "admin" && <Link href="/settings" className="font-medium underline">Configure channel targets</Link>}</Notice>}
 
       <KpiGrid cols={6}>
-        <Kpi label="Revenue" value={inr(m.sales)} delta={growth(m.sales, p.sales)} deltaLabel={`vs ${inr(p.sales)}`} tip="Net sales from the DSR (after discounts)" />
-        <Kpi label="Target" value={inr(m.target)} status={<StatusBadge status={status} ach={m.ach} />} tip="Sum of phased daily store targets for the selected dates" />
-        <Kpi label="Gap to target" value={m.gap == null ? "—" : m.gap > 0 ? inr(m.gap) : `+${inr(-m.gap)}`} sub={m.gap != null && m.gap <= 0 ? "above target" : "to go"} />
-        <Kpi label="Units sold" value={num(m.qty)} delta={growth(m.qty, p.qty)} sub={`${num(m.bills)} bills`} />
-        <Kpi label="ASP" value={inr(m.asp, { compact: false })} delta={growth(m.asp, p.asp)} sub={`UPT ${num(m.upt, 2)}`} tip="Revenue ÷ units. UPT = units per bill" />
-        <Kpi label="Stores selling" value={`${m.storesSelling} / ${m.stores}`} sub={`${inr(m.salesPerStoreDay)} per store/day`} tip="Stores with at least one sale ÷ stores with a target or sale" />
+        <Kpi label="Revenue" value={inr(m.revenue)} delta={growth(m.revenue, p.revenue)} deltaLabel="vs comparable" />
+        <Kpi label="Units" value={num(m.units)} delta={growth(m.units, p.units)} />
+        <Kpi label={`MTD target${on}`} value={hasT ? inr(plan.mtdTarget) : "Not configured"} sub={hasT ? `month ${inr(plan.monthTarget)}` : undefined} tip="Phased target to date for channels that have one" />
+        <Kpi label={`Achievement${on}`} value={pct(plan.achievement, 1)} sub={hasT ? `gap ${inr(Math.max(plan.gapToDate ?? 0, 0))} to date` : "—"} />
+        <Kpi label="Month-end projection" value={inr(plan.projected)} sub={basis ? "all channels · projection" : "projection, not actual"} tip="Stores: MTD achievement × phased month target. Other channels: current daily rate × days in month." />
+        <Kpi label={`Projected achievement${on}`} value={pct(plan.projectedAch, 0)} sub={plan.projectedGap != null ? (plan.projectedGap > 0 ? `${inr(plan.projectedGap)} short` : `${inr(-plan.projectedGap)} over`) : "—"} />
       </KpiGrid>
 
-      <div className="mt-3">
-        <KpiGrid cols={6}>
-          <Kpi label="MTD revenue" value={inr(mo.mtdSales)} sub={`${pct(safeDiv(mo.mtdSales, mo.mtdTarget))} of MTD target`} />
-          <Kpi label="Month target" value={inr(mo.monthTarget)} sub={`${mo.remainingDays} days left`} />
-          <Kpi label="Projected month-end" value={inr(mo.projected)} sub={`${pct(mo.projectedAch, 0)} of month target`} tip="MTD achievement % × full-month phased target (weekends are weighted as planned)" />
-          <Kpi label="Required run rate" value={mo.requiredRunRate == null ? "—" : `${inr(mo.requiredRunRate)}/day`} sub={`current ${inr(mo.currentRunRate)}/day`} tip="Remaining month target ÷ remaining days" />
-          <Kpi label="Stores at/above target" value={`${counts.ahead + counts.on_track}`} sub={`${counts.at_risk} at risk · ${counts.behind} behind`} tip={`Ahead ≥${pct(ctx.settings.thresholds.ahead, 0)}, On track ≥${pct(ctx.settings.thresholds.onTrack, 0)}, At risk ≥${pct(ctx.settings.thresholds.atRisk, 0)}`} />
-          <Kpi label="Selling SKUs" value={`${selling.length}`} sub={`${liveNoSale} live SKUs with store stock, no sale`} tip="SKUs with ≥1 unit sold in stores in the selected dates. Zero-sale count uses Bible inventory (perfumes)." />
-        </KpiGrid>
-      </div>
-
-      <div className="mt-4 grid gap-4 xl:grid-cols-[1.35fr_1fr]">
-        <Section title="Daily revenue — last 30 days" tip="Stacked by category; dashed line = phased daily target">
-          <TrendChart data={trend} height={270}
-            series={[...ctx.filters.cats.map((c) => ({ key: c, label: catLabel(c), color: catColor(c), stack: "s" })), { key: "target", label: "Target", color: "#18181b", type: "line" as const, dashed: true }]} />
-        </Section>
-        <Section title="Category comparison" pad={false}>
-          <div className="px-4 py-2"><CompareTable cols={cmp.cols} rows={cmp.rows} colors={cmp.data.map((d) => (d.key === "total" ? "#18181b" : catColor(d.key)))} /></div>
-        </Section>
-      </div>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {pul.map((x) => (
-          <div key={x.label} className="rounded-xl border border-zinc-200 bg-white px-4 py-3">
-            <div className="text-[11.5px] font-medium uppercase tracking-wide text-zinc-500">{x.label}</div>
-            <div className="mt-1 flex items-baseline justify-between gap-2">
-              <span className="tabular text-[18px] font-semibold">{inr(x.sales)}</span>
-              <Delta v={x.growth} />
+      <div className="mt-3 grid gap-3 xl:grid-cols-[1fr_1fr_1fr]">
+        <Section title={`MTD progress${on}`} tip="Time elapsed vs share of the month target achieved">
+          {hasT ? (
+            <div className="space-y-3">
+              <div>
+                <div className="mb-1 flex justify-between text-[12px]"><span className="text-zinc-500">Month elapsed</span><span className="tabular font-medium">{pct(plan.timeElapsedPct, 0)} · day {plan.elapsed} of {plan.daysInMonth}</span></div>
+                <Meter value={plan.timeElapsedPct} color="#a1a1aa" />
+              </div>
+              <div>
+                <div className="mb-1 flex justify-between text-[12px]"><span className="text-zinc-500">Target achieved</span><span className="tabular font-medium">{pct(plan.targetAchievedPct, 0)} · {inr(plan.coveredRevenue)} of {inr(plan.monthTarget)}</span></div>
+                <div className="relative"><Meter value={plan.targetAchievedPct} color={plan.pace === "behind" ? "#e11d48" : plan.pace === "ahead" ? "#059669" : "#5046e5"} />
+                  {plan.expectedPct != null && <span className="absolute -top-1 h-3.5 w-px bg-ink" style={{ left: `${Math.min(plan.expectedPct, 1) * 100}%` }} title="Where target phasing says we should be" />}</div>
+              </div>
+              <div className="rounded-lg bg-zinc-50 px-3 py-2 text-[12px] text-zinc-700">
+                <b className="font-semibold">{plan.pace === "ahead" ? "Ahead of pace" : plan.pace === "on_pace" ? "On pace" : "Behind pace"}</b> — phasing expects {pct(plan.expectedPct, 0)} of the month target by now.
+                <span className="block text-[11px] text-zinc-500">{plan.remainingDays} days remaining.</span>
+              </div>
             </div>
-            <div className="mt-0.5 text-[12px] text-zinc-500">{x.prevLabel} ({inr(x.prevSales)}) · {pct(x.ach, 0)} of target</div>
+          ) : <div className="py-6 text-center text-[12.5px] text-zinc-500">Target not configured for this channel.</div>}
+        </Section>
+        <Section title={`Required run rate${on}`}>
+          {hasT ? (
+            <div className="space-y-2.5">
+              <div className="grid grid-cols-2 gap-3">
+                <div><div className="text-[11px] text-zinc-500">Remaining target</div><div className="tabular text-[17px] font-semibold">{inr(plan.remaining)}</div></div>
+                <div><div className="text-[11px] text-zinc-500">Days remaining</div><div className="tabular text-[17px] font-semibold">{plan.remainingDays}</div></div>
+                <div><div className="text-[11px] text-zinc-500">Required / day</div><div className="tabular text-[17px] font-semibold">{inr(plan.requiredRunRate)}</div></div>
+                <div><div className="text-[11px] text-zinc-500">Current MTD / day</div><div className="tabular text-[17px] font-semibold">{inr(plan.currentRunRate)}</div></div>
+              </div>
+              <div className={cn("rounded-lg px-3 py-2 text-[12px]", plan.runRateGap != null && plan.runRateGap > 0 ? "bg-rose-50 text-rose-800" : "bg-emerald-50 text-emerald-800")}>
+                {plan.requiredRunRate == null ? "Month complete." : plan.runRateGap != null && plan.runRateGap > 0 ? `Required run rate is ${pct(plan.runRateGap, 0)} higher than the current pace.` : "Current run rate is sufficient."}
+              </div>
+            </div>
+          ) : <div className="py-6 text-center text-[12.5px] text-zinc-500">Needs a target.</div>}
+        </Section>
+        <Section title="Month-end projection" tip="Projection — not an actual number">
+          <div className="grid grid-cols-2 gap-3">
+            <div><div className="text-[11px] text-zinc-500">MTD revenue</div><div className="tabular text-[17px] font-semibold">{inr(plan.mtdRevenue)}</div></div>
+            <div><div className="text-[11px] text-zinc-500">Avg daily revenue</div><div className="tabular text-[17px] font-semibold">{inr(plan.mtdRevenue / plan.elapsed)}</div></div>
+            <div><div className="text-[11px] text-zinc-500">Projected revenue</div><div className="tabular text-[17px] font-semibold">{inr(plan.projected)}</div></div>
+            <div><div className="text-[11px] text-zinc-500">Projected achievement</div><div className="tabular text-[17px] font-semibold">{pct(plan.projectedAch, 0)}</div></div>
           </div>
-        ))}
+          <p className="mt-2 text-[11px] text-zinc-500">Projected{plan.projectedGap != null ? ` gap ${inr(Math.max(plan.projectedGap, 0))}` : " — no target"} · status rules: ahead ≥{pct(ctx.settings.thresholds.ahead, 0)}, on track ≥{pct(ctx.settings.thresholds.onTrack, 0)}, at risk ≥{pct(ctx.settings.thresholds.atRisk, 0)}.</p>
+        </Section>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
-        <Section title="Top stores by achievement" right={<Link className="text-[12px] text-brand-600 hover:underline" href={withQs(ctx, "/stores")}>All stores →</Link>}>
-          <BarList color="#10b981" format="inr" items={byAch.slice(0, 8).map((s) => ({ label: s.store, value: s.sales, sub: pct(s.ach, 0), href: withQs(ctx, `/stores/${s.branch_code}`) }))} />
+      <div className="mt-3 grid gap-3 xl:grid-cols-[1.5fr_1fr]">
+        <Section title="Month trend" tip="Cumulative, day of month: this month vs previous month (same day) vs target pace">
+          <ExecTrend data={curves} basisLabel={basis} prevLabel={new Date(addMonths(ms, -1) + "T00:00:00Z").toLocaleString("en-IN", { month: "short", timeZone: "UTC" })} />
         </Section>
-        <Section title="Lowest achievement" right={<Link className="text-[12px] text-brand-600 hover:underline" href={withQs(ctx, "/exceptions/targets")}>Target misses →</Link>}>
-          <BarList color="#f43f5e" items={byAch.slice(-8).reverse().map((s) => ({ label: s.store, value: s.sales, sub: pct(s.ach, 0), href: withQs(ctx, `/stores/${s.branch_code}`) }))} />
-        </Section>
-        <Section title="Top SKUs" right={<Link className="text-[12px] text-brand-600 hover:underline" href={withQs(ctx, "/products/skus")}>All SKUs →</Link>}>
-          <BarList items={selling.slice(0, 8).map((s) => ({ label: s.name ?? s.sku, value: s.sales, sub: `${s.qty}u`, href: withQs(ctx, `/products/skus/${encodeURIComponent(s.sku)}`) }))} />
-        </Section>
-        <Section title="Bottom selling SKUs" tip="Lowest revenue among SKUs that sold at least once in the period">
-          <BarList color="#a1a1aa" items={selling.slice(-8).reverse().map((s) => ({ label: s.name ?? s.sku, value: s.sales, sub: `${s.qty}u · ${s.stores} stores`, href: withQs(ctx, `/products/skus/${encodeURIComponent(s.sku)}`) }))} />
+        <Section title="Contribution">
+          <div className="text-[11px] font-medium text-zinc-500">Channel</div>
+          <div className="mt-1.5 space-y-1.5">{chanRows.map((c) => (
+            <div key={c.key} className="grid grid-cols-[92px_1fr_44px] items-center gap-2 text-[12px]"><span>{c.label}</span><Meter value={c.share} color={CH_COLORS[c.key as ChKey]} /><span className="tabular text-right font-medium">{pct(c.share, 0)}</span></div>
+          ))}</div>
+          <div className="mt-4 text-[11px] font-medium text-zinc-500">Category</div>
+          <div className="mt-1.5 space-y-1.5">{cats.map((c) => (
+            <div key={c.c} className="grid grid-cols-[92px_1fr_44px] items-center gap-2 text-[12px]"><span>{catLabel(c.c)}</span><Meter value={safeDiv(c.revenue, catTotal)} color={catColor(c.c)} /><span className="tabular text-right font-medium">{pct(safeDiv(c.revenue, catTotal), 0)}</span></div>
+          ))}</div>
         </Section>
       </div>
+
+      <div className="mt-3 grid gap-3 xl:grid-cols-2">
+        <Section title="Channel performance" pad={false}>
+          <table className="w-full whitespace-nowrap text-[12.5px]">
+            <thead><tr className="border-b border-line text-[11px] text-zinc-500">{["Channel", "Revenue", "Growth", "Target", "Achievement", "Contribution"].map((h, i) => <th key={h} className={`px-4 py-2 font-medium ${i ? "text-right" : "text-left"}`}>{h}</th>)}</tr></thead>
+            <tbody>{chanRows.map((c) => (
+              <tr key={c.key} className="border-b border-zinc-100 last:border-0 hover:bg-zinc-50">
+                <td className="px-4 py-2.5"><Link href={withQs(ctx, c.key === "stores" ? "/stores" : `/${c.key}`)} className="flex items-center gap-2 font-medium hover:underline"><span className="size-2 rounded-full" style={{ background: CH_COLORS[c.key as ChKey] }} />{c.label}</Link></td>
+                <td className="tabular px-4 text-right font-semibold">{inr(c.revenue)}</td><td className="px-4 text-right"><Delta v={c.growth} /></td>
+                <td className="tabular px-4 text-right">{c.plan.monthTarget != null ? inr(c.plan.monthTarget) : <span className="text-[11px] text-zinc-400">not configured</span>}</td>
+                <td className="tabular px-4 text-right">{c.plan.achievement != null ? pct(c.plan.achievement, 0) : "—"}</td>
+                <td className="tabular px-4 text-right">{pct(c.share, 0)}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </Section>
+        <Section title="Category performance" pad={false}>
+          <table className="w-full whitespace-nowrap text-[12.5px]">
+            <thead><tr className="border-b border-line text-[11px] text-zinc-500">{["Category", "Revenue", "Growth", "Target %", "Contribution", "Inventory"].map((h, i) => <th key={h} className={`px-4 py-2 font-medium ${i ? "text-right" : "text-left"}`}>{h}</th>)}</tr></thead>
+            <tbody>{cats.map((c) => (
+              <tr key={c.c} className="border-b border-zinc-100 last:border-0 hover:bg-zinc-50">
+                <td className="px-4 py-2.5"><Link href={withQs(ctx, "/category", { cat: c.c })} className="flex items-center gap-2 font-medium hover:underline"><span className="size-2 rounded-full" style={{ background: catColor(c.c) }} />{catLabel(c.c)}</Link></td>
+                <td className="tabular px-4 text-right font-semibold">{inr(c.revenue)}</td><td className="px-4 text-right"><Delta v={c.growth} /></td>
+                <td className="tabular px-4 text-right">{c.ach != null ? pct(c.ach, 0) : <span className="text-[11px] text-zinc-400">—</span>}</td>
+                <td className="tabular px-4 text-right">{pct(safeDiv(c.revenue, catTotal), 0)}</td><td className="tabular px-4 text-right">{compactNum(c.inv)}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </Section>
+      </div>
+
+      <div className="mt-3 grid gap-3 xl:grid-cols-3">
+        <Section title="What is driving performance?"><InsightList items={drv} qs={ctx.qs} /></Section>
+        <Section title="Risks"><InsightList items={rsk} qs={ctx.qs} empty="No material risks." /></Section>
+        <Section title="Opportunities" tip="Calculated potential — estimates, not guaranteed revenue"><InsightList items={opp} qs={ctx.qs} empty="No material opportunities." /></Section>
+      </div>
+      <div className="mt-3">
+        <Section title="Leadership actions" right={<Link href={withQs(ctx, "/actions")} className="text-[11.5px] text-zinc-500 hover:text-ink">Action Centre →</Link>}><InsightList items={lead} qs={ctx.qs} numbered empty="Nothing requires leadership intervention." /></Section>
+      </div>
+      <p className="mt-2 text-[11px] text-zinc-500"><Tip text="Stores = DSR net; Online/Marketplace = Unicommerce non-cancelled items" /> Stores {num(summarize(sc.facts, range).storesSelling)} selling · data to {fmtDate(ctx.asOf, true)}.</p>
     </>
   );
 }

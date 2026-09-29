@@ -26,7 +26,8 @@ export interface Ctx {
 
 export async function pageContext(searchParams: Promise<SP>): Promise<Ctx> {
   const sp = await searchParams;
-  const [settings, fresh, sm, user] = await Promise.all([getSettings(), getFreshness(), getStoreMap(), getUser()]);
+  // user lookup can fail outside a request (e.g. startup warm-up); pages are already gated by the layout
+  const [settings, fresh, sm, user] = await Promise.all([getSettings(), getFreshness(), getStoreMap(), getUser().catch(() => null)]);
   const filters = parseFilters(sp, settings.enabledCategories);
   const period = resolvePeriod(filters.preset, fresh.asOf, fresh.today, { from: filters.from, to: filters.to });
   const qs = new URLSearchParams(Object.entries(sp).flatMap(([k, v]) => (v == null ? [] : [[k, Array.isArray(v) ? v.join(",") : v]]))).toString();

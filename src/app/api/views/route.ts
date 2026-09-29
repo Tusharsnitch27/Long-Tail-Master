@@ -10,7 +10,7 @@ export async function GET() {
   try {
     const u = await requireUser();
     if (!dbConfigured()) return NextResponse.json({ rows: [] });
-    const rows = await q("select id, name, path, query, shared, owner_email from saved_views where owner_email = $1 or shared order by shared, name", [u.email]);
+    const rows = await q("select id, name, path, query, shared, owner from saved_views where owner = $1 or shared order by shared, name", [u.username]);
     return NextResponse.json({ rows });
   } catch (e) { return apiError(e); }
 }
@@ -21,8 +21,8 @@ export async function POST(req: Request) {
     if (!dbConfigured()) return NextResponse.json({ error: "DATABASE_URL is not configured." }, { status: 503 });
     const p = Body.safeParse(await req.json());
     if (!p.success) return NextResponse.json({ error: p.error.issues[0].message }, { status: 422 });
-    const shared = p.data.shared && (u.role === "editor" || u.role === "admin");
-    const rows = await q("insert into saved_views(owner_email, name, path, query, shared) values ($1,$2,$3,$4,$5) returning id", [u.email, p.data.name, p.data.path, p.data.query, shared]);
+    const shared = p.data.shared && u.role === "admin";
+    const rows = await q("insert into saved_views(owner, name, path, query, shared) values ($1,$2,$3,$4,$5) returning id", [u.username, p.data.name, p.data.path, p.data.query, shared]);
     return NextResponse.json({ id: rows[0].id });
   } catch (e) { return apiError(e); }
 }
@@ -31,7 +31,7 @@ export async function DELETE(req: Request) {
   try {
     const u = await requireUser();
     const id = Number(new URL(req.url).searchParams.get("id"));
-    await q("delete from saved_views where id = $1 and (owner_email = $2 or $3)", [id, u.email, u.role === "admin"]);
+    await q("delete from saved_views where id = $1 and (owner = $2 or $3)", [id, u.username, u.role === "admin"]);
     return NextResponse.json({ ok: true });
   } catch (e) { return apiError(e); }
 }

@@ -2,10 +2,9 @@
 import { SignJWT, jwtVerify } from "jose";
 
 export const SESSION_COOKIE = "lt_session";
-export const OAUTH_COOKIE = "lt_oauth";
 export const SESSION_DAYS = Number(process.env.SESSION_DAYS ?? 7);
 
-export interface Session { email: string; name?: string; picture?: string }
+export interface Session { username: string; name?: string }
 
 function secret() {
   const s = process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET;
@@ -13,15 +12,14 @@ function secret() {
   return new TextEncoder().encode(s);
 }
 
-/** Public base URL, e.g. https://longtail.snitch-workflow.com (scheme added if missing). */
-export function appUrl() {
-  const raw = (process.env.NEXTAUTH_URL ?? process.env.APP_URL ?? "http://localhost:3000").trim().replace(/\/$/, "");
-  return /^https?:\/\//.test(raw) ? raw : `https://${raw}`;
-}
-export const secureCookies = () => appUrl().startsWith("https://");
+/** Cookies are Secure unless the public URL is plain http (local dev). */
+export const secureCookies = () => {
+  const url = (process.env.NEXTAUTH_URL ?? process.env.APP_URL ?? "").trim();
+  return url ? !url.startsWith("http://") : process.env.NODE_ENV === "production";
+};
 
 export async function signSession(s: Session) {
-  return new SignJWT({ ...s }).setProtectedHeader({ alg: "HS256" }).setSubject(s.email).setIssuedAt()
+  return new SignJWT({ name: s.name }).setProtectedHeader({ alg: "HS256" }).setSubject(s.username).setIssuedAt()
     .setExpirationTime(`${SESSION_DAYS}d`).sign(secret());
 }
 
@@ -29,7 +27,7 @@ export async function readSession(token: string | undefined): Promise<Session | 
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret(), { algorithms: ["HS256"] });
-    return typeof payload.email === "string" ? { email: payload.email, name: payload.name as string, picture: payload.picture as string } : null;
+    return typeof payload.sub === "string" ? { username: payload.sub, name: payload.name as string | undefined } : null;
   } catch {
     return null;
   }

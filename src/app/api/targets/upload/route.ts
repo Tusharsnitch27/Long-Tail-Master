@@ -13,7 +13,7 @@ import { apiError } from "@/server/api";
  */
 export async function POST(req: Request) {
   try {
-    const user = await requireUser("editor");
+    const user = await requireUser("admin");
     if (!dbConfigured()) return NextResponse.json({ error: "DATABASE_URL is not configured." }, { status: 503 });
     const commit = new URL(req.url).searchParams.get("commit") === "1";
     const text = await req.text();
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     if (!commit || errors.length) {
       return NextResponse.json({ dryRun: true, valid: ok.length, errors, total: ok.reduce((a, r) => a + (r.target ?? 0), 0), clears: ok.filter((r) => r.target == null).length }, { status: errors.length ? 422 : 200 });
     }
-    const res = await applyOverrides(ok, user.email, "upload");
+    const res = await applyOverrides(ok, user.username, "upload");
     return NextResponse.json({ committed: true, ...res });
   } catch (e) {
     return apiError(e);

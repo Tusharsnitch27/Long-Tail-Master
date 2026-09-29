@@ -1,60 +1,86 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { cached } from "@/lib/cache";
+import { cached, invalidate } from "@/lib/cache";
 import { readSession, SESSION_COOKIE } from "@/lib/session";
 import { dbConfigured, q } from "./db";
-import { isAllowed, isBootstrapAdmin } from "./access";
+import { hashPassword, verifyPassword } from "./passwords";
 
-export type Role = "viewer" | "editor" | "admin";
-export interface User { email: string; name: string; role: Role }
-const RANK: Record<Role, number> = { viewer: 0, editor: 1, admin: 2 };
+export type Role = "viewer" | "admin";
+export interface User { username: string; name: string; role: Role }
+const RANK: Record<Role, number> = { viewer: 0, admin: 1 };
 
 export class AuthError extends Error {
   constructor(public status: 401 | 403, message: string) { super(message); }
 }
 
+const envAdmin = () => {
+  const username = process.env.ADMIN_USERNAME?.trim().toLowerCase();
+  const password = process.env.ADMIN_PASSWORD;
+  return username && password ? { username, password } : null;
+};
+
 async function identify(): Promise<string | null> {
-  if ((process.env.AUTH_MODE ?? "google") === "dev") {
+  if (process.env.AUTH_MODE === "dev") {
     // never allow the dev identity in production unless explicitly forced (e.g. an internal-only preview)
     if (process.env.NODE_ENV === "production" && process.env.ALLOW_DEV_AUTH !== "true") return null;
-    return process.env.DEV_USER_EMAIL?.toLowerCase() ?? "dev@snitch.com";
+    return process.env.DEV_USERNAME?.toLowerCase() ?? "dev";
   }
   const session = await readSession((await cookies()).get(SESSION_COOKIE)?.value);
-  return session?.email.toLowerCase() ?? null;
+  return session?.username.toLowerCase() ?? null;
 }
 
+/** Current user; re-checked every minute so disabling a user or changing a role takes effect without waiting for session expiry. */
 export async function getUser(): Promise<User | null> {
-  const email = await identify();
-  if (!email) return null;
-  // re-checked every minute so removing someone from the allowlist takes effect without waiting for session expiry
-  return cached(`user:${email}`, 60, async () => {
-    if (process.env.AUTH_MODE !== "dev" && !(await isAllowed(email))) throw new AuthError(403, `${email} is not on the allowed list.`);
-    return loadUser(email);
-  });
+  const username = await identify();
+  if (!username) return null;
+  return cached(`user:${username}`, 60, () => loadUser(username));
 }
 
-async function loadUser(email: string): Promise<User> {
-  const admin = isBootstrapAdmin(email);
-  const name = email.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  const fallback: User = { email, name, role: admin ? "admin" : "viewer" };
-  if (!dbConfigured()) return fallback;
-  let rows;
-  try {
-    rows = await q<{ email: string; name: string; role: Role; active: boolean }>(
-      `insert into app_users(email, name, role, last_seen_at) values ($1, $2, $3, now())
-       on conflict (email) do update set last_seen_at = now(),
-         role = case when $3 = 'admin' then 'admin' else app_users.role end
-       returning email, name, role, active`,
-      [email, name, admin ? "admin" : "viewer"],
-    );
-  } catch (e) {
-    // Postgres unavailable: keep dashboards readable (Snowflake-only) rather than locking everyone out
-    console.error("[auth] user lookup failed, using fallback role", e);
-    return fallback;
+async function loadUser(username: string): Promise<User> {
+  if (process.env.AUTH_MODE === "dev") return { username, name: "Developer", role: "admin" };
+  const boot = envAdmin();
+  if (!dbConfigured()) {
+    if (boot && boot.username === username) return { username, name: "Admin", role: "admin" };
+    throw new AuthError(401, "Unknown user");
   }
+  const rows = await q<{ username: string; name: string | null; role: Role; active: boolean }>(
+    "update app_users set last_seen_at = now() where username = $1 returning username, name, role, active", [username]);
   const u = rows[0];
-  if (!u.active) throw new AuthError(403, "Your access has been disabled. Contact an admin.");
-  return { email: u.email, name: u.name ?? name, role: u.role };
+  if (!u) throw new AuthError(401, "Your account no longer exists.");
+  if (!u.active) throw new AuthError(403, "Your account has been disabled. Contact an admin.");
+  return { username: u.username, name: u.name || u.username, role: u.role };
+}
+
+/** Creates the ADMIN_USERNAME account on first use if it doesn't exist yet (password from ADMIN_PASSWORD). */
+export async function ensureBootstrapAdmin() {
+  const boot = envAdmin();
+  if (!boot || !dbConfigured()) return;
+  const exists = await q("select 1 from app_users where username = $1", [boot.username]);
+  if (exists.length) return;
+  await q(
+    `insert into app_users(username, name, role, active, password_hash, created_by, password_changed_at) values ($1, 'Admin', 'admin', true, $2, 'bootstrap', now())
+     on conflict (username) do nothing`,
+    [boot.username, await hashPassword(boot.password)],
+  );
+  console.log(`[auth] bootstrap admin "${boot.username}" created`);
+}
+
+/** Returns the user on valid credentials, null otherwise (same response for unknown user / wrong password). */
+export async function checkLogin(usernameRaw: string, password: string): Promise<User | null> {
+  const username = usernameRaw.trim().toLowerCase();
+  const boot = envAdmin();
+  if (!dbConfigured()) {
+    return boot && boot.username === username && boot.password === password ? { username, name: "Admin", role: "admin" } : null;
+  }
+  await ensureBootstrapAdmin();
+  const rows = await q<{ username: string; name: string | null; role: Role; active: boolean; password_hash: string | null }>(
+    "select username, name, role, active, password_hash from app_users where username = $1", [username]);
+  const u = rows[0];
+  // hash even when the user doesn't exist so timing doesn't reveal valid usernames
+  const ok = await verifyPassword(password, u?.password_hash ?? "scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA$AAAA");
+  if (!u || !ok || !u.active) return null;
+  invalidate(`user:${username}`);
+  return { username: u.username, name: u.name || u.username, role: u.role };
 }
 
 export async function requireUser(minRole: Role = "viewer"): Promise<User> {

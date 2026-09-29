@@ -8,7 +8,7 @@ import { apiError } from "@/server/api";
 
 export async function POST(req: Request) {
   try {
-    const user = await requireUser("editor");
+    const user = await requireUser("admin");
     if (!dbConfigured()) return NextResponse.json({ error: "DATABASE_URL is not configured — targets cannot be saved." }, { status: 503 });
     const body = (await req.json()) as { rows?: unknown[] };
     if (!Array.isArray(body.rows) || body.rows.length === 0) return NextResponse.json({ error: "rows[] required" }, { status: 400 });
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     const { byCode, byName } = await getStoreMap();
     const { ok, errors } = validateOverrides(body.rows, byCode, byName);
     if (errors.length) return NextResponse.json({ error: "validation failed", errors }, { status: 422 });
-    const res = await applyOverrides(ok, user.email, "manual");
+    const res = await applyOverrides(ok, user.username, "manual");
     return NextResponse.json(res);
   } catch (e) {
     return apiError(e);

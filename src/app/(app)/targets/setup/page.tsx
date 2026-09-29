@@ -10,7 +10,7 @@ import { TargetEditor, type EditorRow } from "@/components/TargetEditor";
 
 export default async function TargetSetup({ searchParams }: { searchParams: Promise<SP> }) {
   const ctx = await pageContext(searchParams);
-  if (!can(ctx.user, "editor")) return <Empty title="Editor access required">Ask an admin to grant you the editor role to create or change targets.</Empty>;
+  if (!can(ctx.user, "admin")) return <Empty title="Admin access required">Only admins can create or change targets.</Empty>;
   const sp = ctx.sp;
   const ms = typeof sp.m === "string" && /^\d{4}-\d{2}$/.test(sp.m) ? `${sp.m}-01` : startOfMonth(ctx.asOf);
   const me = endOfMonth(ms);

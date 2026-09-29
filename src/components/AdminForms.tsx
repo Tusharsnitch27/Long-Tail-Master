@@ -75,42 +75,79 @@ export function SettingsForm({ initial, categories, readOnly }: { initial: Setti
   );
 }
 
-export function UsersForm({ users, me, readOnly }: { users: { email: string; role: string; active: boolean; last_seen_at: string | null }[]; me: string; readOnly: boolean }) {
+interface UserRow { username: string; name: string | null; role: string; active: boolean; has_password: boolean; last_seen_at: string | null; created_by: string | null }
+
+export function UsersForm({ users, me, readOnly }: { users: UserRow[]; me: string; readOnly: boolean }) {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState("viewer");
-  const [msg, setMsg] = useState<string | null>(null);
-  async function upsert(body: { email: string; role: string; active: boolean }) {
+  const [form, setForm] = useState({ username: "", name: "", password: "", role: "viewer" });
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [resetFor, setResetFor] = useState<string | null>(null);
+  const [newPw, setNewPw] = useState("");
+
+  async function call(body: Record<string, unknown>, okText: string) {
     setMsg(null);
     const res = await fetch("/api/admin/users", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-    const j = await res.json();
-    if (!res.ok) setMsg(j.error); else { setEmail(""); router.refresh(); }
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) { setMsg({ ok: false, text: j.error ?? "Request failed" }); return false; }
+    setMsg({ ok: true, text: okText });
+    router.refresh();
+    return true;
   }
+  const genPw = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"[b % 55]).join("");
+  const input = "h-8 rounded-md border border-zinc-300 px-2 text-[13px]";
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-200 bg-white p-3">
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@snitch.com" className="h-8 w-64 rounded-md border border-zinc-300 px-2 text-[13px]" />
-        <select value={role} onChange={(e) => setRole(e.target.value)} className="h-8 rounded-md border border-zinc-300 px-2 text-[13px]">
-          <option value="viewer">Viewer</option><option value="editor">Editor (targets)</option><option value="admin">Admin</option>
-        </select>
-        <button disabled={readOnly || !email} onClick={() => upsert({ email, role, active: true })} className="h-8 rounded-md bg-zinc-900 px-3 text-[13px] font-medium text-white disabled:opacity-40">Add / update</button>
-        {msg && <span className="text-[13px] text-rose-700">{msg}</span>}
-      </div>
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+      <form onSubmit={async (e) => { e.preventDefault(); if (await call({ action: "create", ...form }, `User "${form.username}" created — share the password with them securely.`)) setForm({ username: "", name: "", password: "", role: "viewer" }); }}
+        className="rounded-xl border border-zinc-200 bg-white p-4">
+        <div className="mb-3 text-[14px] font-semibold">Add user</div>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="text-[12px] text-zinc-600">Username<input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value.toLowerCase().replace(/\s/g, "") })} placeholder="e.g. rahul.k" className={`${input} mt-1 block w-44`} autoCapitalize="none" /></label>
+          <label className="text-[12px] text-zinc-600">Display name<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Rahul K" className={`${input} mt-1 block w-44`} /></label>
+          <label className="text-[12px] text-zinc-600">Password
+            <span className="mt-1 flex gap-1"><input required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="min 8 characters" className={`${input} w-44 font-mono`} />
+              <button type="button" onClick={() => setForm({ ...form, password: genPw() })} className="h-8 rounded-md border border-zinc-300 px-2 text-[12px]">Generate</button></span>
+          </label>
+          <label className="text-[12px] text-zinc-600">Role
+            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className={`${input} mt-1 block`}><option value="viewer">Viewer</option><option value="admin">Admin</option></select>
+          </label>
+          <button disabled={readOnly} className="h-8 rounded-md bg-zinc-900 px-3 text-[13px] font-medium text-white disabled:opacity-40">Create user</button>
+        </div>
+        <p className="mt-2 text-[11.5px] text-zinc-500">Usernames: 3–40 lowercase letters, digits, dot, underscore or hyphen. Passwords are stored hashed and can’t be viewed later — copy it before creating.</p>
+      </form>
+
+      {msg && <div className={`rounded-md px-3 py-2 text-[13px] ${msg.ok ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"}`}>{msg.text}</div>}
+
+      <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white scroll-thin">
         <table className="w-full text-[13px]">
-          <thead className="bg-zinc-50 text-[11px] uppercase text-zinc-500"><tr><th className="px-4 py-2 text-left">User</th><th className="px-2 text-left">Role</th><th className="px-2 text-left">Status</th><th className="px-2 text-left">Last seen</th><th /></tr></thead>
+          <thead className="bg-zinc-50 text-[11px] uppercase text-zinc-500"><tr><th className="px-4 py-2 text-left">User</th><th className="px-2 text-left">Role</th><th className="px-2 text-left">Status</th><th className="px-2 text-left">Last seen</th><th className="px-4 text-right">Actions</th></tr></thead>
           <tbody>
             {users.map((u) => (
-              <tr key={u.email} className="border-t border-zinc-100">
-                <td className="px-4 py-2">{u.email}{u.email === me && <span className="ml-1 text-[11px] text-zinc-400">(you)</span>}</td>
-                <td className="px-2">
-                  <select disabled={readOnly || u.email === me} value={u.role} onChange={(e) => upsert({ email: u.email, role: e.target.value, active: u.active })} className="h-7 rounded border border-zinc-300 px-1 text-[12.5px]">
-                    <option value="viewer">Viewer</option><option value="editor">Editor</option><option value="admin">Admin</option>
+              <tr key={u.username} className="border-t border-zinc-100 align-top">
+                <td className="px-4 py-2"><div className="font-medium">{u.username}{u.username === me && <span className="ml-1 text-[11px] font-normal text-zinc-400">(you)</span>}</div><div className="text-[11.5px] text-zinc-500">{u.name}{u.created_by ? ` · added by ${u.created_by}` : ""}</div></td>
+                <td className="px-2 py-2">
+                  <select disabled={readOnly || u.username === me} value={u.role} onChange={(e) => call({ action: "update", username: u.username, role: e.target.value }, `Role updated for ${u.username}`)} className="h-7 rounded border border-zinc-300 px-1 text-[12.5px]">
+                    <option value="viewer">Viewer</option><option value="admin">Admin</option>
                   </select>
                 </td>
-                <td className="px-2">{u.active ? "Active" : <span className="text-rose-700">Disabled</span>}</td>
-                <td className="px-2 text-zinc-500">{u.last_seen_at?.slice(0, 16) ?? "never"}</td>
-                <td className="px-4 text-right">{u.email !== me && <button disabled={readOnly} onClick={() => upsert({ email: u.email, role: u.role, active: !u.active })} className="text-[12px] text-brand-600 hover:underline">{u.active ? "Disable" : "Enable"}</button>}</td>
+                <td className="px-2 py-2">{!u.active ? <span className="text-rose-700">Disabled</span> : !u.has_password ? <span className="text-amber-700">No password set</span> : "Active"}</td>
+                <td className="px-2 py-2 text-zinc-500">{u.last_seen_at?.slice(0, 16) ?? "never"}</td>
+                <td className="px-4 py-2 text-right">
+                  {resetFor === u.username ? (
+                    <span className="inline-flex items-center gap-1">
+                      <input value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="new password" className={`${input} h-7 w-36 font-mono`} />
+                      <button onClick={() => setNewPw(genPw())} className="text-[12px] text-zinc-600 hover:underline">Generate</button>
+                      <button onClick={async () => { if (await call({ action: "reset_password", username: u.username, password: newPw }, `Password reset for ${u.username} — share it securely.`)) { setResetFor(null); } }} className="rounded bg-zinc-900 px-2 py-1 text-[12px] text-white">Save</button>
+                      <button onClick={() => setResetFor(null)} className="text-[12px] text-zinc-500">Cancel</button>
+                    </span>
+                  ) : (
+                    <span className="inline-flex gap-3 text-[12px]">
+                      <button disabled={readOnly} onClick={() => { setResetFor(u.username); setNewPw(""); }} className="text-brand-600 hover:underline">{u.has_password ? "Reset password" : "Set password"}</button>
+                      {u.username !== me && <button disabled={readOnly} onClick={() => call({ action: "update", username: u.username, active: !u.active }, `${u.username} ${u.active ? "disabled" : "enabled"}`)} className="text-brand-600 hover:underline">{u.active ? "Disable" : "Enable"}</button>}
+                      {u.username !== me && <button disabled={readOnly} onClick={() => confirm(`Delete ${u.username}? This can't be undone.`) && call({ action: "delete", username: u.username }, `${u.username} deleted`)} className="text-rose-600 hover:underline">Delete</button>}
+                    </span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

@@ -70,3 +70,19 @@ export async function getSkuDaily(sku: string, range: Range, ch: Filters["ch"], 
     [sku, range.from, range.to, ...types, ...(store ? [store] : [])],
   );
 }
+
+/** Daily SKU sales for a set of SKUs (optionally restricted to store names), for trend views. */
+export async function getSkuDailyMulti(skus: string[], range: Range, ch: Filters["ch"], storeNames?: string[] | null) {
+  const types = TYPES[ch];
+  const rows = await sfCached<{ date: string; sku: string; sales: number; qty: number; stores: number }>(
+    "skudailymulti",
+    `select to_varchar(date) date, sku_group sku, sum(gross_sales) sales, sum(gross_quantity) qty, count(distinct channel) stores
+     from SNITCH_DB.MAPLEMONK.HORIZONTAL_SALES_CATEGORIES
+     where sku_group in (select value::string from table(flatten(parse_json(?))))
+       and date between ? and ? and type in (${types.map(() => "?").join(",")})
+       ${storeNames?.length ? "and upper(trim(channel)) in (select upper(value::string) from table(flatten(parse_json(?))))" : ""}
+     group by 1, 2 order by 1`,
+    [JSON.stringify([...skus].sort()), range.from, range.to, ...types, ...(storeNames?.length ? [JSON.stringify([...storeNames].sort())] : [])],
+  );
+  return rows.map((r) => ({ ...r, sales: +r.sales || 0, qty: +r.qty || 0, stores: +r.stores || 0 }));
+}

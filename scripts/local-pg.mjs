@@ -3,8 +3,8 @@
 import { PGlite } from "@electric-sql/pglite";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 
-const db = await PGlite.create({ dataDir: "./.pglite" });
-const server = new PGLiteSocketServer({ db, port: 5433, host: "127.0.0.1" });
+const db = await PGlite.create({ dataDir: process.env.PGLITE_DIR ?? "./.pglite" });
+const server = new PGLiteSocketServer({ db, port: Number(process.env.PGLITE_PORT ?? 5433), host: "127.0.0.1" });
 await server.start();
-console.log("PGlite listening on 127.0.0.1:5433");
+console.log(`PGlite listening on 127.0.0.1:${process.env.PGLITE_PORT ?? 5433}`);
 process.on("SIGINT", async () => { await server.stop(); await db.close(); process.exit(0); });

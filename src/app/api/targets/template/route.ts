@@ -10,7 +10,7 @@ import { apiError } from "@/server/api";
 /** CSV template for a month: one row per store × category with the Snowflake base and current override. */
 export async function GET(req: Request) {
   try {
-    await requireUser("editor");
+    await requireUser("admin");
     const u = new URL(req.url);
     const m = /^\d{4}-\d{2}$/.test(u.searchParams.get("m") ?? "") ? `${u.searchParams.get("m")}-01` : null;
     if (!m) return new Response("m=YYYY-MM required", { status: 400 });

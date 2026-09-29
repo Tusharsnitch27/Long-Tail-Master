@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     if (!dbConfigured()) return NextResponse.json({ error: "DATABASE_URL is not configured." }, { status: 503 });
     const p = Body.safeParse(await req.json());
     if (!p.success) return NextResponse.json({ error: p.error.issues.map((i) => i.message).join("; ") }, { status: 422 });
-    for (const k of ["thresholds", "exceptions", "enabledCategories"] as const) await saveSetting(k, p.data[k], user.email);
+    for (const k of ["thresholds", "exceptions", "enabledCategories"] as const) await saveSetting(k, p.data[k], user.username);
     return NextResponse.json({ ok: true });
   } catch (e) {
     return apiError(e);

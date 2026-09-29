@@ -28,7 +28,7 @@ export default async function TargetOverview({ searchParams }: { searchParams: P
     <>
       <PageHeader title="Target Overview" subtitle={<>{sc.label} · {sc.hasActuals ? `actuals through ${fmtDate(sc.cutoff, true)}` : "future month — targets only"}</>}
         right={<div className="flex items-center gap-2"><MonthPicker months={sc.months} value={sc.ms.slice(0, 7)} />
-          {can(ctx.user, "editor") && <Link href={`/targets/setup?m=${sc.ms.slice(0, 7)}`} className="rounded-md bg-zinc-900 px-3 py-1.5 text-[12.5px] font-medium text-white">Edit targets</Link>}</div>} />
+          {can(ctx.user, "admin") && <Link href={`/targets/setup?m=${sc.ms.slice(0, 7)}`} className="rounded-md bg-zinc-900 px-3 py-1.5 text-[12.5px] font-medium text-white">Edit targets</Link>}</div>} />
       <Notice>Base targets come from Snowflake <b>MTD_TARGET_PERFUMES / MTD_TARGET_SHOES</b> (phased daily per store). {storeOv + catOv.length > 0 ? <>This month has <b>{storeOv}</b> store-level and <b>{catOv.length}</b> category-level overrides from Target Setup applied on top.</> : "No overrides are applied for this month."}</Notice>
       <KpiGrid>
         <Kpi label="Month target" value={inr(full.target)} sub={`${full.storesWithTarget} stores with a target`} />

@@ -11,6 +11,9 @@ import { CATEGORIES } from "@/lib/categories";
 import { STORE_DIMS } from "@/lib/filters";
 import { fmtDate } from "@/lib/dates";
 
+// every page depends on the signed-in user and live data
+export const dynamic = "force-dynamic";
+
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   let user;
   try {
@@ -64,7 +67,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </span>
             )}
           </div>
-          <span className="flex items-center gap-2 truncate">{user.email} · <span className="capitalize">{user.role}</span>
+          <span className="flex items-center gap-2 truncate">{user.name !== user.username ? `${user.name} (${user.username})` : user.username} · <span className="capitalize">{user.role}</span>
             {process.env.AUTH_MODE !== "dev" && <a href="/api/auth/logout" className="rounded px-1.5 py-0.5 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900">Sign out</a>}</span>
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto">

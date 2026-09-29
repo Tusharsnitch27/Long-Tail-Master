@@ -76,4 +76,54 @@ create table audit_log (
 create index audit_log_at on audit_log (at desc);
 `,
   },
+  {
+    version: 2,
+    name: "ai_copilot",
+    sql: `
+create table ai_conversations (
+  id uuid primary key,
+  owner_email text not null,
+  title text not null,
+  messages jsonb not null default '[]',
+  results jsonb not null default '{}',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index ai_conversations_owner on ai_conversations (owner_email, updated_at desc);
+
+create table ai_turns (
+  id bigserial primary key,
+  conversation_id uuid not null references ai_conversations(id) on delete cascade,
+  owner_email text not null,
+  question text not null,
+  response jsonb,
+  tools jsonb,
+  usage jsonb,
+  model text,
+  latency_ms int,
+  error text,
+  feedback smallint,
+  created_at timestamptz not null default now()
+);
+create index ai_turns_conv on ai_turns (conversation_id, id);
+`,
+  },
+  {
+    version: 3,
+    name: "username_password_auth",
+    sql: `
+-- Identity moves from email (SSO) to admin-managed username + password; roles are admin | viewer.
+alter table app_users rename column email to username;
+alter table app_users add column password_hash text;
+alter table app_users add column created_by text;
+alter table app_users add column password_changed_at timestamptz;
+alter table app_users drop constraint if exists app_users_role_check;
+update app_users set role = 'viewer' where role not in ('viewer','admin');
+alter table app_users add constraint app_users_role_check check (role in ('viewer','admin'));
+-- users that signed in via SSO have no password and cannot log in until an admin sets one
+alter table ai_conversations rename column owner_email to owner;
+alter table ai_turns rename column owner_email to owner;
+alter table saved_views rename column owner_email to owner;
+`,
+  },
 ];

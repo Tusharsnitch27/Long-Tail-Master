@@ -26,8 +26,10 @@ table supports search, sort, a column picker, a sticky header and CSV export.
 
 ## AI Business Copilot
 
-`/products/ai` answers natural-language questions with Claude (`AI_MODEL`, default `claude-opus-5-5`). The model never touches
-Snowflake: it calls approved tools that run governed queries.
+`/products/ai` answers natural-language questions with Claude (`AI_MODEL`, default `claude-opus-5-5`). By default Claude runs
+through **Snowflake Cortex's Anthropic-compatible endpoint**, authenticated with the same `SNOWFLAKE_PAT` and billed to Snowflake
+credits, so no Anthropic API key is needed (`AI_PROVIDER=snowflake`). Set `AI_PROVIDER=anthropic` with `ANTHROPIC_API_KEY` to call
+Anthropic directly. The model never queries Snowflake itself: it calls approved tools that run governed queries.
 
 | Tool | Answers |
 |---|---|
@@ -87,7 +89,7 @@ npm run dev
    - `SNOWFLAKE_*`, including `SNOWFLAKE_PAT`. This account's auth policy rejects key-pair auth for `N8N_OPS`.
    - `NEXTAUTH_SECRET` (session signing), `NEXTAUTH_URL` (the public https URL)
    - `ADMIN_USERNAME` and `ADMIN_PASSWORD`: the first admin, created on first start
-   - `ANTHROPIC_API_KEY` for the AI Bot
+   - AI Bot: `AI_PROVIDER=snowflake` (uses `SNOWFLAKE_PAT`; the Snowflake role needs Cortex access)
 4. The health check is `GET /api/health`, which is already wired into the Dockerfile.
 
 `docker-compose.yml` runs the app together with Postgres, for a single-box or Compose-based deployment.

@@ -180,7 +180,7 @@ export function Copilot({ firstName }: { firstName: string }) {
           <div ref={endRef} />
         </div>
       )}
-      {turns.length > 0 && <div className="sticky bottom-0 -mx-1 bg-gradient-to-t from-[#f7f7f8] via-[#f7f7f8] to-transparent px-1 pb-3 pt-6">{composer}</div>}
+      {turns.length > 0 && <div className="sticky bottom-0 z-30 -mx-1 bg-gradient-to-t from-[#f7f7f8] via-[#f7f7f8] to-transparent px-1 pb-3 pt-6">{composer}</div>}
     </div>
   );
 }

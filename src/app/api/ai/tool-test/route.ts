@@ -16,6 +16,6 @@ export async function POST(req: Request) {
 /** Dev-only: the exact tool definitions sent to the API. */
 export async function GET() {
   if (process.env.AUTH_MODE !== "dev" || process.env.NODE_ENV === "production") return new Response("not found", { status: 404 });
-  const { API_TOOLS } = await import("@/server/ai/orchestrator");
-  return Response.json(API_TOOLS);
+  const { apiTools } = await import("@/server/ai/orchestrator");
+  return Response.json(apiTools(true));
 }

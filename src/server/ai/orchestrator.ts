@@ -6,6 +6,7 @@ import { SYSTEM_PROMPT } from "./prompt";
 import { SUBMIT_TOOL, type Answer, type View } from "./answer";
 import { TOOLS, aiBase, jsonSchema, toolByName, type ToolEnvelope } from "./tools";
 import { loadConversation, recordTurn, saveConversation, type Conversation } from "./store";
+import { aiClient, aiConfigured, providerFeatures } from "./provider";
 
 export type AiEvent =
   | { type: "meta"; conversation_id: string }
@@ -22,12 +23,10 @@ const EFFORT = (process.env.AI_EFFORT ?? "medium") as "low" | "medium" | "high" 
 const MAX_STEPS = 10;
 const MODEL_ROWS = 60; // rows of each tool result shown to the model (the UI gets the full set)
 
-let client: Anthropic | null = null;
-const anthropic = () => (client ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, baseURL: process.env.AI_BASE_URL || "https://api.anthropic.com" }));
-
-// Deterministic tool list (stable order → prompt cache hits).
-export const API_TOOLS: Anthropic.Beta.BetaTool[] = [...TOOLS, SUBMIT_TOOL].map((t) => ({
-  name: t.name, description: t.description, input_schema: jsonSchema(t.schema) as Anthropic.Beta.BetaTool.InputSchema, strict: true, eager_input_streaming: true,
+// Deterministic tool list (stable order → prompt cache hits). `strict` only where the provider accepts it;
+// every input is validated with zod before a tool runs either way.
+export const apiTools = (strict: boolean): Anthropic.Beta.BetaTool[] => [...TOOLS, SUBMIT_TOOL].map((t) => ({
+  name: t.name, description: t.description, input_schema: jsonSchema(t.schema) as Anthropic.Beta.BetaTool.InputSchema, eager_input_streaming: true, ...(strict ? { strict: true } : {}),
 }));
 
 const LABEL: Record<string, (i: Record<string, unknown>) => string> = {
@@ -95,7 +94,10 @@ function hydrate(views: View[], results: Record<string, ToolEnvelope>): Hydrated
 
 export async function* runTurn(opts: { user: User; question: string; conversationId?: string | null }): AsyncGenerator<AiEvent> {
   const started = Date.now();
-  if (!process.env.ANTHROPIC_API_KEY) { yield { type: "error", message: "The AI Copilot is not configured (ANTHROPIC_API_KEY missing)." }; return; }
+  if (!aiConfigured()) { yield { type: "error", message: "The AI Copilot is not configured (no Snowflake PAT or ANTHROPIC_API_KEY)." }; return; }
+  const { client, provider } = aiClient();
+  const feat = providerFeatures(provider);
+  const tools = apiTools(feat.strictTools);
   let conv: Conversation | null = opts.conversationId ? await loadConversation(opts.conversationId, opts.user.username) : null;
   if (!conv) conv = { id: randomUUID(), owner: opts.user.username, title: opts.question.slice(0, 80), messages: [], results: {} };
   yield { type: "meta", conversation_id: conv.id };
@@ -116,10 +118,12 @@ export async function* runTurn(opts: { user: User; question: string; conversatio
       yield { type: "status", text: step === 0 ? "Understanding the question…" : "Analysing results…" };
       let msg: Anthropic.Beta.BetaMessage;
       try {
-        const stream = anthropic().beta.messages.stream({
-          model: MODEL, max_tokens: 32000, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default",
+        const stream = client.beta.messages.stream({
+          model: MODEL, max_tokens: 32000,
+          // refusal fallback to another model — Anthropic API only (Cortex rejects the parameter)
+          ...(feat.serverFallbacks ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
           system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-          tools: API_TOOLS, messages, thinking: { type: "adaptive" }, output_config: { effort: EFFORT }, cache_control: { type: "ephemeral" },
+          tools, messages, thinking: { type: "adaptive" }, output_config: { effort: EFFORT }, cache_control: { type: "ephemeral" },
         });
         msg = await stream.finalMessage();
         jsonRetries = 0;
@@ -200,7 +204,7 @@ export async function* runTurn(opts: { user: User; question: string; conversatio
     };
   }
   await saveConversation(conv);
-  const turnId = await recordTurn({ conversationId: conv.id, owner: conv.owner, question: opts.question, response: hydrated, tools: toolLog, usage, model: MODEL, latencyMs: Date.now() - started, error }).catch((e) => { console.error("[ai] recordTurn", e); return null; });
+  const turnId = await recordTurn({ conversationId: conv.id, owner: conv.owner, question: opts.question, response: hydrated, tools: toolLog, usage, model: `${MODEL}@${provider}`, latencyMs: Date.now() - started, error }).catch((e) => { console.error("[ai] recordTurn", e); return null; });
   if (hydrated) yield { type: "answer", turn_id: turnId, answer: hydrated };
   else yield { type: "error", message: error ?? "Unknown error" };
 }

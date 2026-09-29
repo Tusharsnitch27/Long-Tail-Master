@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-brand-50: #f1f0fd;
+  --color-brand-100: #e4e1fb;
+  --color-brand-500: #5b4fd6;
+  --color-brand-600: #4c40c4;
+  --color-brand-700: #3f35a3;
+  --color-ink: #18181b;
+}
+
+html, body { background: #f7f7f8; color: var(--color-ink); }
+body { font-feature-settings: "tnum" 1, "cv11" 1; -webkit-font-smoothing: antialiased; }
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* scrollbars for dense tables */
+.scroll-thin::-webkit-scrollbar { height: 8px; width: 8px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 8px; }
+.scroll-thin::-webkit-scrollbar-track { background: transparent; }
+
+@keyframes shimmer { 0% { background-position: -400px 0 } 100% { background-position: 400px 0 } }
+.skeleton { background: linear-gradient(90deg, #ececef 25%, #f4f4f6 37%, #ececef 63%); background-size: 800px 100%; animation: shimmer 1.4s ease infinite; border-radius: 6px; }
+
+[data-tip] { position: relative; }
+[data-tip]:hover::after {
+  content: attr(data-tip); position: absolute; z-index: 60; left: 50%; top: calc(100% + 6px); transform: translateX(-50%);
+  width: max-content; max-width: 260px; white-space: normal; text-align: left; font-weight: 400; text-transform: none; letter-spacing: 0;
+  background: #18181b; color: #fafafa; font-size: 11.5px; line-height: 1.35; padding: 6px 8px; border-radius: 6px; pointer-events: none;
+}

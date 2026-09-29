@@ -1,0 +1,26 @@
+# Local / Coolify "Docker Compose" deployment. In Coolify you can instead deploy the Dockerfile
+# and attach a managed PostgreSQL resource (set DATABASE_URL to its internal URL).
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://longtail:${POSTGRES_PASSWORD:-longtail}@db:5432/longtail
+    ports: ["3000:3000"]
+    depends_on:
+      db: { condition: service_healthy }
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: longtail
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-longtail}
+      POSTGRES_DB: longtail
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U longtail"]
+      interval: 5s
+      retries: 10
+volumes:
+  pgdata:

@@ -11,12 +11,12 @@ export interface ShowcaseItem { sku: string; name: string; image: string | null;
 
 /**
  * Login collage, ranked by last-30-day gross sales (all channels; free gifts never qualify):
- *  Footwear — top boots, sneakers and mules · Fragrance — top 2 + the State of Mind gift set ·
- *  one each of belts, bags, caps and another accessory · Luggage — the top trolley (beside the sign-in).
+ *  Footwear — hero boot + one small image per other shoe type · Fragrance — top perfume + 2 more + the State of Mind gift set ·
+ *  bags, belts and socks together (a cap when socks have no image) · Luggage — Vitto and Rubik (beside the sign-in).
  * Cached for 6 hours and warmed at startup.
  */
 export function getShowcase(): Promise<(ShowcaseItem & { role: string })[]> {
-  return cached("login:showcase:v4", 6 * 3600, async () => {
+  return cached("login:showcase:v6", 6 * 3600, async () => {
     const { asOf } = await getFreshness();
     const range = { from: addDays(asOf, -29), to: asOf }, compare = { from: addDays(asOf, -59), to: addDays(asOf, -30) };
     const [pm, uc, st] = await Promise.all([
@@ -35,22 +35,24 @@ export function getShowcase(): Promise<(ShowcaseItem & { role: string })[]> {
     const item = (p: Product, cat: string): ShowcaseItem => ({ sku: p.sku, name: p.name!, image: p.image, cat });
 
     const first = (xs: Product[], re: RegExp, not?: RegExp) => xs.find((p) => re.test(`${p.l1 ?? ""} ${p.l2 ?? ""} ${p.name}`) && !(not && not.test(`${p.l2 ?? ""} ${p.name}`)));
-    const perfumes = pick(of("perfumes").filter((p) => !/gift|som\b/i.test(p.name!)), 2);
+    const T = (p: Product | undefined, cat: string, role: string) => (p ? [{ ...item(p, cat), role }] : []);
+    const shoes = of("shoes");
+    const hero = first(shoes, /boot|chelsea/i) ?? shoes[0];
+    // one small image per other shoe type, in a fixed order
+    const types: [RegExp, RegExp?][] = [[/sneaker/i, /mule/i], [/mule/i], [/loafer/i], [/sandal|\bslides\b/i, /mule|slide-easy/i], [/oxford|derby|formal/i]];
+    const shoeSmall: Product[] = [];
+    for (const [re, not] of types) { const p = shoes.find((x) => x !== hero && !shoeSmall.includes(x) && re.test(`${x.l1 ?? ""} ${x.l2 ?? ""} ${x.name}`) && !(not && not.test(`${x.l2 ?? ""} ${x.name}`))); if (p && shoeSmall.length < 4) shoeSmall.push(p); }
+    const perfumes = pick(of("perfumes").filter((p) => !/gift|som\b/i.test(p.name!)), 3);
     const som = [...ranked, ...pm.values()].find((p) => p.category === "perfumes" && /state of mind|^som\b|som-gift/i.test(p.name ?? ""));
-    const acc = of("accessories").filter((p) => !isSock(p));
-    const tiles: (ShowcaseItem & { role: string })[] = [];
-    const add = (p: Product | undefined, cat: string, role: string) => { if (p && !tiles.some((t) => t.sku === p.sku)) tiles.push({ ...item(p, cat), role }); };
-    add(first(of("shoes"), /boot|chelsea/i), "Footwear", "big");
-    add(perfumes[0], "Fragrance", "big");
-    add(first(of("shoes"), /sneaker/i, /mule/i), "Footwear", "tile");
-    add(first(of("shoes"), /mule/i), "Footwear", "tile");
-    add(perfumes[1], "Fragrance", "tile");
-    if (som) tiles.push({ sku: som.sku, name: "State of Mind", image: som.image, cat: "Fragrance", role: "tile" });
-    add(of("belts")[0], "Belts", "tile");
-    add(of("bags")[0], "Bags", "tile");
-    add(first(acc, /cap/i), "Accessories", "tile");
-    add(first(acc, /chain|bracelet|pendant|bandana|hat/i), "Accessories", "tile");
-    add(of("luggage")[0], "Luggage", "side");
-    return tiles;
+    const acc = withImg.filter((p) => p.category === "accessories");
+    const sock = acc.find(isSock);
+    const luggage = of("luggage");
+    return [
+      ...T(hero, "Footwear", "shoe-hero"), ...shoeSmall.flatMap((p) => T(p, "Footwear", "shoe")),
+      ...T(perfumes[0], "Fragrance", "perfume-hero"), ...perfumes.slice(1, 3).flatMap((p) => T(p, "Fragrance", "perfume")),
+      ...(som ? [{ sku: som.sku, name: "State of Mind", image: som.image, cat: "Fragrance", role: "perfume" }] : []),
+      ...T(of("bags")[0], "Bags", "acc"), ...T(of("belts")[0], "Belts", "acc"), ...T(sock ?? first(acc, /cap/i), sock ? "Socks" : "Accessories", "acc"),
+      ...T(first(luggage, /vit+o/i), "Luggage", "trolley"), ...T(first(luggage, /rubik/i), "Luggage", "trolley"),
+    ];
   });
 }

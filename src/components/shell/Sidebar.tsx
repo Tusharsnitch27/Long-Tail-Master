@@ -42,7 +42,7 @@ export function Sidebar({ role, name, username, actionCount }: { role: "viewer" 
         <span className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-300 to-brand-500 text-white shadow-[0_4px_14px_rgba(92,192,199,.35)]">
           <svg viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17c4-1 7-4 9-9 1 3 3 6 9 7" /><path d="M12 8V3" /><path d="m9 6 3-3 3 3" /></svg>
         </span>
-        <span className="leading-tight"><span className="block text-[14px] font-semibold tracking-tight text-white">{APP_NAME}</span><span className="block text-[10.5px] text-brand-200/70">Long-tail categories</span></span>
+        <span className="leading-tight"><span className="block text-[14px] font-semibold tracking-tight text-white">{APP_NAME}</span><span className="block text-[10.5px] tracking-[0.3em] text-brand-200/70">SNITCH</span></span>
       </Link>
       {NAV_GROUPS.map((g) => {
         const items = visible.filter((i) => i.group === g.key);

@@ -4,7 +4,7 @@ import { getChannelDaily, getChannelSku, channelFreshness } from "@/server/data/
 import { pageContext } from "@/server/context";
 import { buildActions } from "@/server/actions";
 
-/** Dev-only: summaries of the Snitch Long Tail data modules for validation. */
+/** Dev-only: summaries of the Long Tail data modules for validation. */
 export async function GET(req: Request) {
   if (process.env.AUTH_MODE !== "dev" || process.env.NODE_ENV === "production") return new Response("not found", { status: 404 });
   const what = new URL(req.url).searchParams.get("what");

@@ -1,6 +1,6 @@
 export interface NavItem { href: string; label: string; icon: string; minRole?: "admin"; group: "main" | "analyse" | "act" | "admin" | "wip"; badge?: string }
 
-export const APP_NAME = "Snitch Long Tail";
+export const APP_NAME = "Long Tail";
 export const APP_TAGLINE = "Same style. A bigger universe.";
 
 // Each page answers one management question (see docs/SNITCH_LONGTAIL.md).

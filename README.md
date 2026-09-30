@@ -1,6 +1,6 @@
-# Snitch Long Tail
+# Long Tail
 
-**Building the next ₹100 Cr business.** Snitch Long Tail is the operating tool for Snitch's long-tail categories: Accessories, Bags, Belts,
+**Building the next ₹100 Cr business.** Long Tail is the operating tool for Snitch's long-tail categories: Accessories, Bags, Belts,
 Perfumes, Shoes (incl. Footwear), Sunglasses and Trolleys. It covers Stores, Online (Shopify) and Marketplaces (AJIO, Myntra, Flipkart, Amazon).
 
 - **Next.js 16** (App Router, server components), TypeScript, Tailwind v4 (Ocean Teal theme), Recharts, TanStack Virtual

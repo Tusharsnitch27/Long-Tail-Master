@@ -1,9 +1,9 @@
 export interface NavItem { href: string; label: string; icon: string; minRole?: "admin"; group: "main" | "analyse" | "act" | "admin" | "wip"; badge?: string }
 
-export const APP_NAME = "Snitch Udaan";
-export const APP_TAGLINE = "Building the next ₹100 Cr business";
+export const APP_NAME = "Snitch Longtail";
+export const APP_TAGLINE = "Same style. A bigger universe.";
 
-// Each page answers one management question (see docs/SNITCH_UDAAN.md).
+// Each page answers one management question (see docs/SNITCH_LONGTAIL.md).
 export const NAV: NavItem[] = [
   { href: "/", label: "Executive Summary", icon: "executive", group: "main" },
   { href: "/overview", label: "Daily Overview", icon: "overview", group: "main" },

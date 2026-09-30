@@ -20,6 +20,8 @@ async function prewarm() {
     const { pageContext } = await import("./server/context");
     const { loadScope, productPerformance } = await import("./server/scope");
     const { buildActions } = await import("./server/actions");
+    const { getShowcase } = await import("./server/showcase");
+    void getShowcase().catch(() => undefined);
     const ctx = await pageContext(Promise.resolve({}));
     const sc = await loadScope(ctx);
     await Promise.all([buildActions(ctx), productPerformance(ctx, sc.pm, (s) => sc.wh.bySku.get(s)?.units ?? 0)]);

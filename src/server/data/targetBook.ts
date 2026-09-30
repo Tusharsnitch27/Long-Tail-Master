@@ -78,7 +78,15 @@ export function listStoreTargets(fromMonth: string, toMonth: string): Promise<St
 
 export async function listSplits(month: string) {
   if (!dbConfigured()) return [];
-  return q<SplitRow>("select channel, state, to_char(day,'YYYY-MM-DD') as day, weight::float8 weight from day_splits where day between $1 and $2 order by day", [startOfMonth(month), endOfMonth(month)]);
+  return q<SplitRow & { source: SplitSource }>("select channel, state, to_char(day,'YYYY-MM-DD') as day, weight::float8 weight, source from day_splits where day between $1 and $2 order by day", [startOfMonth(month), endOfMonth(month)]);
+}
+
+/** Which channel × state × month splits exist, and where they came from. */
+export async function splitCoverage(fromMonth: string, toMonth: string) {
+  if (!dbConfigured()) return [];
+  return q<{ channel: TChannel; state: string; month: string; source: SplitSource; days: number }>(
+    "select channel, state, to_char(date_trunc('month', day),'YYYY-MM-DD') as month, max(source) as source, count(*)::int as days from day_splits where day between $1 and $2 group by 1, 2, 3",
+    [startOfMonth(fromMonth), endOfMonth(toMonth)]).catch(() => []);
 }
 
 const log = (c: { query: (s: string, p: unknown[]) => Promise<unknown> }, actor: string, action: string, entity: string, detail: unknown) =>
@@ -108,11 +116,12 @@ export async function saveMonthTargets(rows: { channel: TChannel; category: stri
 }
 
 /** Replace the daily split for channel × state × month (weights; normalised when used). */
-export async function saveSplit(channel: TChannel, state: string, month: string, weights: { day: string; weight: number }[] | null, actor: string, source: "manual" | "upload") {
+export type SplitSource = "manual" | "upload" | "actual" | "recommended";
+export async function saveSplit(channel: TChannel, state: string, month: string, weights: { day: string; weight: number }[] | null, actor: string, source: SplitSource) {
   const ms = startOfMonth(month), me = endOfMonth(month);
   await tx(async (c) => {
     await c.query("delete from day_splits where channel=$1 and state=$2 and day between $3 and $4", [channel, state.toUpperCase(), ms, me]);
-    for (const x of weights ?? []) if (x.day >= ms && x.day <= me) await c.query("insert into day_splits(channel, state, day, weight, updated_by) values ($1,$2,$3,$4,$5)", [channel, state.toUpperCase(), x.day, x.weight, actor]);
+    for (const x of weights ?? []) if (x.day >= ms && x.day <= me) await c.query("insert into day_splits(channel, state, day, weight, updated_by, source) values ($1,$2,$3,$4,$5,$6)", [channel, state.toUpperCase(), x.day, x.weight, actor, source]);
     await log(c, actor, source, "day_splits", { channel, state, month: ms, days: weights?.length ?? 0, cleared: !weights });
   });
   invalidate("split:"); invalidate("facts:");

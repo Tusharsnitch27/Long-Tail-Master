@@ -13,8 +13,14 @@ const WD = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
  * Daily phasing of a month target, as % of the month per day. One split per channel (and per state for Stores;
  * "All India" applies wherever a state has none). No split = even phasing. Saved weights are normalised when used.
  */
-export function SplitEditor({ month, days, states, saved, suggested, readOnly }: {
+export function SplitEditor({ month, days, states, saved, suggested, recommended, sources, events, readOnly }: {
   month: string; days: string[]; states: string[];
+  /** model recommendation per channel (weekday × day-of-month × festive uplift), % of month per day */
+  recommended: Record<Ch, { day: string; weight: number }[]>;
+  /** where each saved split came from: `${channel}|${state}` → actual | recommended | manual | upload */
+  sources: Record<string, string>;
+  /** festive / sale events per day */
+  events: Record<string, string[]>;
   /** saved weights: `${channel}|${state}` → day → weight */
   saved: Record<string, Record<string, number>>;
   /** weekday pattern from the last 8 weeks of actual sales: channel → Mon..Sun share */
@@ -47,6 +53,7 @@ export function SplitEditor({ month, days, states, saved, suggested, readOnly }:
   const offset = (new Date(days[0] + "T00:00:00Z").getUTCDay() + 6) % 7;
   const setAll = (f: (d: string, i: number) => number) => setDraft((s) => ({ ...s, [k]: Object.fromEntries(days.map((d, i) => [d, f(d, i).toFixed(2)])) }));
   const even = () => setAll(() => 100 / days.length);
+  const useRec = () => { const r = recommended[ch]; const t = r.reduce((a, x) => a + x.weight, 0) || 1; setAll((d) => (100 * (r.find((x) => x.day === d)?.weight ?? 0)) / t); };
   const pattern = () => {
     const w = suggested[ch];
     const raw = days.map((d) => w[(new Date(d + "T00:00:00Z").getUTCDay() + 6) % 7] || 1 / 7);
@@ -82,10 +89,12 @@ export function SplitEditor({ month, days, states, saved, suggested, readOnly }:
             {states.map((s) => <option key={s} value={s.toUpperCase()}>{s}{saved[`stores|${s.toUpperCase()}`] ? " · custom" : ""}</option>)}
           </select>
         )}
-        <span className={cn("rounded-md px-2 py-0.5 text-[11.5px] ring-1", has ? "bg-emerald-50 text-emerald-800 ring-emerald-200" : "bg-zinc-100 text-zinc-600 ring-zinc-200")}>{has ? "Custom split saved" : ch === "stores" && state !== "*" ? "Uses All India split" : "Even phasing (no split saved)"}</span>
+        <span className={cn("rounded-md px-2 py-0.5 text-[11.5px] ring-1", !has ? "bg-zinc-100 text-zinc-600 ring-zinc-200" : sources[k] === "actual" ? "bg-brand-50 text-brand-800 ring-brand-200" : sources[k] === "recommended" ? "bg-amber-50 text-amber-800 ring-amber-200" : "bg-emerald-50 text-emerald-800 ring-emerald-200")}>
+          {!has ? (ch === "stores" && state !== "*" ? "Uses All India split" : "Even phasing (no split saved)") : sources[k] === "actual" ? "Actual shape of sales" : sources[k] === "recommended" ? "Recommended — edit freely" : "Custom split saved"}</span>
         <div className="ml-auto flex gap-1.5">
           <button onClick={even} className="flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[12px] text-zinc-600 hover:border-brand-300"><Equal className="size-3.5" />Even</button>
-          <button onClick={pattern} className="flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[12px] text-zinc-600 hover:border-brand-300" title="Weekday pattern of actual sales in the last 8 weeks"><Wand2 className="size-3.5" />Weekday pattern (last 8 weeks)</button>
+          <button onClick={useRec} className="flex items-center gap-1 rounded-md border border-brand-300 bg-brand-50 px-2 py-1 text-[12px] font-medium text-brand-800 hover:border-brand-500" title="Weekday pattern (last 12 weeks) × day-of-month pattern incl. salary days (last 6 months) × festive / sale uplifts"><Wand2 className="size-3.5" />Use recommendation</button>
+          <button onClick={pattern} className="rounded-md border border-line px-2 py-1 text-[12px] text-zinc-600 hover:border-brand-300" title="Weekday pattern of actual sales in the last 8 weeks">Weekday only</button>
           {!readOnly && <button onClick={() => file.current?.click()} className="flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[12px] text-zinc-600 hover:border-brand-300"><Upload className="size-3.5" />Upload CSV</button>}
           <input ref={file} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
         </div>
@@ -94,10 +103,10 @@ export function SplitEditor({ month, days, states, saved, suggested, readOnly }:
         {WD.map((w) => <div key={w} className="text-center text-[10.5px] font-medium uppercase tracking-wider text-zinc-400">{w}</div>)}
         {Array.from({ length: offset }, (_, i) => <div key={`x${i}`} />)}
         {days.map((d) => {
-          const v = pctOf(d), wk = (new Date(d + "T00:00:00Z").getUTCDay() + 6) % 7 >= 5;
+          const v = pctOf(d), wk = (new Date(d + "T00:00:00Z").getUTCDay() + 6) % 7 >= 5, ev = events[d];
           return (
-            <label key={d} className={cn("rounded-lg border px-2 py-1.5", wk ? "border-brand-200 bg-brand-50/50" : "border-line")}>
-              <span className="block text-[10.5px] text-zinc-500">{Number(d.slice(8))}</span>
+            <label key={d} title={ev?.join(" · ")} className={cn("rounded-lg border px-2 py-1.5", ev ? "border-amber-300 bg-amber-50/70" : wk ? "border-brand-200 bg-brand-50/50" : "border-line")}>
+              <span className="flex items-center justify-between text-[10.5px] text-zinc-500"><span>{Number(d.slice(8))}</span>{ev && <span className="truncate pl-1 text-[9.5px] font-medium text-amber-800">{ev[0]}</span>}</span>
               <input disabled={readOnly} value={v} onChange={(e) => setDraft((s) => ({ ...s, [k]: { ...Object.fromEntries(days.map((x) => [x, pctOf(x)])), [d]: e.target.value } }))}
                 className="tabular w-full bg-transparent text-[13px] font-semibold outline-none" inputMode="decimal" />
               <span className="text-[10px] text-zinc-400">% of month</span>

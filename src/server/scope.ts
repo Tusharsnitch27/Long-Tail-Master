@@ -9,7 +9,7 @@ import { getWarehouseStock } from "./data/warehouse";
 import { getSkuFacts } from "./data/sku";
 import { getChannelSku } from "./data/channels";
 
-/** Everything a Snitch Udaan page needs for the current context, loaded once. */
+/** Everything a Snitch Longtail page needs for the current context, loaded once. */
 export async function loadScope(ctx: Ctx, extra: Range[] = []) {
   const { range, compare } = ctx.period;
   const ranges = [range, compare, { from: startOfMonth(ctx.asOf), to: ctx.asOf }, ...extra];

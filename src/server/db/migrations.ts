@@ -478,4 +478,12 @@ insert into app_settings(key, value, updated_by) values ('enabledCategories', '[
   on conflict (key) do update set value = excluded.value, updated_by = 'migration', updated_at = now();
 `,
   },
+  {
+    version: 7,
+    name: "split_source",
+    sql: `
+-- where a daily split came from: actual (past months, from sales), recommended (model), manual / upload (people)
+alter table day_splits add column source text not null default 'manual';
+`,
+  },
 ];

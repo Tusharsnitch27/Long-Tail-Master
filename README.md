@@ -1,6 +1,6 @@
-# Snitch Udaan
+# Snitch Longtail
 
-**Building the next ₹100 Cr business.** Snitch Udaan is the operating tool for Snitch's long-tail categories: Accessories, Bags, Belts,
+**Building the next ₹100 Cr business.** Snitch Longtail is the operating tool for Snitch's long-tail categories: Accessories, Bags, Belts,
 Perfumes, Shoes (incl. Footwear), Sunglasses and Trolleys. It covers Stores, Online (Shopify) and Marketplaces (AJIO, Myntra, Flipkart, Amazon).
 
 - **Next.js 16** (App Router, server components), TypeScript, Tailwind v4 (Ocean Teal theme), Recharts, TanStack Virtual
@@ -8,7 +8,7 @@ Perfumes, Shoes (incl. Footwear), Sunglasses and Trolleys. It covers Stores, Onl
 - **PostgreSQL** holds app data: targets, daily splits, store targets, remarks, action status, VM revamps, future inwards, attribute edits, users and the change log.
 - **Auth** is username + password. Admins create accounts in the Control Centre; the two roles are admin and viewer.
 
-See [docs/SNITCH_UDAAN.md](docs/SNITCH_UDAAN.md) for scope, the source map, targets logic, the metric dictionary and the question each page
+See [docs/SNITCH_LONGTAIL.md](docs/SNITCH_LONGTAIL.md) for scope, the source map, targets logic, the metric dictionary and the question each page
 answers. Rules and their current values are listed in the app under Control Centre → Rules & data.
 
 ## Mitra (AI)

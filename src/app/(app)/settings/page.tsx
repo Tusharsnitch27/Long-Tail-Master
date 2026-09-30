@@ -5,7 +5,9 @@ import { dbConfigured, q } from "@/server/db";
 import { getFreshness } from "@/server/data/freshness";
 import { channelFreshness, getChannelDaily } from "@/server/data/channels";
 import { getFacts } from "@/server/data/facts";
-import { getTargetBook, listMonthTargets, listSplits, changeLog } from "@/server/data/targetBook";
+import { getTargetBook, listMonthTargets, listSplits, changeLog, splitCoverage } from "@/server/data/targetBook";
+import { splitFactors, recommend, eventsOn, CHANNELS } from "@/server/splitModel";
+import { SplitGenerate } from "@/components/control/SplitGenerate";
 import { getStoreInventory } from "@/server/data/inventory";
 import { getProducts } from "@/server/data/products";
 import { channelMetrics, ucChannel, type ChKey } from "@/server/channelData";
@@ -79,24 +81,60 @@ export default async function ControlCentre({ searchParams }: { searchParams: Pr
     );
   } else if (tab === "split") {
     const days = eachDay(monthParam, endOfMonth(monthParam));
-    const [rows, facts, uc] = await Promise.all([
+    const fyStart = Number(cur.slice(5, 7)) >= 4 ? `${cur.slice(0, 4)}-04-01` : `${Number(cur.slice(0, 4)) - 1}-04-01`;
+    const fyMonths = Array.from({ length: 12 }, (_, i) => addMonths(fyStart, i));
+    const [rows, facts, uc, factors, cov] = await Promise.all([
       listSplits(monthParam),
       getFacts({ from: addDays(ctx.asOf, -55), to: ctx.asOf }, cats.map((c) => c.key)).catch(() => []),
       getChannelDaily({ from: addDays(ctx.asOf, -55), to: ctx.asOf }).catch(() => []),
+      splitFactors(ctx.asOf, cats.map((c) => c.key)),
+      splitCoverage(fyMonths[0], fyMonths[11]),
     ]);
-    const saved: Record<string, Record<string, number>> = {};
-    for (const r of rows) (saved[`${r.channel}|${r.state}`] ??= {})[r.day] = r.weight;
-    // weekday pattern of actual sales over the last 8 weeks
+    const saved: Record<string, Record<string, number>> = {}, sources: Record<string, string> = {};
+    for (const r of rows) { (saved[`${r.channel}|${r.state}`] ??= {})[r.day] = r.weight; sources[`${r.channel}|${r.state}`] = r.source; }
     const wd = (d: string) => (new Date(d + "T00:00:00Z").getUTCDay() + 6) % 7;
     const sug: Record<ChKey, number[]> = { stores: Array(7).fill(0), online: Array(7).fill(0), marketplace: Array(7).fill(0) };
     for (const f of facts) if (f.d >= addDays(ctx.asOf, -55)) sug.stores[wd(f.d)] += f.s;
     for (const r of uc) { const k = ucChannel(r.mp); if (k) sug[k][wd(r.d)] += r.revenue; }
     for (const k of Object.keys(sug) as ChKey[]) { const t = sug[k].reduce((a, x) => a + x, 0) || 1; sug[k] = sug[k].map((x) => x / t); }
+    const recommended = Object.fromEntries(CHANNELS.map((k) => [k, recommend(monthParam, k, factors)])) as Record<ChKey, { day: string; weight: number }[]>;
+    const events = Object.fromEntries(days.map((d) => [d, eventsOn(d).map((e) => e.name)]).filter(([, v]) => (v as string[]).length));
     const states = [...new Set(ctx.stores.map((s) => s.state).filter(Boolean) as string[])].sort();
+    const W = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], B = ["1–3", "4–7", "8–14", "15–21", "22–25", "26–31"];
+    const monthEvents = [...new Map(days.flatMap((d) => eventsOn(d)).map((e) => [e.name, e])).values()];
     body = (
       <>
-        {monthNav("split")}
-        <SplitEditor key={monthParam} month={monthParam} days={days} states={states} saved={saved} suggested={sug} readOnly={ro} />
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          {monthNav("split")}
+          <SplitGenerate months={fyMonths} readOnly={ro} />
+        </div>
+        <div className="mb-3 flex flex-wrap gap-1">
+          {fyMonths.map((m) => {
+            const cs = CHANNELS.map((k) => cov.find((c) => c.channel === k && c.state === "*" && c.month === m)?.source ?? null);
+            const tone = cs.every((x) => x == null) ? "border-dashed border-zinc-300 text-zinc-400" : cs.some((x) => x === "manual" || x === "upload") ? "border-emerald-300 text-emerald-800" : cs.some((x) => x === "recommended") ? "border-amber-300 text-amber-800" : "border-brand-300 text-brand-800";
+            return <Link key={m} href={`/settings?tab=split&m=${m.slice(0, 7)}`} className={cn("rounded-md border bg-white px-2 py-0.5 text-[11px]", tone, m === monthParam && "ring-2 ring-brand-500")} title={CHANNELS.map((k, i) => `${k}: ${cs[i] ?? "even"}`).join(" · ")}>{mLabel(m).slice(0, 3)} {m.slice(2, 4)}</Link>;
+          })}
+          <span className="ml-2 flex items-center gap-2 text-[11px] text-zinc-500"><i className="size-2 rounded-sm border border-brand-300" />actual <i className="size-2 rounded-sm border border-amber-300" />recommended <i className="size-2 rounded-sm border border-emerald-300" />custom <i className="size-2 rounded-sm border border-dashed border-zinc-300" />even</span>
+        </div>
+        <SplitEditor key={monthParam} month={monthParam} days={days} states={states} saved={saved} suggested={sug} recommended={recommended} sources={sources} events={events} readOnly={ro} />
+        <div className="mt-3 grid gap-3 xl:grid-cols-[1.4fr_1fr]">
+          <Section title="How the recommendation is built" tip="Recommended weight for a day = weekday index × day-of-month index × festive / sale uplift, normalised to 100%">
+            <table className="w-full text-[12px]">
+              <thead><tr className="text-[11px] text-zinc-500"><th className="pb-1 text-left font-medium">Weekday index · last 12 weeks</th>{W.map((w) => <th key={w} className="pb-1 text-right font-medium">{w}</th>)}</tr></thead>
+              <tbody>{CHANNELS.map((k) => <tr key={k} className="border-t border-brand-50"><td className="py-1 capitalize">{k}</td>{factors.dow[k].map((x, i) => <td key={i} className={cn("tabular text-right", x >= 1.1 ? "font-semibold text-emerald-700" : x <= 0.9 ? "text-rose-600" : "")}>{x.toFixed(2)}</td>)}</tr>)}</tbody>
+            </table>
+            <table className="mt-3 w-full text-[12px]">
+              <thead><tr className="text-[11px] text-zinc-500"><th className="pb-1 text-left font-medium">Day-of-month index · last 6 months</th>{B.map((b) => <th key={b} className="pb-1 text-right font-medium">{b}</th>)}</tr></thead>
+              <tbody>{CHANNELS.map((k) => <tr key={k} className="border-t border-brand-50"><td className="py-1 capitalize">{k}</td>{factors.dom[k].map((x, i) => <td key={i} className={cn("tabular text-right", x >= 1.05 ? "font-semibold text-emerald-700" : x <= 0.95 ? "text-rose-600" : "")}>{x.toFixed(2)}</td>)}</tr>)}</tbody>
+            </table>
+            <p className="mt-2 text-[11px] text-zinc-500">Day-of-month captures salary-credit weeks and month-end dips (weekday effect removed first, shrunk 30% towards 1 to avoid noise). Weekdays {factors.basis.dow}; month pattern {factors.basis.dom}. Past months keep the actual daily shape of gross sales.</p>
+          </Section>
+          <Section title={`Festive & sale days · ${mLabel(monthParam)}`} tip="Assumed uplifts per channel (Stores · Online · Marketplace). Dates and uplifts are editable in the split itself.">
+            {monthEvents.length ? <ul className="space-y-1.5 text-[12px]">{monthEvents.map((e) => (
+              <li key={e.name} className="flex items-center justify-between gap-2 border-b border-brand-50 pb-1.5 last:border-0"><span><b className="font-medium">{e.name}</b> <span className="text-zinc-500">{e.from === e.to ? e.from.slice(8) : `${e.from.slice(8)}–${e.to.slice(8)}`} {mLabel(monthParam).slice(0, 3)}</span></span><span className="tabular text-zinc-600">×{e.up.join(" · ×")}</span></li>
+            ))}</ul> : <div className="py-4 text-center text-[12px] text-zinc-500">No festive or sale days assumed this month.</div>}
+          </Section>
+        </div>
         <Notice>Upload format: <span className="font-mono">date,weight_pct</span> for the selected channel / state, one row per day. Use state-level splits for Stores where festivals differ by region (e.g. Onam in Kerala); stores in states without their own split use All India.</Notice>
       </>
     );

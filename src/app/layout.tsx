@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-export const metadata: Metadata = { title: { default: "Snitch Udaan", template: "%s · Snitch Udaan" }, description: "Snitch Udaan — building the next ₹100 Cr business across long-tail categories" };
+export const metadata: Metadata = { title: { default: "Snitch Longtail", template: "%s · Snitch Longtail" }, description: "Snitch Longtail — the operating tool for Snitch long-tail categories" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

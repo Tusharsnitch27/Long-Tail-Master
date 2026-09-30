@@ -1,4 +1,4 @@
-# Snitch Udaan: data design
+# Snitch Longtail: data design
 
 "Building the next ₹100 Cr business". This is the operating tool for Snitch's long-tail categories. Sources were validated against
 Snowflake `SNITCH_DB.MAPLEMONK` on 30 Sep 2026.
@@ -47,6 +47,9 @@ PostgreSQL (app) holds users, `month_targets`, `day_splits`, `store_month_target
 - **Month targets** are set per channel × category × month in the Control Centre (in ₹ lakhs). The FY 26-27 plan was seeded from the
   business-plan sheet; "Offline" in that sheet is Stores.
 - **Daily split**: weights per day for each channel, and per state for Stores (All India is the default). With no split, the month is phased evenly.
+  "Generate splits for the year" (Control Centre → Daily split) fills past months with the **actual** daily shape of gross sales and upcoming
+  months with a **recommendation**: weekday index (last 12 weeks) × day-of-month index (last 6 months; salary-credit days, month-end dip) ×
+  festive / sale uplifts (`src/server/splitModel.ts`, stated assumptions). Custom splits are kept unless "replace custom" is ticked; everything stays editable.
 - **Store targets**: store × category × month, uploaded or edited in the tool. When any store has one for a category-month, the uploaded
   targets replace the Snowflake store targets for store-level views, phased with the Stores split for the store's state.
 - **Stores rule**: the plan's category target is the Stores target. Store targets only spread it across stores and days (when no daily split is set); if they don't add up to the plan, the difference is flagged.

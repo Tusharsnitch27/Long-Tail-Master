@@ -113,7 +113,7 @@ export function UsersForm({ users, me, readOnly }: { users: UserRow[]; me: strin
           </label>
           <button disabled={readOnly} className="h-8 rounded-md bg-zinc-900 px-3 text-[13px] font-medium text-white disabled:opacity-40">Create user</button>
         </div>
-        <p className="mt-2 text-[11.5px] text-zinc-500">Usernames: 3–40 lowercase letters, digits, dot, underscore or hyphen. Passwords are stored hashed and can’t be viewed later — copy it before creating.</p>
+        <p className="mt-2 text-[11.5px] text-zinc-500">Usernames: 3–80 characters — letters, digits, dot, underscore, hyphen, @ or + (an email address works; no spaces; stored in lowercase). Passwords are stored hashed and can’t be viewed later — copy it before creating.</p>
       </form>
 
       {msg && <div className={`rounded-md px-3 py-2 text-[13px] ${msg.ok ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"}`}>{msg.text}</div>}

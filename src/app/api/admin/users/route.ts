@@ -6,7 +6,7 @@ import { hashPassword, PASSWORD_RULE, validPassword, validUsername } from "@/ser
 import { invalidate } from "@/lib/cache";
 import { apiError } from "@/server/api";
 
-const Username = z.string().trim().toLowerCase().refine(validUsername, "username: 3–40 characters, lowercase letters, digits, . _ -");
+const Username = z.string().trim().toLowerCase().refine(validUsername, "Username: 3–80 characters — letters, digits, . _ - @ + (an email address works). No spaces.");
 const Password = z.string().refine(validPassword, `password must be ${PASSWORD_RULE}`);
 const Role = z.enum(["viewer", "admin"]);
 const Body = z.discriminatedUnion("action", [

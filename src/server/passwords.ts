@@ -24,4 +24,4 @@ export async function verifyPassword(password: string, stored: string | null | u
 
 export const PASSWORD_RULE = "at least 8 characters";
 export const validPassword = (p: string) => typeof p === "string" && p.length >= 8 && p.length <= 200;
-export const validUsername = (u: string) => /^[a-z0-9._-]{3,40}$/.test(u);
+export const validUsername = (u: string) => /^[a-z0-9._@+-]{3,80}$/.test(u);

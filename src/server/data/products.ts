@@ -1,6 +1,10 @@
 import "server-only";
 import { catForProduct, catBySalesName } from "@/lib/categories";
+import { cached } from "@/lib/cache";
 import { sfCached } from "../snowflake";
+import { getMetafields, type Meta } from "./metafields";
+import { getStoreInventory } from "./inventory";
+import { productCode } from "./warehouse";
 
 /**
  * Product Master = LONG_TAIL_MASTER_BIBLE (all long-tail categories, refreshed daily): identity, image, inwards,
@@ -48,11 +52,24 @@ export interface Product {
   returnPctTd: number | null;
   gpPctTd: number | null;
   tags: string[];
+  // metafields
+  l1: string | null; // product type (e.g. Sneaker, Backpack, Square)
+  l2: string | null; // sub-type (e.g. Low top, Chelsea)
+  attrs: Record<string, string>;
+  collection: string | null;
+  /** name + type + attributes + colour + code, lower-case — search matches metafields, not just the name */
+  search: string;
+  /** store inventory source: live store report (latest date) or Product Master fallback */
+  storeInvSource: "live" | "bible" | null;
 }
 
 const S = "SNITCH_DB.MAPLEMONK";
 
-export async function getProducts(): Promise<Product[]> {
+export function getProducts(): Promise<Product[]> {
+  return cached("products:merged:v3", 600, buildProducts);
+}
+
+async function buildProducts(): Promise<Product[]> {
   const rows = await sfCached<Record<string, unknown>>(
     "products:v2",
     `with b as (select * from ${S}.LONG_TAIL_MASTER_BIBLE),
@@ -81,8 +98,9 @@ export async function getProducts(): Promise<Product[]> {
   );
   const n = (v: unknown) => (v == null || v === "" ? null : Number(v));
   const pct = (r: number | null, s: number | null) => (r != null && s && s > 0 ? r / s : null);
-  return rows.map((r) => {
-    const sku = String(r.sku);
+  const [meta, inv] = await Promise.all([getMetafields().catch(() => new Map<string, Meta>()), getStoreInventory([]).catch(() => [])]);
+  const base = rows.map((r) => {
+    const sku = String(r.sku).toUpperCase();
     const cat = catForProduct(r.category as string | null, sku) ?? catBySalesName(String(r.category ?? ""));
     let tags: string[] = [];
     try { tags = r.tags ? (JSON.parse(String(r.tags)) as string[]) : []; } catch {}
@@ -102,9 +120,47 @@ export async function getProducts(): Promise<Product[]> {
       returnPct: { all: pct(ret.all, sales.all), stores: pct(ret.stores, sales.stores), online: pct(ret.online, sales.online), marketplace: pct(ret.marketplace, sales.marketplace) },
       l30Sales: n(r.l30_s), l30Qty: n(r.l30_q),
       qtySoldTd: qty.all, salesTd: sales.all, returnPctTd: pct(ret.all, sales.all), gpPctTd: n(r.gp), tags,
-    };
+      l1: null, l2: null, attrs: {}, collection: null, search: "", storeInvSource: null,
+    } as Product;
   });
+  const bySku = new Map(base.map((p) => [p.sku, p]));
+  // products that exist only in the metafield sheet (e.g. new bags / sunglasses) still belong to the master
+  for (const m of meta.values()) {
+    if (bySku.has(m.sku) || !m.category) continue;
+    const empty = { all: null, stores: null, online: null, marketplace: null };
+    const p = { sku: m.sku, style: m.sku.split("-")[0], name: m.name ? m.name.replace(/\b\w+/g, (w) => (w.length > 2 && w === w.toUpperCase() ? w[0] + w.slice(1).toLowerCase() : w)) : null, category: m.category, colour: null, material: null, vendor: null, image: m.image, mrp: null, sellingPrice: null, cogs: null,
+      status: null, lifecycle: null, allocation: null, liveDate: null, daysSinceLive: null, ageing: null, inBible: false, invTotal: null, invWarehouse: null, invOffline: null, storesStocked: null,
+      inwardTotal: null, lastInward: null, sales: { ...empty }, qty: { ...empty }, returnsValue: { ...empty }, returnPct: { ...empty }, l30Sales: null, l30Qty: null,
+      qtySoldTd: null, salesTd: null, returnPctTd: null, gpPctTd: null, tags: [], l1: null, l2: null, attrs: {}, collection: null, search: "", storeInvSource: null } as Product;
+    base.push(p); bySku.set(p.sku, p);
+  }
+  // live store inventory (latest date of the store report) replaces the Product Master's store figure
+  const known = new Set(bySku.keys());
+  const live = new Map<string, { units: number; stores: number }>();
+  for (const r of inv) {
+    const k = productCode(r.sku, known);
+    const e = live.get(k) ?? { units: 0, stores: 0 };
+    e.units += r.units; if (r.units > 0) e.stores++;
+    live.set(k, e);
+  }
+  for (const p of base) {
+    const m = meta.get(p.sku);
+    if (m) {
+      p.l1 = m.l1; p.l2 = m.l2; p.attrs = { ...m.attrs }; p.collection = m.collection;
+      p.image ??= m.image; p.name ??= m.name ? m.name.replace(/\b\w+/g, (w) => (w.length > 2 && w === w.toUpperCase() ? w[0] + w.slice(1).toLowerCase() : w)) : null;
+      p.category ??= m.category;
+    }
+    if (p.colour && !p.attrs.colour) p.attrs.colour = p.colour;
+    const l = live.get(p.sku);
+    if (inv.length) { p.invOffline = l?.units ?? 0; p.storesStocked = l?.stores ?? 0; p.storeInvSource = "live"; }
+    else if (p.invOffline != null) p.storeInvSource = "bible";
+    p.search = [p.name, p.sku, p.l1, p.l2, p.collection, ...Object.values(p.attrs)].filter(Boolean).join(" ").toLowerCase();
+  }
+  return base;
 }
+
+/** Product type for filters: metafield L1, else Shopify tags. */
+export function productL1(p: Product) { return p.l1 ?? productType(p); }
 
 /** Product type from Shopify tags (Sneakers / Loafers / Boots …). */
 const TYPE_TAGS = ["Sneakers", "Loafers", "Boots", "Mules", "Sandals", "Slides", "Derby", "Oxford", "Boat Shoes", "Moccasins", "Slip-on", "Eau De Parfum", "Reserve Collection", "Aviator", "Wayfarer"];

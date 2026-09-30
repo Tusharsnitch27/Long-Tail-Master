@@ -8,6 +8,8 @@ import { getSettings } from "@/server/settings";
 import { getFreshness } from "@/server/data/freshness";
 import { getChannelDaily, channelFreshness } from "@/server/data/channels";
 import { getWarehouseStock } from "@/server/data/warehouse";
+import { storeInventoryDate } from "@/server/data/inventory";
+import { APP_NAME } from "@/lib/nav";
 import { getProductMap } from "@/server/data/products";
 import { ucChannel } from "@/server/channelData";
 import { buildActions } from "@/server/actions";
@@ -40,7 +42,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   let loadError: string | null = null;
   try {
     const [settings, fresh] = await Promise.all([getSettings(), getFreshness()]);
-    const [uc, ucTs, pm] = await Promise.all([getChannelDaily({ from: addDays(fresh.asOf, -29), to: fresh.today }), channelFreshness(), getProductMap()]);
+    const [uc, ucTs, pm, invDate] = await Promise.all([getChannelDaily({ from: addDays(fresh.asOf, -29), to: fresh.today }), channelFreshness(), getProductMap(), storeInventoryDate().catch(() => null)]);
     const wh = await getWarehouseStock(new Set(pm.keys()));
     // options come from the data: categories with sales in the last 30 days; marketplaces with sales
     const withData = new Set(uc.filter((r) => r.items > 0).map((r) => r.c));
@@ -56,9 +58,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       marketplaces: Object.fromEntries([["overall", mpsFor(null)], ...cats.map((c) => [c.key, mpsFor(c.key)])]),
       asOf: fresh.asOf, today: fresh.today,
       freshness: [
-        { label: "Stores", value: `to ${fmtDate(fresh.asOf)}` },
-        { label: "Online", value: time(ucTs) },
-        { label: "Inventory", value: time(wh.updated) },
+        { label: "Store sales", value: `to ${fmtDate(fresh.asOf)}`, tip: `DSR refreshed ${time(fresh.tables.LONG_TAIL_DSR_PERFUMES ?? null)}`, stale: fresh.asOf < addDays(fresh.today, -2) },
+        { label: "Online", value: time(ucTs), tip: "Online & Marketplace — latest order item (Unicommerce)" },
+        { label: "Inventory", value: time(wh.updated), tip: `Warehouse live ${time(wh.updated)} · store stock ${invDate ? fmtDate(invDate) : "—"} (latest store report)`, stale: !invDate || invDate < addDays(fresh.today, -1) },
       ],
     };
     const ctx = await pageContext(Promise.resolve({}));
@@ -71,13 +73,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const nav = { role: user.role, name: user.name, username: user.username, actionCount: urgent };
   return (
     <div className="flex h-dvh overflow-hidden bg-canvas">
-      <aside className="hidden w-[228px] shrink-0 border-r border-line md:block">
+      <aside className="hidden w-[236px] shrink-0 md:block">
         <Suspense><Sidebar {...nav} /></Suspense>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex h-11 items-center gap-3 border-b border-line px-4 md:hidden">
           <Suspense><MobileNav {...nav} /></Suspense>
-          <span className="text-[13.5px] font-semibold">Category Mitra</span>
+          <span className="text-[13.5px] font-semibold">{APP_NAME}</span>
         </div>
         <main className="min-h-0 flex-1 overflow-y-auto">
           {options && <Suspense><ContextBar options={options} /></Suspense>}

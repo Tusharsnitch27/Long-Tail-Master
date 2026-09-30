@@ -1,5 +1,5 @@
 import type { Preset } from "./dates";
-import type { Channel } from "./categories";
+import { sortCats, type Channel } from "./categories";
 
 /**
  * Global context: Category (single, default Overall), Period, Channel (+ marketplace), Store (only where relevant).
@@ -64,7 +64,7 @@ export function parseFilters(sp: SP, enabledCats: string[]): Filters {
     from: one(sp, "from"),
     to: one(sp, "to"),
     cat,
-    cats: cat ? [cat] : enabledCats,
+    cats: cat ? [cat] : sortCats(enabledCats),
     channel,
     mp: channel === "marketplace" ? one(sp, "mp") ?? null : null,
     stores: list(sp.store),

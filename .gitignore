@@ -5,3 +5,4 @@ node_modules
 .pglite
 tsconfig.tsbuildinfo
 .claude/
+snowflake.log

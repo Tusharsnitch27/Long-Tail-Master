@@ -41,14 +41,19 @@ export function fmtValue(v: unknown, f?: string | null): string {
 }
 
 const COL: Record<string, ColType> = { inr: "inr", num: "num", dec: "dec", pct: "pct", delta: "delta", date: "date", datetime: "text", text: "text" };
-const COLORS = ["#5b4fd6", "#d97a2b", "#10b981", "#2b8fd9", "#b8487a", "#71717a"];
+const COLORS = ["#0e8a96", "#e08a3c", "#0b3b44", "#5cc0c7", "#c2527a", "#7a6a3a"]; // Ocean Teal series palette
 const isDateField = (rows: Record<string, unknown>[], x: string) => rows.every((r) => typeof r[x] === "string" && /^\d{4}-\d{2}(-\d{2})?$/.test(String(r[x])));
+
+const VIEW_LABEL: Record<string, string> = { kpi: "KPIs", table: "Table", bar: "Chart", line: "Trend", area: "Trend", comparison: "Comparison", heatmap: "Heatmap" };
 
 export function View({ v }: { v: ViewData }) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white">
-      <div className="border-b border-zinc-100 px-3 py-2 text-[12.5px] font-semibold">{v.title}</div>
-      <div className="p-3"><Body v={v} /></div>
+    <div className="overflow-hidden rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(11,42,48,.04)]">
+      <div className="flex items-center gap-2 border-b border-line bg-brand-50/40 px-3.5 py-2">
+        <span className="rounded bg-brand-100 px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wider text-brand-800">{VIEW_LABEL[v.type] ?? v.type}</span>
+        <span className="text-[12.5px] font-semibold text-ink">{v.title}</span>
+      </div>
+      <div className="p-3.5"><Body v={v} /></div>
     </div>
   );
 }
@@ -58,7 +63,7 @@ function Body({ v }: { v: ViewData }) {
     return (
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {(v.kpiValues ?? []).map((k) => (
-          <div key={k.label} className="rounded-md bg-zinc-50 px-3 py-2">
+          <div key={k.label} className="rounded-lg bg-brand-50/50 px-3 py-2 ring-1 ring-brand-100">
             <div className="text-[11px] uppercase tracking-wide text-zinc-500">{k.label}</div>
             <div className="tabular mt-0.5 text-[18px] font-semibold">{fmtValue(k.value, k.format)}</div>
           </div>
@@ -99,7 +104,7 @@ function Body({ v }: { v: ViewData }) {
             <tr key={rk}><td className="whitespace-nowrap pr-2">{rk}</td>{cols.map((c) => {
               const n = val.get(`${rk}|${c}`);
               const t = typeof n === "number" ? (n - min) / (max - min || 1) : null;
-              return <td key={c} title={fmtValue(n, f)} className="h-6 min-w-8 border border-white text-center" style={{ background: t == null ? "#fafafa" : `rgba(91,79,214,${0.08 + t * 0.8})`, color: t != null && t > 0.55 ? "white" : undefined }}>{t == null ? "" : fmtValue(n, f)}</td>;
+              return <td key={c} title={fmtValue(n, f)} className="h-6 min-w-8 border border-white text-center" style={{ background: t == null ? "#fafafa" : `rgba(14,138,150,${0.08 + t * 0.8})`, color: t != null && t > 0.55 ? "white" : undefined }}>{t == null ? "" : fmtValue(n, f)}</td>;
             })}</tr>
           ))}</tbody></table>
       </div>
@@ -115,7 +120,7 @@ function Body({ v }: { v: ViewData }) {
         <div style={{ height: Math.max(160, data.length * 26 + 40) }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
-              <CartesianGrid stroke="#eeeef0" horizontal={false} />
+              <CartesianGrid stroke="#e6f0f1" horizontal={false} />
               <XAxis type="number" tick={{ fontSize: 11, fill: "#71717a" }} tickFormatter={(n) => fmtValue(n, yFmt)} />
               <YAxis type="category" dataKey="__label" width={170} tick={{ fontSize: 11, fill: "#3f3f46" }} />
               <Tooltip formatter={(n, name) => [fmtValue(Number(n), v.formats[String(name)] ?? yFmt), v.labels[String(name)] ?? name]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />

@@ -5,13 +5,15 @@ import { cached } from "@/lib/cache";
 import { sfQuery } from "../snowflake";
 import { getStoreMap } from "./stores";
 import { listOverrides, type TargetOverride } from "./targets";
+import { getTargetBook, type StoreMonthTarget, type TargetBook } from "./targetBook";
+import type { Store } from "./stores";
 
 /** One store × category × day. Includes future days of the month (target only) for projections. */
 export interface Fact {
   d: string; // date
   b: string; // branch_code
   c: string; // category key
-  s: number; // net sales (DSR SALES)
+  s: number; // gross sales (DSR SALES, before returns)
   q: number; // units
   n: number | null; // bills (null when source has no bills)
   m: number; // MRP value
@@ -37,7 +39,7 @@ async function fetchMonth(month: string, catKeys: string[]): Promise<Fact[]> {
   const to = endOfMonth(month);
   const isCurrent = to >= addDays(istToday(), -1);
   const ttl = isCurrent ? Number(process.env.SNOWFLAKE_CACHE_TTL ?? 600) : 6 * 3600;
-  return cached(`facts:raw:${month}:${catKeys.join(",")}`, ttl, async () => {
+  return cached(`facts:raw:v2:${month}:${catKeys.join(",")}`, ttl, async () => {
     const cats = catKeys.map((k) => catByKey(k)!).filter(Boolean);
     const out: Fact[] = [];
     const dsr = cats.filter((c) => c.source === "dsr");
@@ -51,7 +53,7 @@ async function fetchMonth(month: string, catKeys: string[]): Promise<Fact[]> {
     if (sales.length) {
       const { byName } = await getStoreMap();
       const rows = await sfQuery<{ d: string; ch: string; cat: string; s: number; q: number; m: number }>(
-        `select to_varchar(date) d, channel ch, category cat, sum(gross_sales) s, sum(gross_quantity) q, sum(price * gross_quantity) m
+        `select to_varchar(date) d, channel ch, category cat, sum(gross_sales) s, sum(iff(gross_sales >= 10 * gross_quantity, gross_quantity, 0)) q, sum(iff(gross_sales >= 10 * gross_quantity, price * gross_quantity, 0)) m
          from ${T("HORIZONTAL_SALES_CATEGORIES")} where type = 'Store' and date between ? and ? and category in (${sales.map(() => "?").join(",")})
          group by 1, 2, 3`,
         [from, to, ...sales.map((c) => c.salesCategory)],
@@ -113,19 +115,46 @@ function applyOverrides(facts: Fact[], overrides: TargetOverride[], storeCodes: 
   return facts;
 }
 
+/**
+ * Store-level month targets from the Control Centre replace the Snowflake store targets for that category-month
+ * (stores without an uploaded target then carry none), phased with the Stores split for the store's state.
+ */
+function applyStoreTargets(facts: Fact[], smt: StoreMonthTarget[], book: TargetBook, byCode: Map<string, Store>) {
+  if (!smt.length) return facts;
+  const groups = new Map<string, StoreMonthTarget[]>();
+  for (const t of smt) { const k = `${t.category}|${t.month}`; groups.set(k, [...(groups.get(k) ?? []), t]); }
+  const idx = new Map(facts.map((f) => [`${f.b}|${f.c}|${f.d}`, f]));
+  for (const [k, ts] of groups) {
+    const [c, month] = k.split("|");
+    const ms = startOfMonth(month), me = endOfMonth(month);
+    for (const f of facts) if (f.c === c && f.d >= ms && f.d <= me) f.t = null;
+    for (const t of ts) {
+      const state = byCode.get(t.branch_code)?.state ?? null;
+      for (const d of eachDay(ms, me)) {
+        let f = idx.get(`${t.branch_code}|${c}|${d}`);
+        if (!f) { f = { d, b: t.branch_code, c, s: 0, q: 0, n: catByKey(c)?.source === "dsr" ? 0 : null, m: 0, st: null, t: null }; facts.push(f); idx.set(`${t.branch_code}|${c}|${d}`, f); }
+        f.t = t.target * book.share("stores", d, state);
+      }
+    }
+  }
+  return facts;
+}
+
 /** Facts for every day of every month touched by `range` (full months, so month targets & projections are complete). */
 export async function getFacts(range: Range, catKeys: string[]): Promise<Fact[]> {
   const keys = catKeys.filter((k) => CATEGORIES.some((c) => c.key === k)).sort();
   const months = monthsBetween(startOfMonth(range.from), range.to);
   const from = months[0], to = endOfMonth(months[months.length - 1]);
   return cached(`facts:eff:${from}:${to}:${keys.join(",")}`, 60, async () => {
-    const [chunks, overrides, { stores }] = await Promise.all([
+    const [chunks, overrides, { stores, byCode }, book] = await Promise.all([
       Promise.all(months.map((m) => fetchMonth(m, keys))),
       listOverrides(from, to),
       getStoreMap(),
+      getTargetBook(from, months[months.length - 1]),
     ]);
     const facts = chunks.flat().map((f) => ({ ...f }));
     const relevant = overrides.filter((o) => keys.includes(o.category));
-    return applyOverrides(facts, relevant, stores.map((s) => s.branch_code));
+    applyOverrides(facts, relevant, stores.map((s) => s.branch_code));
+    return applyStoreTargets(facts, book.stores.filter((t) => keys.includes(t.category)), book, byCode);
   });
 }

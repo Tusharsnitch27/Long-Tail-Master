@@ -1,73 +1,93 @@
 import "server-only";
+import { CATEGORIES } from "@/lib/categories";
 import { sfCached } from "../snowflake";
 import { productCode } from "./warehouse";
 
 /**
- * Inventory is a SNAPSHOT metric: never sum across snapshots.
- *
- * Network level — INVENTORY_DAILY_SNAPSHOT_LATEST keeps one row per SKU × cut-size per day (≈121 days), despite
- * its name. Latest = max(SNAPSHOT_TS) per SKU × cut-size; SKUs can have different latest timestamps (a SKU that
- * stopped syncing keeps an old one), so the timestamp is returned per row.
- *
- * Store level — SPEED_INVENTORY: store × SKU-size × bin location, one set per SAVED_DATE. Latest = max(SAVED_DATE)
- * per BRANCH_CODE (within 14 days); then sum bins/sizes. Covers only the stores in that feed (~20), so every answer
- * must state coverage.
+ * Store inventory = OFFLINE_MASTER_DAILY_REPORT_1: one row per store × SKU group × DATE (daily snapshot, ~140 stores).
+ * The LATEST DATE is live store inventory; earlier dates are backdated snapshots. Inventory is a snapshot metric —
+ * never sum across dates. SKU_GROUP is lower-case in this table, so it is upper-cased and mapped to Product Master codes.
  */
-const S = "SNITCH_DB.MAPLEMONK";
+const T = "SNITCH_DB.MAPLEMONK.OFFLINE_MASTER_DAILY_REPORT_1";
+/** NEW_CATEGORY values that belong to the tool. */
+export const STORE_INV_CATS = ["Perfumes", "Shoes", "Footwear", "Accessories", "Bags", "Belts", "Sunglasses", "Luggage", "Caps"];
+const inList = STORE_INV_CATS.map((c) => `'${c}'`).join(",");
 
-export interface NetworkInv { sku: string; category: string; offline: number; online: number; snapshot_ts: string }
-export interface StoreInv { b: string; store: string; sku: string; size: string; units: number; saved_date: string }
+export interface StoreInv { b: string; store: string; sku: string; size: string; units: number; saved_date: string; s7: number; s30: number; cat: string }
 
-export function getNetworkInventory(): Promise<NetworkInv[]> {
-  return sfCached<NetworkInv>(
-    "inv:network",
-    `select sku_group sku, any_value(category) category, sum(offline_inventory) offline, sum(online_inventory) online,
-            to_varchar(max(snapshot_ts), 'YYYY-MM-DD"T"HH24:MI:SSTZH:TZM') snapshot_ts
-     from (select * from ${S}.INVENTORY_DAILY_SNAPSHOT_LATEST
-           where category in ('Perfumes','Shoes','Sunglasses','Belts','Bags','Accessories','Luggage','Caps')
-           qualify snapshot_ts = max(snapshot_ts) over (partition by sku_group, cut_size))
-     group by 1`,
-    [],
+const branch = (v: unknown) => String(Math.round(Number(v)));
+
+/** Latest date in the store report (= live). */
+export async function storeInventoryDate(): Promise<string | null> {
+  const r = await sfCached<{ d: string | null }>("inv:store:date", `select to_varchar(max(date)) d from ${T} where date >= dateadd(day, -7, current_date)`, [], 600);
+  return r[0]?.d ?? null;
+}
+
+/** Live store stock for long-tail products (latest DATE), store × product. */
+export async function getStoreInventory(skuGroups: string[]): Promise<StoreInv[]> {
+  const known = new Set(skuGroups);
+  const d = await storeInventoryDate();
+  if (!d) return [];
+  const rows = await sfCached<{ b: number; store: string; sku: string; units: number; s7: number; s30: number; cat: string }>(
+    "inv:store:v3",
+    `select branch_code b, max(marketplace_mapped) store, upper(sku_group) sku, sum(inventory) units, sum(sales_last_7_days) s7, sum(sales_last_30_days) s30, max(new_category) cat
+     from ${T} where date = ? and new_category in (${inList}) group by 1, 3`,
+    [d],
     900,
-  ).then((rows) => rows.map((r) => ({ ...r, offline: +r.offline || 0, online: +r.online || 0 })));
+  );
+  return rows.map((r) => ({
+    b: branch(r.b), store: String(r.store ?? "").replace(/^SNITCH\s*-\s*/i, ""), sku: known.size ? productCode(String(r.sku), known) : String(r.sku),
+    size: "All", units: +r.units || 0, saved_date: d, s7: +r.s7 || 0, s30: +r.s30 || 0, cat: String(r.cat),
+  }));
+}
+
+/** Stores present in the store report on the latest date (coverage disclosure). */
+export async function getStoreInventoryCoverage() {
+  const d = await storeInventoryDate();
+  if (!d) return [];
+  const rows = await sfCached<{ b: number; store: string }>("inv:coverage:v3", `select branch_code b, max(marketplace_mapped) store from ${T} where date = ? group by 1`, [d], 900);
+  return rows.map((r) => ({ b: branch(r.b), store: r.store, saved_date: d }));
 }
 
 /**
- * Latest store snapshot for long-tail products. SKUGROUP is NULL for newer SKUs in this feed (e.g. 4MSFR0942-01-01),
- * so the product is derived from the size-level SKU code against the known product list — never filtered on SKUGROUP.
+ * Store × source category totals on the latest date for ALL categories (apparel included) — used only as a store-size
+ * denominator (e.g. "shoes are 2% of this store's units") and to find strong stores where a long-tail category is not live.
  */
-export async function getStoreInventory(skuGroups: string[]): Promise<StoreInv[]> {
-  const known = new Set(skuGroups);
-  if (!known.size) return [];
-  const prefixes = Array.from(new Set([...known].map((k) => k.slice(0, 4)))).sort();
-  const rows = await sfCached<{ b: string; store: string; sku: string; grp: string | null; units: number; saved_date: string }>(
-    `inv:store:v2:${prefixes.join(",")}`,
-    `with latest as (
-       select branch_code, max(saved_date) d from ${S}.SPEED_INVENTORY where saved_date >= dateadd(day, -14, current_date) group by 1)
-     select s.branch_code b, max(s.store) store, s.sku sku, max(s.skugroup) grp, sum(s.total) units, to_varchar(l.d) saved_date
-     from ${S}.SPEED_INVENTORY s join latest l on l.branch_code = s.branch_code and s.saved_date = l.d
-     where left(s.sku, 4) in (select value::string from table(flatten(parse_json(?))))
-     group by s.branch_code, s.sku, l.d`,
-    [JSON.stringify(prefixes)],
-    900,
+export async function getStoreCategoryMix() {
+  const d = await storeInventoryDate();
+  if (!d) return { date: null, rows: [] as { b: string; cat: string; inv: number; s30: number }[] };
+  const rows = await sfCached<{ b: number; cat: string; inv: number; s30: number }>(
+    "inv:storemix",
+    `select branch_code b, coalesce(new_category, 'Other') cat, sum(inventory) inv, sum(sales_last_30_days) s30 from ${T} where date = ? group by 1, 2`,
+    [d],
+    3600,
   );
-  const out: StoreInv[] = [];
-  for (const r of rows) {
-    const code = String(r.sku);
-    const product = r.grp && known.has(r.grp) ? r.grp : productCode(code, known);
-    if (!known.has(product)) continue;
-    out.push({ b: String(r.b), store: r.store, sku: product, size: code.startsWith(product + "-") ? code.slice(product.length + 1) : "One size", units: +r.units || 0, saved_date: r.saved_date });
-  }
-  return out;
+  return { date: d, rows: rows.map((r) => ({ b: branch(r.b), cat: String(r.cat), inv: +r.inv || 0, s30: +r.s30 || 0 })) };
 }
 
-/** Stores present in the store-level inventory feed (coverage disclosure). */
-export function getStoreInventoryCoverage() {
-  return sfCached<{ b: string; store: string; saved_date: string }>(
-    "inv:coverage",
-    `select branch_code b, max(store) store, to_varchar(max(saved_date)) saved_date from ${S}.SPEED_INVENTORY
-     where saved_date >= dateadd(day, -14, current_date) group by 1`,
-    [],
-    900,
+/** Backdated store inventory: daily total units by source category (never summed across days). */
+export async function getStoreInventoryHistory(from: string, to: string) {
+  const rows = await sfCached<{ d: string; cat: string; units: number; stores: number }>(
+    "inv:store:hist",
+    `select to_varchar(date) d, new_category cat, sum(inventory) units, count(distinct iff(inventory > 0, branch_code, null)) stores
+     from ${T} where date between ? and ? and new_category in (${inList}) group by 1, 2 order by 1`,
+    [from, to],
+    3600,
   );
+  return rows.map((r) => ({ d: r.d, cat: catKey(r.cat), units: +r.units || 0, stores: +r.stores || 0 }));
 }
+
+/** Backdated store inventory for one product (daily, all stores). */
+export async function getProductStoreHistory(sku: string, from: string, to: string) {
+  const rows = await sfCached<{ d: string; units: number; stores: number }>(
+    "inv:store:sku",
+    `select to_varchar(date) d, sum(inventory) units, count(distinct iff(inventory > 0, branch_code, null)) stores
+     from ${T} where date between ? and ? and upper(sku_group) = ? group by 1 order by 1`,
+    [from, to, sku.toUpperCase()],
+    3600,
+  );
+  return rows.map((r) => ({ d: r.d, units: +r.units || 0, stores: +r.stores || 0 }));
+}
+
+export const catKey = (newCategory: string) =>
+  CATEGORIES.find((c) => c.salesCategory.toLowerCase() === newCategory?.toLowerCase() || c.ucCategories.some((u) => u.toLowerCase() === newCategory?.toLowerCase()) || c.masterCategory.some((m) => m.toLowerCase() === newCategory?.toLowerCase()))?.key ?? null;

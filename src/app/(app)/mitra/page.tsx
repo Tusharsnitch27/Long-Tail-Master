@@ -7,8 +7,10 @@ export const metadata = { title: "Mitra" };
 // env (provider credentials) and the signed-in user are read per request, never at build time
 export const dynamic = "force-dynamic";
 
-export default async function Mitra() {
-  const user = await getUser();
+export default async function Mitra({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const [user, sp] = await Promise.all([getUser(), searchParams]);
   if (!aiConfigured()) return <Notice tone="warn">Mitra isn’t configured — it needs <b>SNOWFLAKE_PAT</b> + <b>SNOWFLAKE_ACCOUNT</b> (Snowflake Cortex) or <b>ANTHROPIC_API_KEY</b>.</Notice>;
-  return <Copilot firstName={user?.name.split(" ")[0] ?? "there"} />;
+  // ?q= prefills the composer (e.g. "Ask Mitra" on an action card); it is never sent automatically
+  const q = typeof sp.q === "string" ? sp.q.slice(0, 500) : undefined;
+  return <Copilot firstName={user?.name.split(" ")[0] ?? "there"} initialQuestion={q} />;
 }

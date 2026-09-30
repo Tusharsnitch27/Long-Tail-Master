@@ -1,5 +1,8 @@
 "use client";
 import { useMemo, useRef, useState } from "react";
+import { X } from "lucide-react";
+import { facetOptions, matchTerms, normText, passFacets, queryTerms, type FacetDef } from "@/components/products/search";
+import { useListState, LOCAL_PARAMS } from "@/components/products/useListState";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import Papa from "papaparse";
@@ -26,6 +29,8 @@ export interface Col {
   sub?: string;
   /** field holding an image URL shown as a thumbnail before the value */
   image?: string;
+  /** thumbnail size in px for `image` columns (default 32) */
+  imageSize?: number;
 }
 type Row = Record<string, unknown>;
 
@@ -48,6 +53,7 @@ function fmt(v: unknown, t: ColType = "text"): string {
 
 export function DataTable({
   rows, columns, rowHref, searchKeys, defaultSort, csvName = "export", height = 620, totals, title, toolbar, dense = true, emptyText = "No rows match the current filters.",
+  searchText, facets, urlState = false, searchPlaceholder = "Search",
 }: {
   rows: Row[];
   columns: Col[];
@@ -62,19 +68,29 @@ export function DataTable({
   toolbar?: React.ReactNode;
   dense?: boolean;
   emptyText?: string;
+  /** row key holding a hidden search string (e.g. name + metafields); enables multi-word AND matching */
+  searchText?: string;
+  /** dropdown filters over row keys (options = distinct values present, faceted by the other filters) */
+  facets?: FacetDef[];
+  /** mirror search / filters / sort to page-local URL params (q, facet keys, sort) */
+  urlState?: boolean;
+  searchPlaceholder?: string;
 }) {
   const router = useRouter();
   const sp = useSearchParams();
-  const [q, setQ] = useState("");
-  const [sort, setSort] = useState<{ key: string; desc: boolean } | null>(defaultSort ? { key: defaultSort.key, desc: defaultSort.desc ?? true } : null);
+  const fs = useMemo(() => facets ?? [], [facets]);
+  const { q, setQ, sel, setFacet, clear, sort, setSort } = useListState({ facets: fs.map((f) => f.key), defaultSort, url: urlState });
   const [hidden, setHidden] = useState<Set<string>>(() => new Set(columns.filter((c) => c.hidden).map((c) => c.key)));
   const [colMenu, setColMenu] = useState(false);
   const cols = columns.filter((c) => !hidden.has(c.key));
 
   const data = useMemo(() => {
-    let out = rows;
+    let out = fs.length ? rows.filter((r) => passFacets(r, fs, sel)) : rows;
     const s = q.trim().toLowerCase();
-    if (s) {
+    if (s && searchText) {
+      const terms = queryTerms(s);
+      out = out.filter((r) => matchTerms(normText(String(r[searchText] ?? "")), terms));
+    } else if (s) {
       const keys = searchKeys ?? columns.filter((c) => !c.type || c.type === "text" || c.type === "code").map((c) => c.key);
       out = out.filter((r) => keys.some((k) => String(r[k] ?? "").toLowerCase().includes(s)));
     }
@@ -90,7 +106,9 @@ export function DataTable({
       });
     }
     return out;
-  }, [rows, q, sort, searchKeys, columns]);
+  }, [rows, q, sort, searchKeys, columns, searchText, fs, sel]);
+  const opts = useMemo(() => (fs.length ? facetOptions(rows, fs, sel) : {}), [rows, fs, sel]);
+  const active = !!q.trim() || Object.keys(sel).length > 0;
 
   const maxes = useMemo(() => {
     const m: Record<string, number> = {};
@@ -99,7 +117,8 @@ export function DataTable({
   }, [rows, columns]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const rowH = dense ? 34 : 46;
+  const maxImg = Math.max(0, ...columns.filter((c) => c.image && !hidden.has(c.key)).map((c) => c.imageSize ?? 32));
+  const rowH = Math.max(dense ? 34 : 46, maxImg + 10);
   const virt = useVirtualizer({ count: data.length, getScrollElement: () => scrollRef.current, estimateSize: () => rowH, overscan: 12 });
   const items = virt.getVirtualItems();
   const padTop = items.length ? items[0].start : 0;
@@ -118,6 +137,7 @@ export function DataTable({
     // carry current filters; params in the row link win
     const carry = new URLSearchParams(sp.toString());
     carry.delete("tab");
+    if (urlState) for (const k of [...LOCAL_PARAMS, ...fs.map((f) => f.key)]) carry.delete(k);
     for (const [k, v] of new URLSearchParams(own ?? "")) carry.set(k, v);
     const qs = carry.toString();
     return qs ? `${path}?${qs}` : path;
@@ -142,7 +162,7 @@ export function DataTable({
     URL.revokeObjectURL(a.href);
   };
 
-  const onSort = (k: string) => setSort((s) => (s?.key === k ? (s.desc ? { key: k, desc: false } : null) : { key: k, desc: true }));
+  const onSort = (k: string) => setSort((s: { key: string; desc: boolean } | null) => (s?.key === k ? (s.desc ? { key: k, desc: false } : null) : { key: k, desc: true }));
 
   return (
     <div className="rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(17,17,20,.03)]">
@@ -150,8 +170,17 @@ export function DataTable({
         {title && <div className="mr-2 text-[12.5px] font-semibold text-zinc-800">{title}</div>}
         <div className="flex h-7 items-center gap-1.5 rounded-md border border-line px-2 focus-within:border-zinc-400">
           <Search className="size-3.5 text-zinc-400" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" className="w-40 text-[12.5px] outline-none" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={searchPlaceholder} className={cn("text-[12.5px] outline-none", searchText ? "w-56" : "w-40")} />
         </div>
+        {fs.map((f) => (opts[f.key]?.length || sel[f.key]) ? (
+          <select key={f.key} value={sel[f.key] ?? ""} onChange={(e) => setFacet(f.key, e.target.value)} aria-label={f.label}
+            className={cn("h-7 max-w-40 rounded-md border px-1.5 text-[12px] outline-none", sel[f.key] ? "border-brand-500 bg-brand-50 text-brand-800" : "border-line text-zinc-600")}>
+            <option value="">{f.label}: all</option>
+            {(opts[f.key] ?? []).map((o) => <option key={o.v} value={o.v}>{o.v} ({o.n})</option>)}
+            {sel[f.key] && !(opts[f.key] ?? []).some((o) => o.v === sel[f.key]) && <option value={sel[f.key]}>{sel[f.key]} (0)</option>}
+          </select>
+        ) : null)}
+        {active && (fs.length > 0 || urlState) && <button onClick={clear} className="flex h-7 items-center gap-0.5 rounded-md px-1.5 text-[11.5px] text-zinc-500 hover:bg-zinc-100 hover:text-ink"><X className="size-3" />Clear</button>}
         <span className="text-[11.5px] text-zinc-400">{data.length.toLocaleString("en-IN")} rows</span>
         {toolbar}
         <div className="relative ml-auto">
@@ -242,7 +271,7 @@ function Cell({ c, r, first, max }: { c: Col; r: Row; first: boolean; max?: numb
   if (t === "split") {
     // [stores, online, marketplace] shares → compact stacked bar
     const parts = (Array.isArray(v) ? v : []) as (number | null)[];
-    const colors = ["#5046e5", "#8f89ee", "#cbc8f6"], names = ["Stores", "Online", "Marketplace"];
+    const colors = ["#0e8a96", "#14a3ae", "#8fd6da"], names = ["Stores", "Online", "Marketplace"];
     const tip = parts.map((x, i) => `${names[i]} ${x == null ? "—" : Math.round(x * 100) + "%"}`).join(" · ");
     return (
       <td className={base} title={tip}>
@@ -281,7 +310,7 @@ function Cell({ c, r, first, max }: { c: Col; r: Row; first: boolean; max?: numb
     return (
       <td className={base}>
         <span className="flex max-w-[280px] items-center gap-2.5">
-          {img ? <span className="thumb inline-block size-8 shrink-0"><img src={img} alt="" loading="lazy" className="size-full rounded-md border border-line bg-white object-cover" /><img src={img} alt="" loading="lazy" className="preview" /></span> : <span className="size-8 shrink-0 rounded-md bg-zinc-100" />}
+          {img ? <span className="thumb inline-block shrink-0" style={{ width: c.imageSize ?? 32, height: c.imageSize ?? 32 }}><img src={img} alt="" loading="lazy" className="size-full rounded-md border border-line bg-white object-cover" /><img src={img} alt="" loading="lazy" className="preview" /></span> : <span className="shrink-0 rounded-md bg-zinc-100" style={{ width: c.imageSize ?? 32, height: c.imageSize ?? 32 }} />}
           <span className="min-w-0 leading-tight"><span className="block truncate">{fmt(v, t)}</span>{sub != null && sub !== "" && <span className="block font-mono text-[10.5px] font-normal text-zinc-400">{String(sub)}</span>}</span>
         </span>
       </td>

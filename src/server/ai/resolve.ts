@@ -2,6 +2,7 @@ import "server-only";
 import { cached } from "@/lib/cache";
 import { catLabel } from "../views";
 import { getProducts, type Product } from "../data/products";
+import { CATEGORIES } from "@/lib/categories";
 import type { Store } from "../data/stores";
 
 /** Entity resolution: product names/SKUs and locations → governed ids, with explicit confidence. */
@@ -13,7 +14,9 @@ const STOP = new Set(["the", "a", "an", "of", "for", "men", "mens", "snitch", "p
 const CAT_WORDS: Record<string, string> = {
   shoe: "shoes", shoes: "shoes", sneaker: "shoes", sneakers: "shoes", footwear: "shoes", boots: "shoes", loafer: "shoes", loafers: "shoes",
   perfume: "perfumes", perfumes: "perfumes", fragrance: "perfumes", edp: "perfumes", scent: "perfumes",
-  sunglass: "sunglasses", sunglasses: "sunglasses", shades: "sunglasses", belt: "belts", belts: "belts", bag: "bags", bags: "bags",
+  sunglass: "sunglasses", sunglasses: "sunglasses", shades: "sunglasses", belt: "belts", belts: "belts", bag: "bags", bags: "bags", backpack: "bags", backpacks: "bags",
+  sandal: "shoes", sandals: "shoes", slides: "shoes", flipflops: "shoes", trolley: "luggage", trolleys: "luggage", suitcase: "luggage", luggage: "luggage",
+  cap: "accessories", caps: "accessories", socks: "accessories", accessory: "accessories", accessories: "accessories",
 };
 
 /** Damerau-Levenshtein (optimal string alignment) distance. */
@@ -46,7 +49,8 @@ interface Indexed { p: Product; name: string; words: string[]; style: string }
 function index(): Promise<Indexed[]> {
   return cached("ai:productIndex", 1800, async () =>
     (await getProducts())
-      .filter((p) => p.category)
+      // scope guard: only the tool's registered long-tail categories are resolvable
+      .filter((p) => p.category && CATEGORIES.some((c) => c.key === p.category))
       .map((p) => {
         const name = norm(p.name ?? "");
         return { p, name, words: name.split(" ").filter((w) => w && !STOP.has(w)), style: p.sku.split("-")[0].toLowerCase() };

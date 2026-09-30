@@ -20,7 +20,7 @@ Profiled against Snowflake `SNITCH_DB.MAPLEMONK` on 29 Sep 2026 (role `BUSINESS_
 
 **DSR (`LONG_TAIL_DSR_*`)** — `DATE`, `MONTH`, `BRANCH_CODE` (varchar store id), `STORE_NAME`, `OPERATING_MODEL`
 (COCO/COFO/FOCO), `STATE`, `REGION`, `CITY`, `CITY_TYPE`, `LOCATION_TYPE`, `STORE_STATUS` (FRESH/OUTLET), `PARTNER`, `AM`, `RM`, `NSM`,
-`TARGET`, `SALES` (net), `MTD_TARGET`, `MTD_SALES`, `BILLS`, `QTY`, `MRP_SALES`, `COGS_SALES`, `DISC_PCT`, `ASP`, `ATV_*`, `UPT_*`,
+`TARGET`, `SALES` (gross, before returns; matches horizontal GROSS_SALES within 0.5%), `MTD_TARGET`, `MTD_SALES`, `BILLS`, `QTY`, `MRP_SALES`, `COGS_SALES`, `DISC_PCT`, `ASP`, `ATV_*`, `UPT_*`,
 new/repeat splits, L2L, omni, footfall/conversion, and inventory columns (`INV_*`, `*_OPTIONS`) which are **null** in current rows.
 
 **Targets (`MTD_TARGET_*`)** — `DATE`, `BRANCH_CODE`, `TARGET` (daily), `MTD_TARGET` (cumulative).
@@ -68,7 +68,7 @@ L30/L60/L90/TD sales & qty per channel, return %, GP %.
 
 | Metric | Definition |
 |---|---|
-| Revenue | Σ DSR `SALES` (net) — store views; Σ `GROSS_SALES` — SKU views |
+| Revenue | Σ DSR `SALES` (gross, before returns; matches horizontal GROSS_SALES within 0.5%) — store views; Σ `GROSS_SALES` — SKU views |
 | Target | Σ effective daily target over the selected dates (phased; weekends carry more) |
 | Achievement % | Revenue ÷ target (— when target is 0/missing) |
 | Gap | Target − revenue (negative = above target) |

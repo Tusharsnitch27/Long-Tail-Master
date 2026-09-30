@@ -4,11 +4,23 @@ import { getChannelDaily, getChannelSku, channelFreshness } from "@/server/data/
 import { pageContext } from "@/server/context";
 import { buildActions } from "@/server/actions";
 
-/** Dev-only: summaries of the Category Mitra data modules for validation. */
+/** Dev-only: summaries of the Snitch Udaan data modules for validation. */
 export async function GET(req: Request) {
   if (process.env.AUTH_MODE !== "dev" || process.env.NODE_ENV === "production") return new Response("not found", { status: 404 });
   const what = new URL(req.url).searchParams.get("what");
   const t0 = Date.now();
+  if (what === "sku") {
+    const q0 = (new URL(req.url).searchParams.get("q") ?? "").toUpperCase();
+    const ps = (await getProducts()).filter((p) => p.sku.startsWith(q0)).slice(0, 5);
+    return Response.json(ps.map((p) => ({ sku: p.sku, name: p.name, cat: p.category, l1: p.l1, img: !!p.image, inBible: p.inBible })));
+  }
+  if (what === "targets") {
+    const { getTargetBook } = await import("@/server/data/targetBook");
+    const { q } = await import("@/server/db");
+    const raw = await q("select channel, category, to_char(month,'YYYY-MM-DD') as month, target::float8 target from month_targets where month = '2026-09-01'").catch((e) => String(e));
+    const b = await getTargetBook("2026-09-01");
+    return Response.json({ raw, months: b.months.length, perfumesStores: b.month("stores", ["perfumes"], "2026-09-01") });
+  }
   if (what === "products") {
     const ps = await getProducts();
     const byCat: Record<string, { n: number; inBible: number; salesAll: number; returns: number; storeInv: number; whBible: number }> = {};

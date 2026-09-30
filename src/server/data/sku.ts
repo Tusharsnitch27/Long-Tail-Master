@@ -20,6 +20,9 @@ export interface SkuStoreFact {
   price: number | null;
 }
 
+/** Units excluding free gifts (lines sold under ₹10 per unit). */
+const PAID_QTY = "iff(gross_sales >= 10 * gross_quantity, gross_quantity, 0)";
+
 const TYPES: Record<Filters["ch"], string[]> = { store: ["Store"], shopify: ["Shopify"], marketplace: ["Marketplace"], all: ["Store", "Shopify", "Marketplace"] };
 
 export async function getSkuFacts(opts: { range: Range; compare: Range; asOf: string; cats: string[]; ch: Filters["ch"] }): Promise<SkuStoreFact[]> {
@@ -37,11 +40,11 @@ export async function getSkuFacts(opts: { range: Range; compare: Range; asOf: st
   ];
   const w = (col: string) => `sum(iff(date between ? and ?, ${col}, 0))`;
   const rows = await sfCached<Record<string, unknown>>(
-    "skufacts",
+    "skufacts:v2",
     `select sku_group sku, category cat, trim(channel) ch, type,
-       ${w("gross_sales")} rs, ${w("gross_quantity")} rq, ${w("gross_sales")} ps, ${w("gross_quantity")} pq,
-       ${w("gross_sales")} l7s, ${w("gross_quantity")} l7q, ${w("gross_sales")} p7s, ${w("gross_quantity")} p7q,
-       ${w("gross_sales")} l30s, ${w("gross_quantity")} l30q, ${w("gross_sales")} mtds, ${w("gross_quantity")} mtdq,
+       ${w("gross_sales")} rs, ${w(PAID_QTY)} rq, ${w("gross_sales")} ps, ${w(PAID_QTY)} pq,
+       ${w("gross_sales")} l7s, ${w(PAID_QTY)} l7q, ${w("gross_sales")} p7s, ${w(PAID_QTY)} p7q,
+       ${w("gross_sales")} l30s, ${w(PAID_QTY)} l30q, ${w("gross_sales")} mtds, ${w(PAID_QTY)} mtdq,
        ${w("discount_amount")} disc,
        to_varchar(max(date)) last, max(price) price
      from SNITCH_DB.MAPLEMONK.HORIZONTAL_SALES_CATEGORIES
@@ -62,8 +65,8 @@ export async function getSkuFacts(opts: { range: Range; compare: Range; asOf: st
 export async function getSkuDaily(sku: string, range: Range, ch: Filters["ch"], store?: string) {
   const types = TYPES[ch];
   return sfCached<{ date: string; sales: number; qty: number; stores: number }>(
-    "skudaily",
-    `select to_varchar(date) date, sum(gross_sales) sales, sum(gross_quantity) qty, count(distinct channel) stores
+    "skudaily:v2",
+    `select to_varchar(date) date, sum(gross_sales) sales, sum(${PAID_QTY}) qty, count(distinct channel) stores
      from SNITCH_DB.MAPLEMONK.HORIZONTAL_SALES_CATEGORIES
      where sku_group = ? and date between ? and ? and type in (${types.map(() => "?").join(",")}) ${store ? "and trim(channel) = ?" : ""}
      group by 1 order by 1`,
@@ -75,8 +78,8 @@ export async function getSkuDaily(sku: string, range: Range, ch: Filters["ch"], 
 export async function getSkuDailyMulti(skus: string[], range: Range, ch: Filters["ch"], storeNames?: string[] | null) {
   const types = TYPES[ch];
   const rows = await sfCached<{ date: string; sku: string; sales: number; qty: number; stores: number }>(
-    "skudailymulti",
-    `select to_varchar(date) date, sku_group sku, sum(gross_sales) sales, sum(gross_quantity) qty, count(distinct channel) stores
+    "skudailymulti:v2",
+    `select to_varchar(date) date, sku_group sku, sum(gross_sales) sales, sum(${PAID_QTY}) qty, count(distinct channel) stores
      from SNITCH_DB.MAPLEMONK.HORIZONTAL_SALES_CATEGORIES
      where sku_group in (select value::string from table(flatten(parse_json(?))))
        and date between ? and ? and type in (${types.map(() => "?").join(",")})

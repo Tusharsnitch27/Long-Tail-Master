@@ -8,8 +8,8 @@ import { summarize } from "./analytics";
 import type { Ctx } from "./context";
 
 /**
- * One view of revenue across channels. Stores = DSR (net), Online = Unicommerce SHOPIFY, Marketplace = Unicommerce
- * AJIO / MYNTRA / FLIPKART / AMAZON (non-cancelled items). Overall = the sum, so channels always reconcile to it.
+ * One view of revenue across channels. Stores = DSR (gross sales), Online = Unicommerce SHOPIFY, Marketplace = Unicommerce
+ * AJIO / MYNTRA / FLIPKART / AMAZON / NYKAA (items incl. cancellations). Overall = the sum, so channels always reconcile to it.
  */
 export type ChKey = "stores" | "online" | "marketplace";
 export const CH_LABEL: Record<ChKey, string> = { stores: "Stores", online: "Online", marketplace: "Marketplace" };

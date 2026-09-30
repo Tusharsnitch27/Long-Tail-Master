@@ -1,25 +1,15 @@
-# Long-Tail Ops
+# Snitch Udaan
 
-Internal operating tool for Snitch long-tail categories (Perfumes and Shoes first). It covers store performance, targets,
-SKU performance, and an action centre of exceptions.
+**Building the next ₹100 Cr business.** Snitch Udaan is the operating tool for Snitch's long-tail categories: Accessories, Bags, Belts,
+Perfumes, Shoes (incl. Footwear), Sunglasses and Trolleys. It covers Stores, Online (Shopify) and Marketplaces (AJIO, Myntra, Flipkart, Amazon).
 
-- **Next.js 16** (App Router, server components), TypeScript, Tailwind v4, Recharts, TanStack Virtual
-- **Snowflake** is the analytical source of truth. It is queried server-side only and results are cached in memory.
-- **PostgreSQL** holds application data: target overrides and history, users and roles, settings, saved views, and the audit log.
-- **Auth** is username + password. Admins create accounts in the app; there are two roles, admin and viewer.
+- **Next.js 16** (App Router, server components), TypeScript, Tailwind v4 (Ocean Teal theme), Recharts, TanStack Virtual
+- **Snowflake** is the analytical source of truth. It is queried server-side only and cached in memory (stale-while-revalidate).
+- **PostgreSQL** holds app data: targets, daily splits, store targets, remarks, action status, VM revamps, future inwards, attribute edits, users and the change log.
+- **Auth** is username + password. Admins create accounts in the Control Centre; the two roles are admin and viewer.
 
-See [docs/DATA_MODEL.md](docs/DATA_MODEL.md) for the source-table audit, joins, data-quality findings and metric definitions.
-
-## Category Mitra
-
-A category operating system for leadership, category owners and execution teams. See [docs/CATEGORY_MITRA.md](docs/CATEGORY_MITRA.md) for
-the source map, metric dictionary, product grain, channel mapping, inventory logic and the question each page answers.
-
-Pages: Executive Summary `/` · Overview · Mitra · Category Overview · Channel Overview · Store Overview (Summary / Stores / DSR) ·
-Online Overview · Marketplace Overview · Merchandising Overview · Action Centre · Settings (targets incl. channel targets, users, rules).
-
-Global context is Category (Overall + categories with data), Period and Channel (only where relevant). Marketplace and store
-selectors list only values present in the data.
+See [docs/SNITCH_UDAAN.md](docs/SNITCH_UDAAN.md) for scope, the source map, targets logic, the metric dictionary and the question each page
+answers. Rules and their current values are listed in the app under Control Centre → Rules & data.
 
 ## Mitra (AI)
 

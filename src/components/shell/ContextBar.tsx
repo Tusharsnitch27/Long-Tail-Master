@@ -11,12 +11,12 @@ export interface ContextOptions {
   marketplaces: Record<string, string[]>;
   asOf: string;
   today: string;
-  freshness: { label: string; value: string }[];
+  freshness: { label: string; value: string; tip?: string; stale?: boolean }[];
 }
 
 const PERIODS = [
-  { key: "today", label: "Today" }, { key: "yesterday", label: "Yesterday" }, { key: "cw", label: "This week" },
-  { key: "pw", label: "Last week" }, { key: "mtd", label: "MTD" }, { key: "l30", label: "L30" },
+  { key: "today", label: "Today" }, { key: "yesterday", label: "Yesterday" }, { key: "cw", label: "Current week" }, { key: "pw", label: "Previous week" },
+  { key: "mtd", label: "MTD" }, { key: "l30", label: "Last 30" }, { key: "l90", label: "Last 90" }, { key: "pm", label: "Previous month" },
 ];
 const CHANNELS = [{ key: "all", label: "Overall" }, { key: "stores", label: "Stores" }, { key: "online", label: "Online" }, { key: "marketplace", label: "Marketplace" }];
 
@@ -25,7 +25,7 @@ function Seg({ items, value, onChange }: { items: { key: string; label: string }
     <div className="flex h-8 items-center gap-0.5 rounded-lg border border-line bg-white p-0.5">
       {items.map((i) => (
         <button key={i.key} onClick={() => onChange(i.key)}
-          className={cn("h-full whitespace-nowrap rounded-md px-2.5 text-[12.5px] transition-colors", value === i.key ? "bg-ink font-medium text-white" : "text-zinc-600 hover:bg-zinc-100 hover:text-ink")}>
+          className={cn("h-full whitespace-nowrap rounded-md px-2.5 text-[12.5px] transition-colors", value === i.key ? "bg-brand-700 font-medium text-white" : "text-zinc-600 hover:bg-brand-50 hover:text-ink")}>
           {i.label}
         </button>
       ))}
@@ -82,7 +82,7 @@ export function ContextBar({ options }: { options: ContextOptions }) {
       <div className="flex flex-wrap items-center gap-2 px-6 py-2.5">
         {scope.category && (
           <Dropdown label="Category" value={cat} onChange={(k) => set({ cat: k === "overall" ? null : k })}
-            items={[{ key: "overall", label: "Overall", color: "#111114" }, ...options.categories]} />
+            items={[{ key: "overall", label: "Overall", color: "#0b2a30" }, ...options.categories]} />
         )}
         {scope.period && (
           <>
@@ -106,9 +106,10 @@ export function ContextBar({ options }: { options: ContextOptions }) {
           </>
         )}
         {!show && <div className="h-8" />}
-        <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-zinc-500">
+        <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-500">
+          <span className="font-medium uppercase tracking-wider text-zinc-400">Updated</span>
           {options.freshness.map((f) => (
-            <span key={f.label} className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-emerald-500" />{f.label} <span className="font-medium text-zinc-700">{f.value}</span></span>
+            <span key={f.label} className="flex items-center gap-1.5" title={f.tip}><span className={cn("size-1.5 rounded-full", f.stale ? "bg-amber-500" : "bg-emerald-500")} />{f.label} <span className="font-medium text-zinc-700">{f.value}</span></span>
           ))}
         </div>
       </div>

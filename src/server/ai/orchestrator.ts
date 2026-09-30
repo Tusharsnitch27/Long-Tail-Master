@@ -7,6 +7,8 @@ import { SUBMIT_TOOL, type Answer, type View } from "./answer";
 import { TOOLS, aiBase, jsonSchema, toolByName, type ToolEnvelope } from "./tools";
 import { loadConversation, recordTurn, saveConversation, type Conversation } from "./store";
 import { aiClient, aiConfigured, providerFeatures } from "./provider";
+import { effectiveRemarks } from "../data/remarks";
+import { IN_SCOPE_NOTE } from "@/lib/categories";
 
 export type AiEvent =
   | { type: "meta"; conversation_id: string }
@@ -38,8 +40,9 @@ const LABEL: Record<string, (i: Record<string, unknown>) => string> = {
   get_exceptions: (i) => `Exceptions: ${String(i.type).replaceAll("_", " ")}`,
   explain_change: () => "Decomposing the change",
   get_channel_performance: (i) => `Channel performance by ${i.group_by}`,
-  get_actions: (i) => `Action Centre${i.group && i.group !== "all" ? ` · ${i.group}` : ""}`,
+  get_actions: (i) => `Checking the Action Centre${i.group && i.group !== "all" ? ` · ${i.group}` : ""}`,
   get_product_summary: () => "Product Master details",
+  get_team_remarks: () => "Reading team remarks",
   submit_answer: () => "Writing the answer",
 };
 
@@ -106,7 +109,8 @@ export async function* runTurn(opts: { user: User; question: string; conversatio
   yield { type: "meta", conversation_id: conv.id };
 
   const base = await aiBase();
-  const context = `<context>\nToday (IST): ${base.today} — partial day. Last complete day (as-of): ${base.asOf}. Enabled categories: ${base.settings.enabledCategories.join(", ")}. Status thresholds: ahead ≥${base.settings.thresholds.ahead}, on track ≥${base.settings.thresholds.onTrack}, at risk ≥${base.settings.thresholds.atRisk}. User: ${opts.user.name} (${opts.user.role}).\n</context>\n\n`;
+  const remarkCount = await effectiveRemarks(base.today).then((r) => r.length).catch(() => 0);
+  const context = `<context>\nToday (IST): ${base.today} — partial day. Last complete day (as-of): ${base.asOf}. Enabled categories: ${base.settings.enabledCategories.join(", ")} (in scope: ${IN_SCOPE_NOTE}). Active team remarks: ${remarkCount}${remarkCount ? " — call get_team_remarks when stores, products, periods or recommendations are involved" : ""}. Status thresholds: ahead ≥${base.settings.thresholds.ahead}, on track ≥${base.settings.thresholds.onTrack}, at risk ≥${base.settings.thresholds.atRisk}. User: ${opts.user.name} (${opts.user.role}).\n</context>\n\n`;
   const messages = conv.messages; // append-only
   messages.push({ role: "user", content: context + opts.question });
 

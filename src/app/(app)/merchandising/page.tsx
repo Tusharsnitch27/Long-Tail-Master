@@ -78,7 +78,7 @@ export default async function Merchandising({ searchParams }: { searchParams: Pr
       {tab === "position" && <DataTable rows={posRows} columns={posCols} defaultSort={{ key: "l30" }} rowHref="/products/{sku}" csvName="inventory-position" height={680} dense={false} searchKeys={["name", "sku", "category"]} />}
       {tab === "allocation" && (
         <>
-          <Notice>Strong L7 velocity + low store stock + warehouse stock available. Store stock is known for the {act.coverage.feedStores} stores in the store-inventory feed only. Suggested quantities cover {21} days at the current rate, capped at 25% of warehouse stock.</Notice>
+          <Notice>Strong L7 velocity + low store stock + warehouse stock available. Store stock is from the latest store report ({act.coverage.feedStores} stores). Suggested quantities cover {21} days at the current rate, capped at 25% of warehouse stock.</Notice>
           {alloc.length ? <div className="grid gap-2.5 xl:grid-cols-2">{alloc.map((a) => <ActionCard key={a.key} a={a} qs={base.qs} status={statuses.get(a.key) ?? "open"} />)}</div> : <div className="py-6 text-center text-[12.5px] text-zinc-500">No allocation opportunities right now.</div>}
         </>
       )}

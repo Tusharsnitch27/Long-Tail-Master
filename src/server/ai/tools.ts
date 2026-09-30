@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { CATEGORIES } from "@/lib/categories";
+import { CATEGORIES, IN_SCOPE_NOTE } from "@/lib/categories";
 import { addDays, addMonths, diffDays, endOfMonth, minDate, maxDate, rangeDays, resolvePeriod, startOfMonth, startOfWeek, eachDay, type Preset, type Range } from "@/lib/dates";
 import type { Filters } from "@/lib/filters";
 import { growth, safeDiv, targetStatus } from "@/lib/metrics";
@@ -13,6 +13,7 @@ import { getStoreInventory, getStoreInventoryCoverage } from "../data/inventory"
 import { getWarehouseStock } from "../data/warehouse";
 import { getChannelDaily } from "../data/channels";
 import { buildActions, GROUP_LABEL } from "../actions";
+import { effectiveRemarks } from "../data/remarks";
 import { channelMetrics, marketplaceBreakdown, ucChannel } from "../channelData";
 import { productPerformance } from "../scope";
 import { groupFacts, monthOutlook, summarize, storeMatcher } from "../analytics";
@@ -127,6 +128,10 @@ export interface ToolEnvelope {
 interface ToolDef<S extends z.ZodTypeAny> { name: string; description: string; schema: S; run: (input: z.infer<S>, b: Base) => Promise<ToolEnvelope> }
 const def = <S extends z.ZodTypeAny>(t: ToolDef<S>) => t;
 
+/** Apparel and other non-long-tail words: questions about these are out of scope (no data is mixed in). */
+const OUT_OF_SCOPE = ["shirt", "shirts", "t-shirt", "tshirt", "tee", "tees", "jeans", "denim", "trouser", "trousers", "pant", "pants", "chinos", "shorts", "jacket", "jackets", "hoodie", "hoodies", "sweater", "sweatshirt", "blazer", "suit", "kurta", "polo", "polos", "cargo", "joggers", "apparel", "innerwear", "boxers", "vest", "overshirt", "co-ord", "coord"];
+const outOfScope = (q: string) => q.toLowerCase().split(/[^a-z-]+/).find((w) => OUT_OF_SCOPE.includes(w)) ?? null;
+
 const resolveProductTool = def({
   name: "resolve_product",
   description: "Resolve a product name, style, typo or SKU code (e.g. 'Stryker', 'chelsea boots', 'SH0173') to product families and SKU groups using the product masters. ALWAYS call before product-specific metrics. Returns confidence (high/medium/low/none) and whether the match is ambiguous; also returns MRP, colour and status for direct lookups.",
@@ -134,9 +139,12 @@ const resolveProductTool = def({
   run: async (i) => {
     const r = await resolveProduct(i.query, i.category);
     const pm = await getProductMap();
+    const oos = outOfScope(i.query);
     return {
       tool: "resolve_product", description: `Product resolution for "${i.query}"`, filters: { query: i.query, category: i.category }, as_of: null, source: "product_master",
-      confidence: r.confidence, ambiguous: r.ambiguous, guidance: r.guidance, suggestions: r.suggestions,
+      confidence: oos && r.confidence !== "high" ? "none" : r.confidence, ambiguous: r.ambiguous,
+      guidance: oos && r.confidence !== "high" ? `"${oos}" is outside this tool's scope (${IN_SCOPE_NOTE}). Do not answer about it; say it is out of scope and offer an in-scope alternative.` : r.guidance,
+      scope: `Only ${IN_SCOPE_NOTE} are in scope.`, suggestions: r.suggestions,
       matches: r.matches.map((m) => ({ ...m, product_type: (() => { const p = pm.get(m.skus[0]?.sku); return p ? productType(p) : null; })() })),
     };
   },
@@ -156,7 +164,7 @@ const resolveLocationTool = def({
 const PERF_GROUPS = ["none", "category", "store", "city", "state", "region", "store_type", "area_manager", "date", "week", "month"] as const;
 const getPerformance = def({
   name: "get_performance",
-  description: "Store-level sales vs target from the DSR + target tables (net revenue, units, bills, target, achievement, gap, growth vs a comparison period, stores selling, productivity, month outlook). Use for category/store/region performance, rankings of stores, trends over dates/weeks/months, and target questions. NOT for SKU/product-level questions (use get_sku_performance).",
+  description: "Store-level sales vs target from the DSR + target tables (gross revenue before returns, units, bills, target, achievement, gap, growth vs a comparison period, stores selling, productivity, month outlook). Use for category/store/region performance, rankings of stores, trends over dates/weeks/months, and target questions. NOT for SKU/product-level questions (use get_sku_performance).",
   schema: z.strictObject({
     period: PeriodSchema, compare: CompareSchema, categories: Categories, scope: ScopeSchema.nullable(),
     group_by: z.enum(PERF_GROUPS), sort_by: z.enum(["revenue", "units", "achievement", "gap", "growth", "target", "sales_per_store_day"]).nullable(),
@@ -255,7 +263,7 @@ const getPerformance = def({
 const SKU_GROUPS = ["sku", "product_family", "store", "category", "date", "week"] as const;
 const getSkuPerformance = def({
   name: "get_sku_performance",
-  description: "Product-level sales: revenue, units, growth, ASP, L7 vs prior 7, L30, last sale. channel=store uses store sales lines (adds stores selling, penetration, store/date/week breakdowns); website_app (Shopify) / marketplace / all use Unicommerce order items (non-cancelled) and add return % and store/warehouse stock. Filter to specific SKUs (from resolve_product) and/or categories and store scope; group by sku, product_family, store, category, date or week. Use for 'top SKUs', 'how is <product> doing', product trends and store-by-product breakdowns.",
+  description: "Product-level sales: revenue, units, growth, ASP, L7 vs prior 7, L30, last sale. channel=store uses store sales lines (adds stores selling, penetration, store/date/week breakdowns); website_app (Shopify) / marketplace / all use Unicommerce order items (all (incl. cancelled)) and add return % and store/warehouse stock. Filter to specific SKUs (from resolve_product) and/or categories and store scope; group by sku, product_family, store, category, date or week. Use for 'top SKUs', 'how is <product> doing', product trends and store-by-product breakdowns.",
   schema: z.strictObject({
     period: PeriodSchema, compare: CompareSchema, categories: Categories, skus: z.array(z.string()).nullable().describe("SKU group codes from resolve_product"),
     scope: ScopeSchema.nullable(), channel: z.enum(["store", "website_app", "marketplace", "all"]), group_by: z.enum(SKU_GROUPS),
@@ -287,7 +295,7 @@ const getSkuPerformance = def({
       const dir = i.sort_dir === "asc" ? 1 : -1;
       rows = rows.sort((x, y) => (((x[sk as keyof typeof x] as number | null) ?? -Infinity) > ((y[sk as keyof typeof y] as number | null) ?? -Infinity) ? dir : -dir));
       return { tool: "get_sku_performance", description: `Product sales (${channel}) by ${i.group_by}`, filters: { categories: c.filters.cats, skus: i.skus, channel },
-        period: periodInfo(c), comparison: compareInfo(c), as_of: c.period.range.to, source: channel === "all" ? "stores: store sales lines; online/marketplace: Unicommerce (non-cancelled)" : "UNICOMMERCE_FACT_ITEMS_INTERMEDIATE (non-cancelled)",
+        period: periodInfo(c), comparison: compareInfo(c), as_of: c.period.range.to, source: channel === "all" ? "stores: store sales lines; online/marketplace: Unicommerce (all (incl. cancelled))" : "UNICOMMERCE_FACT_ITEMS_INTERMEDIATE (all (incl. cancelled))",
         summary: { revenue: r0(fs.reduce((a2, r) => a2 + r.revenue, 0)), units: fs.reduce((a2, r) => a2 + r.units, 0), selling_products: fs.filter((r) => r.units > 0).length, rolling_windows_end: c.asOf },
         columns: [{ key: "label", label: "Product", format: "text" }, ...(i.group_by === "sku" ? [{ key: "sku", label: "SKU", format: "text" as const }] : []), { key: "revenue", label: "Revenue", format: "inr" }, { key: "units", label: "Units", format: "num" }, { key: "growth", label: "Growth", format: "delta" }, { key: "return_pct", label: "Return %", format: "pct" }, { key: "warehouse_units", label: "Warehouse", format: "num" }],
         data: rows.slice(0, i.limit ?? 25), row_count: rows.length, notes: [] };
@@ -356,7 +364,7 @@ const getSkuPerformance = def({
 
 const getInventory = def({
   name: "get_current_inventory",
-  description: "CURRENT inventory (latest state only — never summed across dates). level=network: per product store units (all stores combined, Product Master) + warehouse units (Unicommerce live) + total, with timestamps; group_by=size adds the warehouse size split. level=store: per-store units from the store-inventory feed, which covers only ~20 stores (coverage is returned — always disclose it). Use for 'how much inventory', 'where is X available', 'stores with stock', 'size split', stocked-but-not-selling analysis (include_sales_velocity).",
+  description: "CURRENT inventory (latest state only — never summed across dates). level=network: per product store units (all stores combined, Product Master) + warehouse units (Unicommerce live) + total, with timestamps; group_by=size adds the warehouse size split. level=store: per-store units from the daily store report (OFFLINE_MASTER_DAILY_REPORT_1, latest date = live, ~140 stores; product level, no size split). Warehouse is split North / South. Use for 'how much inventory', 'where is X available', 'stores with stock', 'size split', stocked-but-not-selling analysis (include_sales_velocity).",
   schema: z.strictObject({
     skus: z.array(z.string()).nullable().describe("SKU group codes from resolve_product; null = whole categories"),
     categories: Categories, level: z.enum(["network", "store"]), scope: ScopeSchema.nullable(),
@@ -376,20 +384,20 @@ const getInventory = def({
         const p = pm.get(sku); const w = wh.bySku.get(sku);
         return { key: sku, sku, label: p?.name ?? sku, category: catLabel(p?.category ?? ""), colour: p?.colour ?? null,
           store_units: p?.invOffline ?? null, stores_stocked: p?.storesStocked ?? null, warehouse_units: w?.units ?? 0,
-          total_units: (p?.invOffline ?? 0) + (w?.units ?? 0), warehouse_updated: w?.updated ?? null,
+          total_units: (p?.invOffline ?? 0) + (w?.units ?? 0), warehouse_north: w?.byZone.North ?? 0, warehouse_south: w?.byZone.South ?? 0, warehouse_updated: w?.updated ?? null,
           warehouse_by_size: i.group_by === "size" ? w?.bySize ?? {} : undefined, warehouse_by_facility: w?.byFacility ?? {} };
       }).filter((r) => r.total_units > 0 || i.skus?.length).sort((a2, b2) => b2.total_units - a2.total_units);
       if (i.skus?.length) {
         const none = rows.filter((r) => r.total_units === 0).map((r) => r.sku);
         if (none.length) notes.push(`No current stock (stores or warehouse) for: ${none.join(", ")}.`);
       }
-      notes.push("Store units are all stores combined (Product Master, refreshed daily); use level=store for per-store stock (feed covers ~20 stores).");
+      notes.push("Store units = all stores combined from the latest store report (OFFLINE_MASTER_DAILY_REPORT_1, ~140 stores). Use level=store for per-store stock. Warehouse split: North = SAPL-NORTH-TAURU; South = SAPL-WH1 + SAPL-WH2.");
       return {
         tool: "get_current_inventory", description: "Current inventory: stores (all) + warehouse (live)", filters: { skus: i.skus, categories: cats, level: "network" },
-        as_of: wh.updated, snapshots: { store_inventory: `Product Master · refreshed ${bibleTs ?? "daily"}`, warehouse_inventory: `Unicommerce live · last update ${wh.updated ?? "—"} IST` },
-        source: "store: LONG_TAIL_MASTER_BIBLE.OFFLINE_INV_ALL; warehouse: UNICOMMERCE_LIVE_INVENTORY (current state, good stock)",
-        summary: { products: rows.length, store_units: rows.reduce((a2, r) => a2 + (r.store_units ?? 0), 0), warehouse_units: rows.reduce((a2, r) => a2 + r.warehouse_units, 0), total_units: rows.reduce((a2, r) => a2 + r.total_units, 0) },
-        columns: [{ key: "label", label: "Product", format: "text" }, { key: "sku", label: "SKU", format: "text" }, { key: "store_units", label: "Store units", format: "num" }, { key: "warehouse_units", label: "Warehouse units", format: "num" }, { key: "total_units", label: "Total", format: "num" }, { key: "stores_stocked", label: "Stores stocked", format: "num" }],
+        as_of: wh.updated, snapshots: { store_inventory: `Store report (latest date = live) · Product Master refreshed ${bibleTs ?? "daily"}`, warehouse_inventory: `Unicommerce live · last update ${wh.updated ?? "—"} IST` },
+        source: "store: OFFLINE_MASTER_DAILY_REPORT_1 latest date (fallback LONG_TAIL_MASTER_BIBLE); warehouse: UNICOMMERCE_LIVE_INVENTORY (current state, good stock)",
+        summary: { products: rows.length, store_units: rows.reduce((a2, r) => a2 + (r.store_units ?? 0), 0), warehouse_units: rows.reduce((a2, r) => a2 + r.warehouse_units, 0), warehouse_north: rows.reduce((a2, r) => a2 + r.warehouse_north, 0), warehouse_south: rows.reduce((a2, r) => a2 + r.warehouse_south, 0), total_units: rows.reduce((a2, r) => a2 + r.total_units, 0) },
+        columns: [{ key: "label", label: "Product", format: "text" }, { key: "sku", label: "SKU", format: "text" }, { key: "store_units", label: "Store units", format: "num" }, { key: "warehouse_units", label: "Warehouse units", format: "num" }, { key: "warehouse_north", label: "WH North", format: "num" }, { key: "warehouse_south", label: "WH South", format: "num" }, { key: "total_units", label: "Total", format: "num" }, { key: "stores_stocked", label: "Stores stocked", format: "num" }],
         data: rows.slice(0, i.limit ?? 50), row_count: rows.length, notes,
       };
     }
@@ -431,13 +439,13 @@ const getInventory = def({
     const sortedStoreUnits = [...new Map(rowsRaw.reduce((mm, r) => mm.set(r.b, (mm.get(r.b) ?? 0) + r.units), new Map<string, number>())).values()].filter((u) => u > 0).sort((a, b2) => b2 - a);
     const topN = Math.max(1, Math.ceil(sortedStoreUnits.length * 0.25));
     const dates = Array.from(new Set(feed.map((f) => f.saved_date))).sort();
-    notes.push(`Store-level inventory covers only ${feed.length} store(s) in the store-inventory feed (of ~${b.stores.filter((s) => s.last_seen && s.last_seen >= addDays(b.asOf, -30)).length} active stores). Store counts are for these stores only.`);
-    if (dates.length > 1) notes.push(`Stores have different latest snapshot dates (${dates[0]} … ${dates.at(-1)}); each store's own latest snapshot is used.`);
+    notes.push(`Store-level inventory is the store report for ${dates.at(-1) ?? "the latest date"}: ${feed.length} store(s) in scope (of ~${b.stores.filter((s) => s.last_seen && s.last_seen >= addDays(b.asOf, -30)).length} active stores). Stock is at product level (no size split).`);
+    if (gb === "size") notes.push("The store report has no size split — use level=network with group_by=size for the warehouse size split.");
     return {
       tool: "get_current_inventory", description: `Current store-level inventory by ${gb}`, filters: { skus: i.skus, categories: cats, scope: scopeText(i.scope), level: "store" },
-      as_of: dates.at(-1) ?? null, snapshot_dates: dates, source: "store_inventory (SPEED_INVENTORY, latest SAVED_DATE per store; bins and sizes summed)",
-      coverage: { feed_stores: feed.length, feed_store_names: feed.map((f) => f.store.replace(/^SNITCH\s*-\s*/i, "")) },
-      summary: { total_units: total, stores_with_stock: storesWithStock.size, feed_stores_without_stock: feed.length - storesWithStock.size, avg_units_per_stocked_store: r2(safeDiv(total, storesWithStock.size)),
+      as_of: dates.at(-1) ?? null, snapshot_dates: dates, source: "store report (OFFLINE_MASTER_DAILY_REPORT_1, latest DATE = live)",
+      coverage: { report_stores: feed.length, report_date: dates.at(-1) ?? null },
+      summary: { total_units: total, stores_with_stock: storesWithStock.size, report_stores_without_stock: feed.length - storesWithStock.size, avg_units_per_stocked_store: r2(safeDiv(total, storesWithStock.size)),
         top_25pct_stores_share: r2(safeDiv(sortedStoreUnits.slice(0, topN).reduce((a, v) => a + v, 0), total)), top_25pct_store_count: topN },
       columns: [{ key: "label", label: gb === "store" ? "Store" : gb === "sku" ? "Product" : gb, format: "text" }, { key: "units", label: "Units", format: "num" }, { key: "skus_in_stock", label: "SKUs in stock", format: "num" }, ...(i.include_sales_velocity ? [{ key: "units_sold_l7", label: "Sold L7", format: "num" as const }, { key: "units_sold_l30", label: "Sold L30", format: "num" as const }, { key: "weeks_of_cover", label: "Weeks of cover", format: "dec" as const }] : []), ...(gb === "store" ? [{ key: "snapshot_date", label: "Snapshot", format: "date" as const }] : [])],
       data: rows.slice(0, i.limit ?? 50), row_count: rows.length, notes,
@@ -452,7 +460,7 @@ const FLAG: Partial<Record<(typeof EXC)[number], string>> = {
 };
 const getExceptions = def({
   name: "get_exceptions",
-  description: "Action-centre lists using the configured exception rules (as of the last complete day): stores with zero sale / below target / major WoW decline / low productivity / high required run rate / largest MTD gap; SKUs that are zero-sale, declining, strong-but-under-distributed or selling in few stores; stocked_but_not_selling = store × SKU with current stock (store-inventory feed stores only) but no sale in the last 7 days.",
+  description: "Action-centre lists using the configured exception rules (as of the last complete day): stores with zero sale / below target / major WoW decline / low productivity / high required run rate / largest MTD gap; SKUs that are zero-sale, declining, strong-but-under-distributed or selling in few stores; stocked_but_not_selling = store × SKU with current stock on the latest store report (~140 stores) but no sale in the last 7 days.",
   schema: z.strictObject({ type: z.enum(EXC), categories: Categories, scope: ScopeSchema.nullable(), limit: Limit }),
   run: async (i, b) => {
     const rules = b.settings.exceptions;
@@ -483,10 +491,10 @@ const getExceptions = def({
       }
       const rows = [...agg.entries()].filter(([k]) => !sold.has(k)).map(([, e]) => ({ key: `${e.b}|${e.sku}`, branch_code: e.b, label: b.byCode.get(e.b)?.short_name ?? e.b, sku: e.sku, product: pm.get(e.sku)?.name ?? e.sku, category: catLabel(pm.get(e.sku)?.category ?? ""), units_in_stock: e.units })).sort((a, b2) => b2.units_in_stock - a.units_in_stock);
       const byStore = new Map<string, number>(); for (const r of rows) byStore.set(r.label, (byStore.get(r.label) ?? 0) + r.units_in_stock);
-      return { ...base, description: "Store × SKU with current stock but no sale in the last 7 days", source: "store_inventory + sku_sales", as_of: cov.map((x) => x.saved_date).sort().at(-1) ?? b.asOf,
+      return { ...base, description: "Store × SKU with current stock but no sale in the last 7 days", source: "store report + sku_sales", as_of: cov.map((x) => x.saved_date).sort().at(-1) ?? b.asOf,
         columns: [{ key: "label", label: "Store", format: "text" }, { key: "product", label: "Product", format: "text" }, { key: "sku", label: "SKU", format: "text" }, { key: "units_in_stock", label: "Units in stock", format: "num" }],
-        data: rows.slice(0, i.limit ?? 40), row_count: rows.length, summary: { pairs: rows.length, stores_affected: byStore.size, units_idle: rows.reduce((a, r) => a + r.units_in_stock, 0), feed_stores: cov.length },
-        notes: [`Only the ${cov.length} stores in the store-inventory feed can be checked.`] };
+        data: rows.slice(0, i.limit ?? 40), row_count: rows.length, summary: { pairs: rows.length, stores_affected: byStore.size, units_idle: rows.reduce((a, r) => a + r.units_in_stock, 0), report_stores: cov.length },
+        notes: [`Checked against the latest store report (${cov.length} stores).`] };
     }
     // SKU exceptions over rolling windows
     const c = buildCtx(b, { preset: "l30", from: null, to: null }, "previous_period", i.categories, i.scope);
@@ -512,7 +520,7 @@ const getExceptions = def({
 
 const explainChange = def({
   name: "explain_change",
-  description: "Diagnose WHY revenue changed between two periods using only measurable drivers. Store level (no skus): decomposes the change into stores selling × bills per selling store × ATV (= UPT × ASP), plus category, region and biggest store contributors. Product level (skus given): stores selling × units per selling store × ASP, biggest store contributors, and current stock in the largest decliners where the store-inventory feed covers them. Returns which data is unavailable (e.g. footfall) so you never invent causes.",
+  description: "Diagnose WHY revenue changed between two periods using only measurable drivers. Store level (no skus): decomposes the change into stores selling × bills per selling store × ATV (= UPT × ASP), plus category, region and biggest store contributors. Product level (skus given): stores selling × units per selling store × ASP, biggest store contributors, and current stock (store report) in the largest decliners. Returns which data is unavailable (e.g. footfall) so you never invent causes.",
   schema: z.strictObject({ period: PeriodSchema, compare: CompareSchema, categories: Categories, skus: z.array(z.string()).nullable(), scope: ScopeSchema.nullable() }),
   run: async (i, b) => {
     const c = buildCtx(b, i.period, i.compare === "none" ? "auto" : i.compare, i.categories, i.scope);
@@ -538,7 +546,7 @@ const explainChange = def({
         drivers: decompose({ stores_selling: [m.storesSelling, p.storesSelling], bills_per_selling_store: [perDay ? safeDiv(bills(m), days.cur) : bills(m), perDay ? safeDiv(bills(p), days.prev) : bills(p)], atv: [m.atv, p.atv], upt: [m.upt, p.upt], asp: [m.asp, p.asp], discount_pct: [m.disc, p.disc] }, [f(m, days.cur), f(p, days.prev)]),
         by_category: contrib((x) => x.c, catLabel), by_region: contrib((x) => b.byCode.get(x.b)?.region ?? "Unknown", (k) => k),
         biggest_store_declines: stores.slice(0, 8), biggest_store_gains: stores.slice(-5).reverse(),
-        unavailable: ["footfall/conversion (not loaded for long-tail categories)", "competitor or marketing activity", "store-level inventory outside the ~20-store feed"],
+        unavailable: ["footfall/conversion (not loaded for long-tail categories)", "competitor or marketing activity"],
         notes: ["share_of_log_change: how much of the revenue change each multiplicative driver explains (stores × bills/store × ATV; ATV = UPT × ASP). Discount is informational."],
       };
     }
@@ -560,19 +568,19 @@ const explainChange = def({
     const inFeed = new Set(inv.map((x) => x.b));
     return {
       tool: "explain_change", description: "Revenue change decomposition (product level)", filters: { skus: i.skus, scope: scopeText(i.scope) }, period: periodInfo(c), comparison: compareInfo(c), as_of: c.period.range.to,
-      source: "sku_sales + store_inventory", basis: perDay ? "per-day rates" : "period totals",
+      source: "sku_sales + store report", basis: perDay ? "per-day rates" : "period totals",
       summary: { revenue: r0(cur.s), prev_revenue: r0(prev.s), change: r2(growth(cur.s, prev.s)), units: cur.q, prev_units: prev.q },
       drivers: decompose({ stores_selling: [cur.st, prev.st], units_per_selling_store: [cur.ups, prev.ups], asp: [cur.asp, prev.asp] }, [cur.s, prev.s]),
       stores_lost: storeDelta.filter((e) => e.prev > 0 && e.cur === 0).length, stores_gained: storeDelta.filter((e) => e.prev === 0 && e.cur > 0).length,
-      biggest_store_declines: storeDelta.slice(0, 8).map((e) => ({ store: e.label, current: r0(e.cur), previous: r0(e.prev), delta: e.delta, current_stock_units: e.b && inFeed.has(e.b) ? stockOf(e.b) : "not in inventory feed" })),
-      unavailable: ["footfall/conversion", "store-level inventory outside the ~20-store feed", "price/promo calendar (only realised ASP)"],
+      biggest_store_declines: storeDelta.slice(0, 8).map((e) => ({ store: e.label, current: r0(e.cur), previous: r0(e.prev), delta: e.delta, current_stock_units: e.b && inFeed.has(e.b) ? stockOf(e.b) : "store not on the store report" })),
+      unavailable: ["footfall/conversion", "price/promo calendar (only realised ASP)"],
     };
   },
 });
 
 const getChannelPerformance = def({
   name: "get_channel_performance",
-  description: "Revenue by channel: Stores (DSR net), Online (Shopify) and Marketplace (AJIO / MYNTRA / FLIPKART / AMAZON — only those with data), from Unicommerce non-cancelled order items. Overall = Stores + Online + Marketplace. group_by: channel | marketplace | category | date | week. Returns revenue, units, orders, ASP, share, growth vs the comparison period. Use for 'which channel is driving/dragging', 'why are marketplace sales down', channel mix.",
+  description: "Revenue by channel: Stores (DSR gross), Online (Shopify) and Marketplace (AJIO / MYNTRA / FLIPKART / AMAZON / NYKAA — only those with data), from Unicommerce all (incl. cancelled) order items. Overall = Stores + Online + Marketplace. group_by: channel | marketplace | category | date | week. Returns revenue, units, orders, ASP, share, growth vs the comparison period. Use for 'which channel is driving/dragging', 'why are marketplace sales down', channel mix.",
   schema: z.strictObject({ period: PeriodSchema, compare: CompareSchema, categories: Categories, channel: z.enum(["all", "stores", "online", "marketplace"]), marketplace: z.string().nullable(), group_by: z.enum(["channel", "marketplace", "category", "date", "week"]) }),
   run: async (i, b) => {
     const c = buildCtx(b, i.period, i.compare, i.categories, null);
@@ -603,7 +611,7 @@ const getChannelPerformance = def({
     }
     const m = channelMetrics(facts, uc, range, ch, mp), p2 = c.compareNone ? null : channelMetrics(facts, uc, compare, ch, mp);
     return { tool: "get_channel_performance", description: `Channel performance by ${i.group_by}`, filters: { categories: c.filters.cats, channel: ch, marketplace: mp },
-      period: periodInfo(c), comparison: compareInfo(c), as_of: range.to, source: "Stores: DSR; Online/Marketplace: UNICOMMERCE_FACT_ITEMS_INTERMEDIATE (non-cancelled)",
+      period: periodInfo(c), comparison: compareInfo(c), as_of: range.to, source: "Stores: DSR; Online/Marketplace: UNICOMMERCE_FACT_ITEMS_INTERMEDIATE (all (incl. cancelled))",
       summary: { revenue: r0(m.revenue), units: m.units, orders: m.orders, asp: r0(m.asp), prev_revenue: p2 ? r0(p2.revenue) : null, growth: p2 ? r2(growth(m.revenue, p2.revenue)) : null, overall_revenue: r0(tot.revenue), marketplaces_with_data: Array.from(new Set(uc.filter((u) => ucChannel(u.mp) === "marketplace").map((u) => u.mp))) },
       columns: i.group_by === "date" || i.group_by === "week"
         ? [{ key: "key", label: i.group_by === "date" ? "Date" : "Week of", format: "date" }, { key: "stores", label: "Stores", format: "inr" }, { key: "online", label: "Online", format: "inr" }, { key: "marketplace", label: "Marketplace", format: "inr" }, { key: "total", label: "Total", format: "inr" }]
@@ -614,22 +622,60 @@ const getChannelPerformance = def({
 
 const getActions = def({
   name: "get_actions",
-  description: "The Action Centre: measurable opportunities/risks already computed from sales velocity + store stock + warehouse stock + peers + targets. Groups: channel (declines, mix shift, return risk), store (target recovery, category gap, inventory with low sales), sku (fast mover low cover, slow moving, distribution opportunity, sustained decline), merchandising (allocation to specific stores with suggested qty, missed distribution). Use for 'what should we focus on', 'where should X be allocated', 'which SKUs need attention', stockout/excess risk.",
+  description: "The Action Centre: measurable opportunities/risks already computed from sales velocity + store report stock + warehouse stock (North/South) + peers + targets, with the team's remarks applied. Groups: channel (declines, mix shift, return risk), store (target recovery, category gap, inventory with low sales, target set but category not live, expansion candidates where a category isn't live, target mismatch vs Control Centre), sku (fast mover low cover, slow moving, distribution opportunity, sustained decline), merchandising (allocation to specific stores with suggested qty, missed distribution). Rows carry team_notes; actions hidden by a remark are excluded (count in summary). Use for 'what should we focus on', 'where should X be allocated', 'which SKUs need attention', stockout/excess risk.",
   schema: z.strictObject({ categories: Categories, group: z.enum(["all", "channel", "store", "sku", "merchandising"]), priority: z.enum(["any", "urgent", "high_or_urgent"]), skus: z.array(z.string()).nullable(), branch_codes: z.array(z.string()).nullable(), limit: Limit }),
   run: async (i, b) => {
     const c = buildCtx(b, { preset: "mtd", from: null, to: null }, "auto", i.categories, null);
-    const { actions, coverage } = await buildActions(c);
-    const list = actions.filter((a) => (i.group === "all" || a.group === i.group) && (i.priority === "any" || (i.priority === "urgent" ? a.priority === "urgent" : a.priority !== "medium"))
-      && (!i.skus?.length || (a.product && i.skus.includes(a.product.sku))) && (!i.branch_codes?.length || (a.store && i.branch_codes.includes(a.store.code))));
+    const { actions, suppressed, coverage } = await buildActions(c);
+    const match = (a: (typeof actions)[number]) => (i.group === "all" || a.group === i.group) && (i.priority === "any" || (i.priority === "urgent" ? a.priority === "urgent" : a.priority !== "medium"))
+      && (!i.skus?.length || (a.product && i.skus.includes(a.product.sku))) && (!i.branch_codes?.length || (a.store && i.branch_codes.includes(a.store.code)));
+    const list = actions.filter(match);
+    const hidden = suppressed.filter(match);
     const counts: Record<string, number> = {};
     for (const a of list) counts[`${GROUP_LABEL[a.group]} · ${a.typeLabel}`] = (counts[`${GROUP_LABEL[a.group]} · ${a.typeLabel}`] ?? 0) + 1;
     return { tool: "get_actions", description: "Action Centre items", filters: { categories: c.filters.cats, group: i.group, priority: i.priority, skus: i.skus, branch_codes: i.branch_codes },
-      as_of: coverage.asOf, inventory_as_of: coverage.inventoryAsOf, source: "action engine (DSR, store × SKU sales, Unicommerce, Product Master, warehouse live, store-inventory feed)",
-      summary: { count: list.length, by_type: counts, urgent: list.filter((a) => a.priority === "urgent").length, feed_stores: coverage.feedStores },
+      as_of: coverage.asOf, inventory_as_of: coverage.inventoryAsOf, store_report_date: coverage.storeReportDate,
+      source: "action engine (DSR, store × SKU sales, Unicommerce, Product Master, warehouse live, store report) + team remarks",
+      summary: { count: list.length, by_type: counts, urgent: list.filter((a) => a.priority === "urgent").length, impact_open: r0(list.reduce((x, a) => x + a.impact, 0)), hidden_by_team_remarks: hidden.length, report_stores: coverage.feedStores,
+        anomaly_days: coverage.anomalyDays },
       columns: [{ key: "label", label: "Action", format: "text" }, { key: "priority", label: "Priority", format: "text" }, { key: "type", label: "Type", format: "text" }, { key: "impact", label: "Impact ₹", format: "inr" }, { key: "confidence", label: "Confidence", format: "text" }],
-      data: list.slice(0, i.limit ?? 20).map((a) => ({ key: a.key, label: a.title, priority: a.priority, type: a.typeLabel, group: a.group, impact: r0(a.impact), impact_label: a.impactLabel, confidence: a.confidence,
-        reason: a.reason, recommendation: a.recommendation, evidence: Object.fromEntries(a.evidence.map((e) => [e.label, e.value])), product: a.product?.name ?? null, sku: a.product?.sku ?? null, image: a.product?.image ?? null, store: a.store?.name ?? null })),
-      row_count: list.length, notes: [`Store-level stock (allocation, in-store stock) only covers the ${coverage.feedStores} stores in the store-inventory feed.`] };
+      data: list.slice(0, i.limit ?? 20).map((a) => ({ key: a.key, label: a.title, priority: a.priority, type: a.typeLabel, group: a.group, category: a.category, impact: r0(a.impact), impact_label: a.impactLabel, confidence: a.confidence,
+        reason: a.reason, recommendation: a.recommendation, evidence: Object.fromEntries(a.evidence.map((e) => [e.label, e.value])), product: a.product?.name ?? null, sku: a.product?.sku ?? null, image: a.product?.image ?? null, store: a.store?.name ?? null, branch_code: a.store?.code ?? null,
+        period: a.period ?? null, team_notes: (a.notes ?? []).map((n) => `${n.scope === "date" && n.day ? `[anomaly day ${n.day}] ` : ""}${n.text} (${n.by})`) })),
+      row_count: list.length,
+      notes: [
+        "Store actions only target stores where the category is live (stock on the latest store report or a sale in the last 60 days); not-live stores get expansion / distribution suggestions, never 'push sales'.",
+        ...(hidden.length ? [`${hidden.length} matching action(s) are hidden by team remarks (not applicable / snoozed) — don't recommend them; call get_team_remarks for the reasons.`] : []),
+        ...(coverage.anomalyDays.length ? [`Team-marked anomaly days (excluded from week-on-week baselines where possible): ${coverage.anomalyDays.map((d) => `${d.day} ${d.text}`).join("; ")}.`] : []),
+      ] };
+  },
+});
+
+const getTeamRemarks = def({
+  name: "get_team_remarks",
+  description: "Active team remarks — context the category team entered in the Action Centre: stores that don't carry a category (not applicable), snoozed actions, anomaly days (festival, Snitch birthday, sale days, listing outages), VM revamps, stock in transit, general notes. ALWAYS respect these: don't recommend what a remark rules out, and mention anomaly days when they fall inside a period you compare. Filter by categories / branch codes / SKUs / date range.",
+  schema: z.strictObject({ categories: Categories, branch_codes: z.array(z.string()).nullable(), skus: z.array(z.string()).nullable(), from: z.string().nullable().describe("YYYY-MM-DD: only date remarks on/after this day"), to: z.string().nullable().describe("YYYY-MM-DD") }),
+  run: async (i, b) => {
+    const rs = await effectiveRemarks(b.today);
+    const rows = rs.filter((r) => {
+      if (i.categories?.length && r.category && !i.categories.includes(r.category)) return false;
+      if (i.branch_codes?.length && (r.scope === "store" || r.scope === "store_category") && !i.branch_codes.includes(r.scope_id ?? "")) return false;
+      if (i.skus?.length && r.scope === "product" && !i.skus.includes(r.scope_id ?? "")) return false;
+      if (r.scope === "date" && r.day && ((i.from && r.day < i.from) || (i.to && r.day > i.to))) return false;
+      return true;
+    }).map((r) => ({
+      key: String(r.id), kind: r.kind, scope: r.scope, label: r.text,
+      store: r.scope === "store" || r.scope === "store_category" ? b.byCode.get(r.scope_id ?? "")?.short_name ?? r.scope_id : null,
+      branch_code: r.scope === "store" || r.scope === "store_category" ? r.scope_id : null,
+      category: r.category ? catLabel(r.category) : null, sku: r.scope === "product" ? r.scope_id : null, action_key: r.action_key,
+      day: r.day, snoozed_until: r.kind === "snooze" ? r.until : null, by: r.created_by, at: r.created_at,
+      effect: r.kind === "not_applicable" ? (r.scope === "store_category" ? "category treated as NOT live in this store; its store actions are hidden" : "matching actions hidden")
+        : r.kind === "snooze" ? `matching actions hidden until ${r.until}` : r.scope === "date" ? "anomaly day: excluded from week-on-week baselines; mention it when comparing periods that include it" : "context note shown on matching actions",
+    }));
+    return { tool: "get_team_remarks", description: "Active team remarks", filters: { categories: i.categories, branch_codes: i.branch_codes, skus: i.skus, from: i.from, to: i.to }, as_of: b.today, source: "remarks (Action Centre, Postgres)",
+      summary: { count: rows.length, by_kind: rows.reduce<Record<string, number>>((m, r) => { m[r.kind] = (m[r.kind] ?? 0) + 1; return m; }, {}) },
+      columns: [{ key: "label", label: "Remark", format: "text" }, { key: "kind", label: "Kind", format: "text" }, { key: "scope", label: "Applies to", format: "text" }, { key: "store", label: "Store", format: "text" }, { key: "category", label: "Category", format: "text" }, { key: "day", label: "Date", format: "date" }, { key: "by", label: "By", format: "text" }],
+      data: rows, row_count: rows.length, notes: ["Remarks are team context, not data — quote them as “team note”."] };
   },
 });
 
@@ -655,7 +701,7 @@ const getProductSummary = def({
   },
 });
 
-export const TOOLS = [resolveProductTool, resolveLocationTool, getPerformance, getChannelPerformance, getSkuPerformance, getInventory, getProductSummary, getActions, getExceptions, explainChange] as const;
+export const TOOLS = [resolveProductTool, resolveLocationTool, getPerformance, getChannelPerformance, getSkuPerformance, getInventory, getProductSummary, getActions, getTeamRemarks, getExceptions, explainChange] as const;
 export type ToolName = (typeof TOOLS)[number]["name"];
 export const toolByName = new Map<string, ToolDef<z.ZodTypeAny>>(TOOLS.map((t) => [t.name, t as unknown as ToolDef<z.ZodTypeAny>]));
 

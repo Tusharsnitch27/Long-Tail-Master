@@ -31,15 +31,15 @@ export interface Range { from: ISODate; to: ISODate }
 export const rangeDays = (r: Range) => diffDays(r.from, r.to) + 1;
 export const inRange = (d: ISODate, r: Range) => d >= r.from && d <= r.to;
 
-export type Preset = "today" | "yesterday" | "l7" | "cw" | "pw" | "l30" | "mtd" | "pm" | "custom";
+export type Preset = "today" | "yesterday" | "l7" | "cw" | "pw" | "l30" | "l90" | "mtd" | "pm" | "custom";
 export const PRESETS: { key: Preset; label: string }[] = [
   { key: "today", label: "Today" },
   { key: "yesterday", label: "Yesterday" },
-  { key: "l7", label: "Last 7 days" },
   { key: "cw", label: "Current week" },
   { key: "pw", label: "Previous week" },
-  { key: "l30", label: "Last 30 days" },
   { key: "mtd", label: "MTD" },
+  { key: "l30", label: "Last 30" },
+  { key: "l90", label: "Last 90" },
   { key: "pm", label: "Previous month" },
   { key: "custom", label: "Custom" },
 ];
@@ -98,6 +98,11 @@ export function resolvePeriod(preset: Preset, asOf: ISODate, today: ISODate, cus
       range = { from: addDays(asOf, -29), to: asOf };
       compare = { from: addDays(asOf, -59), to: addDays(asOf, -30) };
       compareLabel = "vs prior 30 days";
+      break;
+    case "l90":
+      range = { from: addDays(asOf, -89), to: asOf };
+      compare = { from: addDays(asOf, -179), to: addDays(asOf, -90) };
+      compareLabel = "vs prior 90 days";
       break;
     case "pm": {
       const pm = addMonths(asOf, -1);

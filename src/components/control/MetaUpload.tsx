@@ -5,7 +5,7 @@ import { Upload, Download } from "lucide-react";
 import { parseCsv, downloadCsv } from "@/lib/csv";
 import { cn } from "@/lib/cn";
 
-const COLS = ["sku_group", "l1", "l2", "colour", "occasion", "aesthetic", "bestWith", "closure", "upperMaterial", "soleType", "toeShape", "construction", "season", "soleMaterial", "material", "shape"];
+const COLS = ["sku_group", "image", "l1", "l2", "colour", "occasion", "aesthetic", "bestWith", "closure", "upperMaterial", "soleType", "toeShape", "construction", "season", "soleMaterial", "material", "shape"];
 
 /** Upload product attributes (metafields). Columns other than sku_group become attributes; blanks are ignored. */
 export function MetaUpload({ missing }: { missing: { sku: string; name: string; category: string; gaps: string[] }[] }) {

@@ -147,7 +147,7 @@ async function buildProducts(): Promise<Product[]> {
     const m = meta.get(p.sku);
     if (m) {
       p.l1 = m.l1; p.l2 = m.l2; p.attrs = { ...m.attrs }; p.collection = m.collection;
-      p.image ??= m.image; p.name ??= m.name ? m.name.replace(/\b\w+/g, (w) => (w.length > 2 && w === w.toUpperCase() ? w[0] + w.slice(1).toLowerCase() : w)) : null;
+      if (m.imageOverride) p.image = m.image; else p.image ??= m.image;
       p.category ??= m.category;
     }
     if (p.colour && !p.attrs.colour) p.attrs.colour = p.colour;

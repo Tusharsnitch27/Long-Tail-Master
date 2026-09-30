@@ -12,7 +12,7 @@ import { dbConfigured, q } from "../db";
  *    "Longtail Metafields" workbook (src/data/shoe-metafields.json; L1 / L2 deliberately not taken from it)
  *  - Admin edits / uploads in the tool (Postgres product_meta) win over both.
  */
-export interface Meta { sku: string; l1: string | null; l2: string | null; name: string | null; image: string | null; category: string | null; collection: string | null; attrs: Record<string, string> }
+export interface Meta { sku: string; l1: string | null; l2: string | null; name: string | null; image: string | null; imageOverride?: boolean; category: string | null; collection: string | null; attrs: Record<string, string> }
 
 export const ATTR_LABEL: Record<string, string> = {
   colour: "Colour", occasion: "Occasion", aesthetic: "Fashion aesthetic", bestWith: "Best with", closure: "Closure", upperMaterial: "Upper material",
@@ -44,8 +44,8 @@ export function getMetafields(): Promise<Map<string, Meta>> {
     for (const [sku, a] of Object.entries(seed as Record<string, Record<string, string>>)) Object.assign(get(sku).attrs, a);
     for (const o of overrides) {
       const e = get(o.sku_group.toUpperCase());
-      const { l1, l2, ...attrs } = o.attrs ?? {};
-      if (l1) e.l1 = l1; if (l2) e.l2 = l2;
+      const { l1, l2, image, ...attrs } = o.attrs ?? {};
+      if (l1) e.l1 = l1; if (l2) e.l2 = l2; if (image) { e.image = image; e.imageOverride = true; }
       Object.assign(e.attrs, attrs);
     }
     return m;

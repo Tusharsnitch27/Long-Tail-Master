@@ -1,4 +1,4 @@
-# Snitch Longtail: data design
+# Snitch Long Tail: data design
 
 "Building the next ₹100 Cr business". This is the operating tool for Snitch's long-tail categories. Sources were validated against
 Snowflake `SNITCH_DB.MAPLEMONK` on 30 Sep 2026.

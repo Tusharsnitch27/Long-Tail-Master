@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-export const metadata: Metadata = { title: { default: "Snitch Longtail", template: "%s · Snitch Longtail" }, description: "Snitch Longtail — the operating tool for Snitch long-tail categories" };
+export const metadata: Metadata = { title: { default: "Snitch Long Tail", template: "%s · Snitch Long Tail" }, description: "Snitch Long Tail — the operating tool for Snitch long-tail categories" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

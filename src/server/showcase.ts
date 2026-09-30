@@ -11,12 +11,12 @@ export interface ShowcaseItem { sku: string; name: string; image: string | null;
 
 /**
  * Login collage, ranked by last-30-day gross sales (all channels; free gifts never qualify):
- *  Footwear — the top shoe of each type (L1) · Fragrance — top 2 + the State of Mind gift set · Eyewear — top 3 ·
- *  Accessories — top 3 (socks separately, top 2) · Luggage — one each of Blink, Rubik and Vitto · Bags, Belts — top 2.
+ *  Footwear — top boots, sneakers and mules · Fragrance — top 2 + the State of Mind gift set ·
+ *  one each of belts, bags, caps and another accessory · Luggage — the top trolley (beside the sign-in).
  * Cached for 6 hours and warmed at startup.
  */
-export function getShowcase(): Promise<ShowcaseItem[]> {
-  return cached("login:showcase:v2", 6 * 3600, async () => {
+export function getShowcase(): Promise<(ShowcaseItem & { role: string })[]> {
+  return cached("login:showcase:v4", 6 * 3600, async () => {
     const { asOf } = await getFreshness();
     const range = { from: addDays(asOf, -29), to: asOf }, compare = { from: addDays(asOf, -59), to: addDays(asOf, -30) };
     const [pm, uc, st] = await Promise.all([
@@ -34,21 +34,23 @@ export function getShowcase(): Promise<ShowcaseItem[]> {
     const of = (c: string) => withImg.filter((p) => p.category === c);
     const item = (p: Product, cat: string): ShowcaseItem => ({ sku: p.sku, name: p.name!, image: p.image, cat });
 
-    const shoes: Product[] = [];
-    for (const p of of("shoes")) if (p.l1 && !shoes.some((s) => s.l1 === p.l1)) shoes.push(p);
+    const first = (xs: Product[], re: RegExp, not?: RegExp) => xs.find((p) => re.test(`${p.l1 ?? ""} ${p.l2 ?? ""} ${p.name}`) && !(not && not.test(`${p.l2 ?? ""} ${p.name}`)));
     const perfumes = pick(of("perfumes").filter((p) => !/gift|som\b/i.test(p.name!)), 2);
     const som = [...ranked, ...pm.values()].find((p) => p.category === "perfumes" && /state of mind|^som\b|som-gift/i.test(p.name ?? ""));
-    const luggage = ["blink", "rubik", "vit+o"].map((k) => of("luggage").find((p) => new RegExp(k, "i").test(p.name!))).filter((p): p is Product => !!p);
-    return [
-      ...shoes.slice(0, 6).map((p) => item(p, "Footwear")),
-      ...perfumes.map((p) => item(p, "Fragrance")),
-      ...(som ? [{ sku: som.sku, name: "State of Mind", image: som.image, cat: "Fragrance · Gift set" }] : []),
-      ...pick(of("sunglasses"), 3).map((p) => item(p, "Eyewear")),
-      ...pick(of("accessories").filter((p) => !isSock(p)), 3).map((p) => item(p, "Accessories")),
-      ...pick(of("accessories").filter(isSock), 2).map((p) => item(p, "Socks")),
-      ...luggage.map((p) => item(p, "Luggage")),
-      ...pick(of("bags"), 2).map((p) => item(p, "Bags")),
-      ...pick(of("belts"), 2).map((p) => item(p, "Belts")),
-    ];
+    const acc = of("accessories").filter((p) => !isSock(p));
+    const tiles: (ShowcaseItem & { role: string })[] = [];
+    const add = (p: Product | undefined, cat: string, role: string) => { if (p && !tiles.some((t) => t.sku === p.sku)) tiles.push({ ...item(p, cat), role }); };
+    add(first(of("shoes"), /boot|chelsea/i), "Footwear", "big");
+    add(perfumes[0], "Fragrance", "big");
+    add(first(of("shoes"), /sneaker/i, /mule/i), "Footwear", "tile");
+    add(first(of("shoes"), /mule/i), "Footwear", "tile");
+    add(perfumes[1], "Fragrance", "tile");
+    if (som) tiles.push({ sku: som.sku, name: "State of Mind", image: som.image, cat: "Fragrance", role: "tile" });
+    add(of("belts")[0], "Belts", "tile");
+    add(of("bags")[0], "Bags", "tile");
+    add(first(acc, /cap/i), "Accessories", "tile");
+    add(first(acc, /chain|bracelet|pendant|bandana|hat/i), "Accessories", "tile");
+    add(of("luggage")[0], "Luggage", "side");
+    return tiles;
   });
 }

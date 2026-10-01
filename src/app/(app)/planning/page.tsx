@@ -49,7 +49,7 @@ export default async function DemandPlanning({ searchParams }: { searchParams: P
         subtitle={<>{ctx.filters.cat ? catLabel(ctx.filters.cat) : "All categories"} · DOI control, forecast, reorder and open-to-buy · stock as of {fmtDate(ctx.asOf, true)}</>} />
       <WipBanner>v1 planning model — every forward number here is a <b>projection</b> from recent rate of sale, not an actual. Seasonality (festive, EOSS) is only captured where a month target is set in the Control Centre. Share feedback before this becomes a buying tool.</WipBanner>
 
-      <form method="get" className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-white px-4 py-3 text-[12px] shadow-[0_1px_2px_rgba(60,40,20,.04)]">
+      <form method="get" className="mb-4 flex flex-wrap items-end gap-3 card rounded-[18px] px-4 py-3 text-[12px] shadow-[0_1px_2px_rgba(60,40,20,.04)]">
         {ctx.filters.cat && <input type="hidden" name="cat" value={ctx.filters.cat} />}
         <label className="flex flex-col gap-1"><span className="text-[11px] text-zinc-500">Target DOI — min</span><input name="lo" type="number" min={1} max={365} defaultValue={pp.lo} className="w-24 rounded-md border border-line px-2 py-1" /></label>
         <label className="flex flex-col gap-1"><span className="text-[11px] text-zinc-500">Target DOI — max</span><input name="hi" type="number" min={1} max={400} defaultValue={pp.hi} className="w-24 rounded-md border border-line px-2 py-1" /></label>

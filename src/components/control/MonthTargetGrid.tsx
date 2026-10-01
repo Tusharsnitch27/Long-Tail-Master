@@ -84,7 +84,7 @@ export function MonthTargetGrid({ months, cats, values: serverValues, actuals, c
   const template = () => downloadCsv("targets-template.csv", [["channel", "category", "month", "target_lakhs"], ...(["stores", "online", "marketplace"] as Ch[]).flatMap((c) => cats.flatMap((x) => months.map((m) => [c, x.label, m.slice(0, 7), fmtL(values[key(c, x.key, m)])])))]);
 
   return (
-    <div className="rounded-xl border border-line bg-white">
+    <div className="card rounded-[18px]">
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
         <div className="flex gap-0.5 rounded-lg border border-line p-0.5">
           {CH.map((c) => <button key={c.key} onClick={() => setCh(c.key)} className={cn("rounded-md px-2.5 py-1 text-[12.5px]", ch === c.key ? "bg-brand-900 font-medium text-white" : "text-zinc-600 hover:bg-brand-50")}>{c.label}</button>)}

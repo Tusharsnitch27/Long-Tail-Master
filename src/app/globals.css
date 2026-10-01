@@ -36,8 +36,59 @@
 }
 
 html, body { background: var(--color-canvas); color: var(--color-ink); }
-/* soft warm light, as on the login page */
-.atelier { background: radial-gradient(900px 500px at 85% -10%, #fbf6ef 0%, transparent 60%), radial-gradient(700px 420px at 0% 110%, #eadbc8 0%, transparent 60%), var(--color-canvas); }
+/* soft warm light, as on the login page — with a whisper of paper grain */
+.atelier {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42 0 0 0 0 .3 0 0 0 0 .18 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(1100px 560px at 92% -12%, rgba(212,170,120,.20) 0%, transparent 62%),
+    radial-gradient(900px 520px at 100% 0%, #fbf6ef 0%, transparent 55%),
+    radial-gradient(760px 460px at -5% 108%, rgba(201,150,110,.22) 0%, transparent 60%),
+    linear-gradient(180deg, #f5eee5 0%, #f1e8dc 100%);
+}
+
+/* ─── Atelier primitives ─────────────────────────────────────────────── */
+/* gilded text: bronze → honey → bronze (wordmark, accents) */
+.text-gilded { background: linear-gradient(100deg, #8c5a30 0%, #c99a62 38%, #e7c79a 52%, #b07a45 70%, #8c5a30 100%); background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: gild 9s ease-in-out infinite alternate; }
+.text-gilded-light { background: linear-gradient(100deg, #d3b089 0%, #f3dcb8 45%, #c08f60 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+@keyframes gild { from { background-position: 0% 50% } to { background-position: 100% 50% } }
+
+/* card surface: warm paper gradient with a gradient hairline border and layered shadow */
+.card {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(180deg, #fffdfa 0%, #fbf6ef 100%) padding-box,
+    linear-gradient(165deg, rgba(211,176,137,.75) 0%, rgba(230,219,204,.85) 32%, rgba(230,219,204,.95) 100%) border-box;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 1px 2px rgba(60,40,20,.05), 0 24px 48px -38px rgba(60,40,20,.55);
+}
+.card-lift { transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s ease; }
+.card-lift:hover { transform: translateY(-2px); box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 2px 4px rgba(60,40,20,.06), 0 30px 56px -34px rgba(60,40,20,.6); }
+
+/* gold hairline divider */
+.gold-rule { height: 1px; background: linear-gradient(90deg, rgba(168,112,63,0) 0%, rgba(168,112,63,.45) 18%, rgba(211,176,137,.35) 60%, rgba(168,112,63,0) 100%); }
+/* tiny diamond ornament before section titles */
+.ornament { width: 6px; height: 6px; transform: rotate(45deg); border-radius: 1px; background: linear-gradient(135deg, #e7c79a, #a8703f); box-shadow: 0 0 0 3px rgba(211,176,137,.18); flex-shrink: 0; }
+
+/* espresso surfaces (buttons, active tabs, badges) get depth: gradient + inner highlight */
+.bg-brand-900 { background-image: linear-gradient(180deg, rgba(255,255,255,.11) 0, rgba(255,255,255,0) 1.5px), linear-gradient(180deg, #352a20 0%, #1b1712 100%); }
+button.bg-brand-900, a.bg-brand-900 { transition: filter .2s ease, box-shadow .2s ease, transform .15s ease; }
+button.bg-brand-900:not(:disabled):hover, a.bg-brand-900:hover { filter: brightness(1.2) saturate(1.1); }
+button.bg-brand-900:not(:disabled):active, a.bg-brand-900:active { transform: translateY(1px); }
+
+/* staggered entrance for grids and page blocks */
+.stagger > * { animation: rise .55s cubic-bezier(.2,.8,.2,1) both; }
+.stagger > *:nth-child(2) { animation-delay: .04s } .stagger > *:nth-child(3) { animation-delay: .08s } .stagger > *:nth-child(4) { animation-delay: .12s }
+.stagger > *:nth-child(5) { animation-delay: .16s } .stagger > *:nth-child(6) { animation-delay: .2s } .stagger > *:nth-child(7) { animation-delay: .24s } .stagger > *:nth-child(n+8) { animation-delay: .28s }
+
+/* sheen sweep on hover (KPI cards, hero) */
+.sheen { position: relative; overflow: hidden; }
+.sheen::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,.55) 50%, transparent 65%); transform: translateX(-120%); transition: transform .9s cubic-bezier(.2,.8,.2,1); }
+.sheen:hover::after { transform: translateX(120%); }
+
+@media (prefers-reduced-motion: reduce) {
+  .stagger > *, .rise, .text-gilded, .floaty { animation: none !important; }
+  .card-lift, .sheen::after { transition: none !important; }
+}
 /* small wide-tracked section labels (FOOTWEAR · FRAGRANCE on the login page) */
 .eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.32em; text-transform: uppercase; color: rgb(27 23 18 / 0.62); }
 .font-serif { font-family: var(--font-serif); letter-spacing: -0.01em; }
@@ -46,7 +97,8 @@ body { font-size: 13px; font-feature-settings: "tnum" 1, "cv11" 1, "ss01" 1; -we
 .tabular { font-variant-numeric: tabular-nums; }
 
 .scroll-thin::-webkit-scrollbar { height: 8px; width: 8px; }
-.scroll-thin::-webkit-scrollbar-thumb { background: #d5c9b9; border-radius: 8px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #e2c9a6, #c9a57c); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+.scroll-thin::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #d3b089, #a8703f); background-clip: padding-box; }
 .scroll-thin::-webkit-scrollbar-track { background: transparent; }
 
 @keyframes shimmer { 0% { background-position: -400px 0 } 100% { background-position: 400px 0 } }
@@ -56,7 +108,7 @@ body { font-size: 13px; font-feature-settings: "tnum" 1, "cv11" 1, "ss01" 1; -we
 [data-tip]:hover::after {
   content: attr(data-tip); position: absolute; z-index: 60; left: 50%; top: calc(100% + 6px); transform: translateX(-50%);
   width: max-content; max-width: 260px; white-space: normal; text-align: left; font-weight: 400; text-transform: none; letter-spacing: 0;
-  background: #1b1712; color: #f3ebe1; font-size: 11.5px; line-height: 1.35; padding: 6px 8px; border-radius: 6px; pointer-events: none;
+  background: linear-gradient(180deg, #2b231c, #1b1712); color: #f3ebe1; font-size: 11.5px; line-height: 1.35; padding: 7px 9px; border-radius: 8px; pointer-events: none; box-shadow: 0 14px 30px -14px rgba(60,40,20,.7);
 }
 
 /* product thumbnail with hover preview */

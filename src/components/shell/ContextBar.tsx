@@ -78,8 +78,8 @@ export function ContextBar({ options }: { options: ContextOptions }) {
   const show = scope.category || scope.period || scope.channel;
 
   return (
-    <div className="sticky top-0 z-30 border-b border-line bg-[#efe5d8]/90 shadow-[0_6px_18px_-14px_rgba(60,40,20,.45)] backdrop-blur-md">
-      <div className={cn("h-px w-full bg-brand-500 transition-opacity", pending ? "animate-pulse opacity-100" : "opacity-0")} />
+    <div className="sticky top-0 z-30 bg-gradient-to-b from-[#f3ebe1]/95 to-[#efe5d8]/85 shadow-[0_10px_24px_-18px_rgba(60,40,20,.5)] backdrop-blur-md after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-brand-400/50 after:to-transparent">
+      <div className={cn("h-[2px] w-full bg-gradient-to-r from-transparent via-brand-400 to-transparent transition-opacity", pending ? "animate-pulse opacity-100" : "opacity-0")} />
       <div className="flex flex-wrap items-center gap-2 px-6 py-2.5">
         {scope.category && (
           <Dropdown label="Category" value={cat} onChange={(k) => set({ cat: k === "overall" ? null : k })}

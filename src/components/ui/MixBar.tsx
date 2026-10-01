@@ -29,9 +29,9 @@ export function MixBar({ parts, title, format = "inr", className, barClass = "h-
   return (
     <span ref={ref} tabIndex={0} onMouseEnter={open} onMouseLeave={() => setPos(null)} onFocus={open} onBlur={() => setPos(null)}
       className={cn("block cursor-default outline-none", className)} aria-label={top.map((p) => `${p.label} ${pct(p.value / t, 0)}`).join(", ")}>
-      <span className={cn("flex w-full overflow-hidden rounded-full bg-zinc-100 transition", pos && "ring-2 ring-brand-300", barClass)}>
+      <span className={cn("flex w-full overflow-hidden rounded-full bg-zinc-100 shadow-[inset_0_1px_2px_rgba(60,40,20,.12)] transition", pos && "ring-2 ring-brand-300", barClass)}>
         {shown.map((p) => (
-          <span key={p.label} className="flex items-center justify-center overflow-hidden text-[10px] font-semibold text-white" style={{ width: `${(p.value / t) * 100}%`, background: p.color }}>
+          <span key={p.label} className="flex items-center justify-center overflow-hidden text-[10px] font-semibold text-white" style={{ width: `${(p.value / t) * 100}%`, background: `linear-gradient(180deg, rgba(255,255,255,.18) 0, rgba(255,255,255,0) 45%), linear-gradient(90deg, ${p.color}, ${p.color}d9)`, boxShadow: "inset -1px 0 0 rgba(255,255,255,.35)" }}>
             {p.value / t >= labelMin ? pct(p.value / t, 0) : ""}
           </span>
         ))}
@@ -39,7 +39,7 @@ export function MixBar({ parts, title, format = "inr", className, barClass = "h-
       {legend && <span className="mt-0.5 block truncate text-[10.5px] text-zinc-500">{top[0].label} {pct(top[0].value / t, 0)}{top[1] ? ` · ${top[1].label} ${pct(top[1].value / t, 0)}` : ""}</span>}
       {pos && (
         <span role="tooltip" style={{ left: pos.x, top: pos.y, transform: `translate(-50%, ${pos.up ? "calc(-100% - 6px)" : "6px"})` }}
-          className="pointer-events-none fixed z-[90] block w-max min-w-48 max-w-72 rounded-lg bg-brand-900 px-2.5 py-2 text-left text-[11.5px] font-normal normal-case leading-snug tracking-normal text-canvas shadow-[0_18px_40px_-16px_rgba(60,40,20,.6)]">
+          className="pointer-events-none fixed z-[90] block w-max min-w-48 max-w-72 rounded-xl bg-brand-900 ring-1 ring-[#d3b089]/30 px-2.5 py-2 text-left text-[11.5px] font-normal normal-case leading-snug tracking-normal text-canvas shadow-[0_18px_40px_-16px_rgba(60,40,20,.6)]">
           {title && <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-300">{title}</span>}
           {top.map((p) => (
             <span key={p.label} className="grid grid-cols-[10px_1fr_auto_36px] items-center gap-1.5 py-px">

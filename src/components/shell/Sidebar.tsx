@@ -26,21 +26,23 @@ export function Sidebar({ role, name, username, actionCount }: { role: "viewer" 
     const on = active(i.href);
     return (
       <Link key={i.href} href={qs && !["/settings", "/ads"].includes(i.href) ? `${i.href}?${qs}` : i.href}
-        className={cn("group flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] transition-colors",
-          on ? "bg-white/[0.08] font-medium text-[#f3ebe1] shadow-[inset_2px_0_0_#c08f60]" : "text-[#f3ebe1]/65 hover:bg-white/[0.05] hover:text-[#f3ebe1]")}>
+        className={cn("group relative flex h-8 items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-all duration-200",
+          on ? "bg-gradient-to-r from-[#c08f60]/25 via-[#c08f60]/10 to-transparent font-medium text-[#f7efe4] shadow-[inset_0_1px_0_rgba(255,255,255,.06)]" : "text-[#f3ebe1]/65 hover:translate-x-0.5 hover:bg-white/[0.05] hover:text-[#f3ebe1]")}>
+        {on && <span aria-hidden className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-gradient-to-b from-[#f3dcb8] to-[#a8703f] shadow-[0_0_10px_rgba(211,176,137,.8)]" />}
         <Icon className={cn("size-[15px] shrink-0", on ? "text-brand-300" : "text-[#f3ebe1]/40 group-hover:text-[#f3ebe1]/80")} strokeWidth={1.9} />
         <span className="flex-1 truncate whitespace-nowrap" title={i.label}>{i.label}</span>
         {i.href === "/actions" && actionCount ? <span className="tabular rounded bg-rose-500/90 px-1.5 text-[10.5px] font-semibold text-white">{actionCount}</span> : null}
-        {i.badge && <span className={cn("rounded px-1 text-[9.5px] font-semibold tracking-wide", i.badge === "AI" ? "bg-brand-300 text-brand-900" : "bg-white/10 text-[#f3ebe1]/60")}>{i.badge}</span>}
+        {i.badge && <span className={cn("rounded px-1 text-[9.5px] font-semibold tracking-wide", i.badge === "AI" ? "bg-gradient-to-r from-[#f3dcb8] to-[#c08f60] text-brand-900 shadow-[0_0_10px_-2px_rgba(211,176,137,.7)]" : "bg-white/10 text-[#f3ebe1]/60")}>{i.badge}</span>}
       </Link>
     );
   };
   const visible = NAV.filter((i) => !i.minRole || role === "admin");
   return (
-    <nav className="relative flex h-full flex-col overflow-y-auto bg-side bg-[radial-gradient(420px_260px_at_0%_0%,rgba(168,112,63,.22),transparent_70%)] px-3 py-5 scroll-thin">
+    <nav className="relative flex h-full flex-col overflow-y-auto bg-side bg-[radial-gradient(460px_300px_at_0%_0%,rgba(192,143,96,.30),transparent_70%),radial-gradient(380px_420px_at_100%_100%,rgba(168,112,63,.16),transparent_70%),linear-gradient(180deg,#261e17_0%,#1b1712_45%,#140f0b_100%)] px-3 py-5 shadow-[inset_-1px_0_0_rgba(211,176,137,.18)] scroll-thin">
       <Link href={qs ? `/?${qs}` : "/"} className="mb-6 block px-2.5 leading-none">
         <span className="block text-[10px] font-semibold tracking-[0.55em] text-[#f3ebe1]/80">SNITCH</span>
-        <span className="mt-1.5 block font-serif text-[26px] italic tracking-[-0.02em] text-brand-300">{APP_NAME}</span>
+        <span className="text-gilded-light mt-1.5 block font-serif text-[28px] italic tracking-[-0.02em]">{APP_NAME}</span>
+        <span className="mt-3 block h-px w-24 bg-gradient-to-r from-brand-300/70 to-transparent" />
       </Link>
       {NAV_GROUPS.map((g) => {
         const items = visible.filter((i) => i.group === g.key);
@@ -55,7 +57,7 @@ export function Sidebar({ role, name, username, actionCount }: { role: "viewer" 
       <div className="mt-auto pt-4">
         <div className="relative flex items-center gap-1.5">
           <button onClick={() => setMenu((m) => !m)} className="flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-lg bg-white/5 px-2 text-left hover:bg-white/10">
-            <span className="flex size-7 items-center justify-center rounded-full bg-brand-300 font-serif text-[13px] text-brand-900">{name.slice(0, 1).toUpperCase()}</span>
+            <span className="flex size-7 items-center justify-center rounded-full bg-gradient-to-br from-[#f3dcb8] to-[#a8703f] font-serif text-[13px] text-brand-900 shadow-[0_0_0_2px_rgba(243,220,184,.15)]">{name.slice(0, 1).toUpperCase()}</span>
             <span className="min-w-0 flex-1 leading-tight"><span className="block truncate text-[12.5px] font-medium text-white">{name}</span><span className="block text-[10.5px] capitalize text-[#f3ebe1]/50">{role}</span></span>
             <ChevronsUpDown className="size-3.5 text-[#f3ebe1]/40" />
           </button>

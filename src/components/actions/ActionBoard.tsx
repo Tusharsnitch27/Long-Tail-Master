@@ -66,7 +66,7 @@ export function ActionBoard({ actions, hidden, statuses, categories, initialGrou
         </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-white p-2 shadow-[0_1px_2px_rgba(60,40,20,.04)]">
+      <div className="mb-4 flex flex-wrap items-center gap-2 card rounded-[18px] p-2 shadow-[0_1px_2px_rgba(60,40,20,.04)]">
         <SlidersHorizontal className="ml-1 size-3.5 text-zinc-400" />
         <label className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-2 size-4 text-zinc-400" />

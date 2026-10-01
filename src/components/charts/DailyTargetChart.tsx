@@ -3,6 +3,8 @@ import { Bar, CartesianGrid, Cell, ComposedChart, Line, ResponsiveContainer, Too
 import { inr, pct, num } from "@/lib/format";
 import { fmtDate, weekday } from "@/lib/dates";
 import { ChartDownload } from "./ChartDownload";
+import { useId } from "react";
+import { TOOLTIP, CURSOR, GRID } from "./theme";
 
 export interface DailyRow { date: string; actual: number; target: number | null; units?: number; lw?: number | null }
 
@@ -10,6 +12,7 @@ const color = (a: number | null, target: number | null) => (target == null || !t
 
 /** Daily actual vs target: bars coloured by achievement (green ≥95%, amber ≥80%, red below), target as a dashed line. */
 export function DailyTargetChart({ data, height = 260, showLw = true, name = "daily-revenue-vs-target" }: { data: DailyRow[]; height?: number; showLw?: boolean; name?: string }) {
+  const uid = useId().replace(/:/g, "");
   const rows = data.map((d) => ({ ...d, ach: d.target ? d.actual / d.target : null }));
   const hasT = rows.some((r) => r.target != null);
   return (
@@ -27,18 +30,23 @@ export function DailyTargetChart({ data, height = 260, showLw = true, name = "da
       <div style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={rows} margin={{ top: 6, right: 8, left: 4, bottom: 0 }}>
-            <CartesianGrid stroke="#efe6da" vertical={false} />
+            <defs>
+              {["#c08f60", "#b8a894", "#15803d", "#d97706", "#dc2626"].map((c) => (
+                <linearGradient key={c} id={`${uid}${c.slice(1)}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={c} stopOpacity={0.95} /><stop offset="100%" stopColor={c} stopOpacity={0.55} /></linearGradient>
+              ))}
+            </defs>
+            <CartesianGrid stroke={GRID} strokeDasharray="2 4" vertical={false} />
             <XAxis dataKey="date" tickLine={false} axisLine={{ stroke: "#e6dbcc" }} tick={{ fontSize: 11, fill: "#7a6c5d" }} minTickGap={14} tickFormatter={(v) => fmtDate(String(v))} />
             <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#7a6c5d" }} width={56} tickFormatter={(v) => inr(v, { decimals: 1 })} />
-            <Tooltip cursor={{ fill: "rgba(168,112,63,0.06)" }} contentStyle={{ fontSize: 12, borderRadius: 10, border: "1px solid #e6dbcc" }}
+            <Tooltip cursor={CURSOR} {...TOOLTIP}
               labelFormatter={(v) => `${weekday(String(v))}, ${fmtDate(String(v), true)}`}
               formatter={(v, n, it) => {
                 const r = it.payload as (typeof rows)[number];
                 if (n === "Revenue") return [`${inr(Number(v))}${r.ach != null ? ` · ${pct(r.ach, 0)} of target` : ""}${r.units != null ? ` · ${num(r.units)} units` : ""}`, n];
                 return [v == null ? "—" : inr(Number(v)), n];
               }} />
-            <Bar dataKey="actual" name="Revenue" radius={[3, 3, 0, 0]} maxBarSize={22}>
-              {rows.map((r) => <Cell key={r.date} fill={color(r.ach, r.target)} />)}
+            <Bar dataKey="actual" name="Revenue" radius={[4, 4, 0, 0]} maxBarSize={22}>
+              {rows.map((r) => <Cell key={r.date} fill={`url(#${uid}${color(r.ach, r.target).slice(1)})`} />)}
             </Bar>
             {showLw && <Line dataKey="lw" name="Same day last week" stroke="#e2c9a6" strokeWidth={1.8} dot={false} connectNulls />}
             {hasT && <Line dataKey="target" name="Target" stroke="#1b1712" strokeDasharray="5 4" strokeWidth={1.6} dot={false} connectNulls />}

@@ -182,7 +182,7 @@ export function Copilot({ firstName, initialQuestion }: { firstName: string; ini
         <div className="flex items-center gap-2.5">
           <Avatar size={34} />
           <div className="leading-tight">
-            <h1 className="font-serif text-[24px] leading-none tracking-[-0.02em] text-ink">Ask <span className="italic text-brand-500">Harvey</span></h1>
+            <h1 className="font-serif text-[26px] leading-none tracking-[-0.02em] text-ink">Ask <span className="text-gilded italic">Harvey</span></h1>
             <div className="mt-1 text-[11.5px] text-zinc-500">Your Long Tail analyst · governed data only</div>
           </div>
         </div>
@@ -202,12 +202,12 @@ export function Copilot({ firstName, initialQuestion }: { firstName: string; ini
       {turns.length === 0 ? (
         <>
           {/* hero */}
-          <section className="relative overflow-hidden rounded-[20px] bg-brand-900 p-6 text-[#f3ebe1] shadow-[0_30px_60px_-30px_rgba(60,40,20,.6)] sm:p-8">
+          <section className="relative overflow-hidden rounded-[22px] bg-[radial-gradient(700px_320px_at_100%_0%,rgba(192,143,96,.35),transparent_65%),radial-gradient(500px_300px_at_0%_100%,rgba(168,112,63,.22),transparent_70%),linear-gradient(160deg,#2b221a_0%,#1b1712_55%,#120e0a_100%)] p-6 text-[#f3ebe1] shadow-[0_30px_60px_-30px_rgba(60,40,20,.7)] ring-1 ring-[#d3b089]/20 sm:p-8">
             <div className="pointer-events-none absolute -right-24 -top-24 size-80 rounded-full bg-brand-500/30 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-32 left-1/3 size-72 rounded-full bg-brand-300/10 blur-3xl" />
             <div className="relative">
               <div className="text-[10px] font-semibold uppercase tracking-[0.4em] text-brand-300">Hi {firstName}</div>
-              <h2 className="mt-2.5 max-w-2xl font-serif text-[30px] leading-[1.05] tracking-[-0.02em] sm:text-[40px]">I’m <span className="italic text-brand-300">Harvey</span>, your Long Tail analyst.</h2>
+              <h2 className="mt-2.5 max-w-2xl font-serif text-[30px] leading-[1.05] tracking-[-0.02em] sm:text-[40px]">I’m <span className="text-gilded-light italic">Harvey</span>, your Long Tail analyst.</h2>
               <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-[#f3ebe1]/80">
                 I know your sales, targets, stores, channels, products and inventory. Ask in plain words — I’ll pull the numbers from governed data,
                 show them the way you need (charts, tables, side-by-side comparisons), explain what changed and why, and help you decide the next step.
@@ -236,7 +236,7 @@ export function Copilot({ firstName, initialQuestion }: { firstName: string; ini
           </div>
           <div className="mt-2.5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {GROUPS.map((g) => (
-              <div key={g.key} className="flex flex-col rounded-[16px] border border-line bg-paper p-3 shadow-[0_1px_2px_rgba(60,40,20,.04)]">
+              <div key={g.key} className="card card-lift flex flex-col rounded-[18px] p-3">
                 <div className="mb-2 flex items-center gap-2">
                   <span className="flex size-7 items-center justify-center rounded-lg bg-brand-50 text-brand-700"><g.icon className="size-3.5" /></span>
                   <div className="leading-tight"><div className="text-[12.5px] font-semibold text-ink">{g.title}</div><div className="text-[10.5px] text-zinc-400">{g.hint}</div></div>
@@ -296,7 +296,7 @@ export function Copilot({ firstName, initialQuestion }: { firstName: string; ini
 
 function KeyPoint({ icon: I, title, children }: { icon: typeof Zap; title: string; children: React.ReactNode }) {
   return (
-    <div className="flex gap-2.5 rounded-[16px] border border-line bg-paper px-3.5 py-3 shadow-[0_1px_2px_rgba(60,40,20,.04)]">
+    <div className="card flex gap-2.5 rounded-[18px] px-3.5 py-3 shadow-[0_1px_2px_rgba(60,40,20,.04)]">
       <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700"><I className="size-3.5" /></span>
       <div className="min-w-0"><div className="text-[12.5px] font-semibold text-ink">{title}</div><div className="mt-0.5 text-[11.5px] leading-relaxed text-zinc-500">{children}</div></div>
     </div>
@@ -340,7 +340,7 @@ function AnswerView({ a, onAsk }: { a: Answer; onAsk: (q: string) => void }) {
       {a.metrics.length > 0 && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
           {a.metrics.map((m) => (
-            <div key={m.label} className="relative overflow-hidden rounded-xl border border-line bg-white px-3 py-2.5">
+            <div key={m.label} className="relative overflow-hidden card rounded-[18px] px-3 py-2.5">
               <span className="absolute inset-x-0 top-0 h-[3px] bg-brand-500" />
               <div className="text-[11px] text-zinc-500">{m.label}</div>
               <div className="tabular mt-0.5 text-[18px] font-semibold tracking-[-0.02em] text-ink">{m.value}</div>

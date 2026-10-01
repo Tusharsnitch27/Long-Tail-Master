@@ -92,7 +92,7 @@ function Card({ r, href, defs }: { r: GridRow; href: string; defs: Record<string
   const stock = r.storeInv + r.whInv;
   const coverTone = r.doi == null ? (stock > 0 ? "text-amber-700" : "text-zinc-400") : r.doi < 21 ? "text-rose-600" : r.doi > 180 ? "text-amber-700" : "text-emerald-700";
   return (
-    <Link href={href} className="group flex gap-3 rounded-xl border border-line bg-white p-3 shadow-[0_1px_2px_rgba(60,40,20,.04)] transition-colors hover:border-brand-300">
+    <Link href={href} className="card card-lift group flex gap-3 rounded-[18px] p-3">
       <div className="relative size-[132px] shrink-0 overflow-hidden rounded-lg border border-line bg-brand-50/40">
         {r.image ? <img src={r.image} alt="" loading="lazy" className="size-full object-cover transition-transform duration-300 group-hover:scale-105" /> : <div className="flex size-full items-center justify-center text-[11px] text-brand-400">no image</div>}
         {r.flag && <span className={cn("absolute bottom-1.5 left-1.5 rounded px-1.5 py-px text-[10px] font-semibold", r.flag === "Low cover" ? "bg-rose-600 text-white" : r.flag === "Slow" ? "bg-amber-500 text-white" : "bg-brand-900 text-white")}>{r.flag}</span>}

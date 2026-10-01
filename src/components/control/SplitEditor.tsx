@@ -78,7 +78,7 @@ export function SplitEditor({ month, days, states, saved, suggested, recommended
   }
   const has = Boolean(base);
   return (
-    <div className="rounded-xl border border-line bg-white">
+    <div className="card rounded-[18px]">
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
         <div className="flex gap-0.5 rounded-lg border border-line p-0.5">
           {(["stores", "online", "marketplace"] as Ch[]).map((c) => <button key={c} onClick={() => { setCh(c); if (c !== "stores") setState("*"); }} className={cn("rounded-md px-2.5 py-1 text-[12.5px] capitalize", ch === c ? "bg-brand-900 font-medium text-white" : "text-zinc-600 hover:bg-brand-50")}>{c}</button>)}

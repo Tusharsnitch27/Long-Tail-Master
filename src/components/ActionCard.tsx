@@ -55,7 +55,7 @@ export function ActionCard({ a, compact, qs = "", status }: { a: Action; compact
   }
 
   return (
-    <article className={cn("relative overflow-hidden rounded-xl border border-line bg-white p-4 pl-5 shadow-[0_1px_2px_rgba(60,40,20,.04)] transition-colors hover:border-brand-200", closed && "opacity-70")}>
+    <article className={cn("card card-lift relative overflow-hidden rounded-[18px] p-4 pl-5", closed && "opacity-70")}>
       <span className={cn("absolute inset-y-0 left-0 w-1", STRIPE[a.priority])} />
       <div className="flex items-start gap-3">
         {a.product ? <Thumb src={a.product.image} size={56} /> : <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600"><Icon className="size-5" /></span>}

@@ -217,6 +217,7 @@ The top bar shows filters (category / period / channel as relevant) plus timesta
 - Fonts via `next/font` (self-hosted at build): Inter (`font-sans`) for UI and numbers, **Playfair Display** (`font-serif`) for page titles,
   section titles, the sidebar wordmark and Harvey. Small labels use wide-tracked uppercase (`.eyebrow`, KPI labels).
 - Solid buttons and selected tabs are espresso (`bg-brand-900`); the app background is `.atelier` (the login's soft warm light).
+- **Polish primitives (globals.css):** `.card` (paper gradient + gradient hairline border + layered shadow; used by Section, Kpi, DataTable, ActionCard, editors), `.card-lift` (hover lift), `.sheen` (hover light sweep on KPIs), `.gold-rule` (section header divider), `.ornament` (bronze diamond before section titles), `.text-gilded` / `.text-gilded-light` (animated bronze text: wordmark, "Harvey"), `.stagger` (staggered entrance of page blocks and KPI grids), grain texture in `.atelier`. Every `bg-brand-900` surface gets an espresso gradient with a top highlight (unlayered rule — it deliberately sets only `background-image`, never `box-shadow`, so rings and shadows survive). Charts: gradient bar fills and the shared espresso tooltip in `src/components/charts/theme.ts`. All motion is off under `prefers-reduced-motion`.
 - Chart colours: channels are one bronze scale (`CH_COLORS`); WH South caramel, WH North deep teal `#2e6f73`; category colours re-tuned to earthy hues.
   Green / amber / red still carry status meaning only.
 

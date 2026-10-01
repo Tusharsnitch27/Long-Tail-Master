@@ -1,6 +1,7 @@
 "use client";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartDownload } from "@/components/charts/ChartDownload";
+import { TOOLTIP } from "@/components/charts/theme";
 import { TrendChart } from "@/components/charts/TrendChart";
 import { DataTable, type Col, type ColType } from "@/components/table/DataTable";
 import { inr, num, pct, signedPct } from "@/lib/format";
@@ -49,7 +50,7 @@ const VIEW_LABEL: Record<string, string> = { kpi: "KPIs", table: "Table", bar: "
 
 export function View({ v }: { v: ViewData }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(60,40,20,.04)]">
+    <div className="overflow-hidden card rounded-[18px] shadow-[0_1px_2px_rgba(60,40,20,.04)]">
       <div className="flex items-center gap-2 border-b border-line bg-brand-50/40 px-3.5 py-2">
         <span className="rounded bg-brand-100 px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wider text-brand-800">{VIEW_LABEL[v.type] ?? v.type}</span>
         <span className="text-[12.5px] font-semibold text-ink">{v.title}</span>
@@ -126,7 +127,7 @@ function Body({ v }: { v: ViewData }) {
               <CartesianGrid stroke="#efe6da" horizontal={false} />
               <XAxis type="number" tick={{ fontSize: 11, fill: "#7a6c5d" }} tickFormatter={(n) => fmtValue(n, yFmt)} />
               <YAxis type="category" dataKey="__label" width={170} tick={{ fontSize: 11, fill: "#453b32" }} />
-              <Tooltip formatter={(n, name) => [fmtValue(Number(n), v.formats[String(name)] ?? yFmt), v.labels[String(name)] ?? name]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+              <Tooltip formatter={(n, name) => [fmtValue(Number(n), v.formats[String(name)] ?? yFmt), v.labels[String(name)] ?? name]} {...TOOLTIP} />
               {v.y.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} formatter={(n) => v.labels[n] ?? n} />}
               {v.y.map((k, i) => <Bar key={k} dataKey={k} name={k} fill={COLORS[i % COLORS.length]} radius={[0, 3, 3, 0]} maxBarSize={18} />)}
             </BarChart>

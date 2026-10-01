@@ -82,11 +82,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex h-11 items-center gap-3 border-b border-line bg-paper/80 px-4 backdrop-blur md:hidden">
           <Suspense><MobileNav {...nav} /></Suspense>
-          <span className="font-serif text-[16px] italic text-brand-500">{APP_NAME}</span>
+          <span className="text-gilded font-serif text-[17px] italic">{APP_NAME}</span>
         </div>
         <main className="min-h-0 flex-1 overflow-y-auto">
           {options && <Suspense><ContextBar options={options} /></Suspense>}
-          <div className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6">
+          <div className="stagger mx-auto max-w-[1440px] px-4 py-5 sm:px-6">
             {loadError ? (
               <div className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-[13px] text-rose-900">
                 <div className="font-semibold">Could not reach Snowflake</div>

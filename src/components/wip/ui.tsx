@@ -24,7 +24,7 @@ export function LabCard({ id, title, why, action, children, className, right }: 
   id?: string; title: string; why: string; action?: React.ReactNode; children: React.ReactNode; className?: string; right?: React.ReactNode;
 }) {
   return (
-    <section id={id} className={cn("scroll-mt-20 rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(60,40,20,.04)]", className)}>
+    <section id={id} className={cn("scroll-mt-20 card rounded-[18px] shadow-[0_1px_2px_rgba(60,40,20,.04)]", className)}>
       <div className="flex flex-wrap items-start justify-between gap-2 px-4 pb-2 pt-3">
         <div className="min-w-0">
           <h2 className="flex flex-wrap items-center gap-2 text-[13px] font-semibold text-zinc-800">{title}<ExperimentalPill /></h2>
@@ -44,7 +44,7 @@ export function LabCard({ id, title, why, action, children, className, right }: 
 
 export function HowBox({ title = "How this is calculated", items }: { title?: string; items: { k: string; v: React.ReactNode }[] }) {
   return (
-    <details className="group rounded-xl border border-line bg-white px-4 py-3 text-[12px] shadow-[0_1px_2px_rgba(60,40,20,.04)]">
+    <details className="group card rounded-[18px] px-4 py-3 text-[12px] shadow-[0_1px_2px_rgba(60,40,20,.04)]">
       <summary className="cursor-pointer select-none text-[12.5px] font-semibold text-zinc-800">{title}</summary>
       <dl className="mt-2 grid gap-x-6 gap-y-1.5 md:grid-cols-2">
         {items.map((i) => <div key={i.k}><dt className="font-medium text-zinc-700">{i.k}</dt><dd className="text-zinc-500">{i.v}</dd></div>)}

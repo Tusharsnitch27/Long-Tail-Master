@@ -147,7 +147,7 @@ export default async function ProductDetail({ params, searchParams }: { params: 
     <>
       <Link href={back} className="mb-3 inline-flex items-center gap-1 text-[12px] text-zinc-500 hover:text-ink"><ChevronLeft className="size-3.5" />Product Master</Link>
 
-      <div className="mb-4 grid gap-4 rounded-xl border border-line bg-white p-4 shadow-[0_1px_2px_rgba(60,40,20,.04)] lg:grid-cols-[184px_1fr]">
+      <div className="mb-4 grid gap-4 card rounded-[18px] p-4 shadow-[0_1px_2px_rgba(60,40,20,.04)] lg:grid-cols-[184px_1fr]">
         <div>
           {p.image ? (
             <a href={p.image} target="_blank" rel="noreferrer" className="group relative block size-[184px] overflow-hidden rounded-xl border border-line bg-brand-50/40">

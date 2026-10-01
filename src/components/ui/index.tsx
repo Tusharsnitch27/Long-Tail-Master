@@ -6,10 +6,11 @@ import { pct, signedPct } from "@/lib/format";
 
 export function PageHeader({ title, subtitle, right }: { title: string; subtitle?: React.ReactNode; right?: React.ReactNode }) {
   return (
-    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+    <div className="rise mb-5 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="font-serif text-[26px] leading-[1.05] tracking-[-0.02em] text-ink sm:text-[30px]">{title}</h1>
-        {subtitle && <div className="mt-1.5 text-[12.5px] text-zinc-500">{subtitle}</div>}
+        <h1 className="font-serif text-[27px] leading-[1.05] tracking-[-0.02em] text-ink sm:text-[32px]">{title}</h1>
+        <div className="mt-2 flex items-center gap-2"><span className="h-[2px] w-10 rounded-full bg-gradient-to-r from-brand-500 via-brand-300 to-transparent" /><span className="ornament !size-[5px]" /></div>
+        {subtitle && <div className="mt-2 text-[12.5px] text-zinc-500">{subtitle}</div>}
       </div>
       {right}
     </div>
@@ -28,12 +29,15 @@ export function Section({ title, tip, right, children, className, pad = true }: 
   title?: React.ReactNode; tip?: string; right?: React.ReactNode; children: React.ReactNode; className?: string; pad?: boolean;
 }) {
   return (
-    <section className={cn("rounded-[16px] border border-line bg-paper shadow-[0_1px_2px_rgba(60,40,20,.04),0_18px_40px_-34px_rgba(60,40,20,.45)]", className)}>
+    <section className={cn("card rounded-[18px]", className)}>
       {(title || right) && (
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-1 pt-3.5">
-          <h2 className="flex items-center gap-1.5 font-serif text-[15.5px] leading-tight text-ink">{title}{tip && <Tip text={tip} />}</h2>
-          {right}
-        </div>
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-2.5 pt-3.5">
+            <h2 className="flex items-center gap-2 font-serif text-[15.5px] leading-tight text-ink">{title && <span className="ornament" />}{title}{tip && <Tip text={tip} />}</h2>
+            {right}
+          </div>
+          <div className="gold-rule mx-4" />
+        </>
       )}
       <div className={pad ? "px-4 pb-4 pt-2" : ""}>{children}</div>
     </section>
@@ -62,7 +66,7 @@ export function StatusBadge({ status, ach }: { status: TargetStatus; ach?: numbe
 
 export type Tone = "good" | "warn" | "bad" | "info" | "muted";
 const TONE_TEXT: Record<Tone, string> = { good: "text-emerald-700", warn: "text-amber-700", bad: "text-rose-600", info: "text-brand-700", muted: "text-zinc-400" };
-const TONE_BAR: Record<Tone, string> = { good: "bg-emerald-500", warn: "bg-amber-500", bad: "bg-rose-500", info: "bg-brand-500", muted: "bg-zinc-300" };
+const TONE_BAR: Record<Tone, string> = { good: "bg-gradient-to-r from-emerald-400 to-emerald-600", warn: "bg-gradient-to-r from-amber-300 to-amber-500", bad: "bg-gradient-to-r from-rose-400 to-rose-600", info: "bg-gradient-to-r from-brand-300 to-brand-600", muted: "bg-zinc-300" };
 /** Tone for an achievement ratio against the status thresholds. */
 export const achTone = (a: number | null | undefined, th = { onTrack: 0.95, atRisk: 0.8 }): Tone => (a == null ? "muted" : a >= th.onTrack ? "good" : a >= th.atRisk ? "warn" : "bad");
 
@@ -72,6 +76,7 @@ export function Kpi({ label, value, sub, delta, deltaLabel, tip, className, href
   const body = (
     <>
       {tone && <span className={cn("absolute inset-x-0 top-0 h-[3px]", TONE_BAR[tone])} />}
+      {tone && tone !== "muted" && <span aria-hidden className={cn("pointer-events-none absolute -right-8 -top-10 size-24 rounded-full opacity-[0.13] blur-2xl", TONE_BAR[tone])} />}
       <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">{label}{tip && <Tip text={tip} />}</div>
       <div className={cn("tabular mt-1.5 truncate text-[21px] font-semibold leading-tight tracking-[-0.02em]", tone && tone !== "info" && tone !== "muted" && TONE_TEXT[tone])}>{value}</div>
       <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11.5px] text-zinc-500">
@@ -81,21 +86,21 @@ export function Kpi({ label, value, sub, delta, deltaLabel, tip, className, href
       </div>
     </>
   );
-  const cls = cn("relative block min-w-0 overflow-hidden rounded-[14px] border border-line bg-paper px-3.5 py-3 shadow-[0_1px_2px_rgba(60,40,20,.04)]", href && "transition-colors hover:border-brand-300", className);
+  const cls = cn("card sheen relative block min-w-0 overflow-hidden rounded-[16px] px-3.5 py-3", href && "card-lift", className);
   return href ? <Link href={href} className={cls}>{body}</Link> : <div className={cls}>{body}</div>;
 }
 
 export function KpiGrid({ children, cols = 5 }: { children: React.ReactNode; cols?: number }) {
   const c = { 3: "lg:grid-cols-3", 4: "lg:grid-cols-4", 5: "lg:grid-cols-5", 6: "lg:grid-cols-6", 7: "lg:grid-cols-4 xl:grid-cols-7", 8: "lg:grid-cols-4 xl:grid-cols-8" }[cols] ?? "lg:grid-cols-5";
-  return <div className={cn("grid grid-cols-2 gap-2.5 md:grid-cols-3", c)}>{children}</div>;
+  return <div className={cn("stagger grid grid-cols-2 gap-2.5 md:grid-cols-3", c)}>{children}</div>;
 }
 
 export function Tabs({ tabs, active }: { tabs: { href: string; label: string; key: string; count?: number }[]; active: string }) {
   return (
-    <div className="mb-4 flex w-fit max-w-full gap-0.5 overflow-x-auto rounded-xl border border-line bg-paper p-0.5 scroll-thin">
+    <div className="card mb-4 flex w-fit max-w-full gap-0.5 overflow-x-auto rounded-[14px] p-1 scroll-thin">
       {tabs.map((t) => (
         <Link key={t.key} href={t.href} scroll={false}
-          className={cn("flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-[12.5px] transition-colors", t.key === active ? "bg-brand-900 font-medium text-canvas" : "text-zinc-600 hover:bg-brand-50 hover:text-ink")}>
+          className={cn("flex items-center gap-1.5 whitespace-nowrap rounded-[10px] px-3.5 py-1.5 text-[12.5px] transition-all", t.key === active ? "bg-brand-900 font-medium text-canvas shadow-[0_6px_16px_-8px_rgba(60,40,20,.7)]" : "text-zinc-600 hover:bg-brand-50 hover:text-ink")}>
           {t.label}{t.count != null && <span className={cn("tabular rounded px-1 text-[10.5px]", t.key === active ? "bg-white/20" : "bg-zinc-100 text-zinc-500")}>{t.count}</span>}
         </Link>
       ))}
@@ -105,7 +110,7 @@ export function Tabs({ tabs, active }: { tabs: { href: string; label: string; ke
 
 export function Empty({ title = "Nothing to show", children }: { title?: string; children?: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-[16px] border border-dashed border-zinc-300 bg-paper px-6 py-10 text-center">
+    <div className="flex flex-col items-center justify-center rounded-[18px] border border-dashed border-brand-200 bg-gradient-to-b from-white to-paper px-6 py-10 text-center">
       <div className="font-serif text-[16px] text-zinc-800">{title}</div>
       {children && <div className="mt-1 max-w-md text-[12.5px] text-zinc-500">{children}</div>}
     </div>
@@ -114,7 +119,7 @@ export function Empty({ title = "Nothing to show", children }: { title?: string;
 
 export function Notice({ tone = "info", children }: { tone?: "info" | "warn"; children: React.ReactNode }) {
   return (
-    <div className={cn("mb-4 rounded-lg border px-3 py-2 text-[12px]", tone === "warn" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-brand-100 bg-brand-50/60 text-brand-900")}>
+    <div className={cn("mb-4 rounded-lg border px-3 py-2 text-[12px]", tone === "warn" ? "border-amber-200 bg-gradient-to-r from-amber-50 to-amber-50/40 text-amber-900" : "border-brand-100 bg-gradient-to-r from-brand-50 via-brand-50/50 to-transparent text-brand-900")}>
       {children}
     </div>
   );
@@ -150,8 +155,8 @@ export function ProductCell({ name, sku, image, href, size = 44, sub }: { name: 
  */
 export function DataPrompt({ title, children, href, cta, compact }: { title: string; children?: React.ReactNode; href?: string; cta?: string; compact?: boolean }) {
   return (
-    <div className={cn("flex items-start gap-3 rounded-xl border border-dashed border-brand-300 bg-brand-50/50 text-brand-900", compact ? "px-3 py-2" : "px-4 py-3")}>
-      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-brand-500 text-[11px] font-bold text-white">!</span>
+    <div className={cn("flex items-start gap-3 rounded-[14px] border border-dashed border-brand-300 bg-gradient-to-r from-brand-50 via-brand-50/60 to-white/40 text-brand-900", compact ? "px-3 py-2" : "px-4 py-3")}>
+      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-300 to-brand-600 text-[11px] font-bold text-white shadow-[0_3px_8px_-2px_rgba(168,112,63,.6)]">!</span>
       <div className="min-w-0 flex-1 text-[12.5px]">
         <div className="font-semibold">{title}</div>
         {children && <div className="mt-0.5 text-[12px] text-brand-800/80">{children}</div>}
@@ -170,7 +175,7 @@ export function Pill({ tone = "info", children, className }: { tone?: Tone; chil
 export function Meter({ value, color = "#a8703f", className }: { value: number | null; color?: string; className?: string }) {
   return (
     <span className={cn("block h-1.5 w-full overflow-hidden rounded-full bg-zinc-100", className)}>
-      <span className="block h-full rounded-full" style={{ width: `${Math.max(0, Math.min(1, value ?? 0)) * 100}%`, background: color }} />
+      <span className="block h-full rounded-full" style={{ width: `${Math.max(0, Math.min(1, value ?? 0)) * 100}%`, background: `linear-gradient(90deg, ${color}aa, ${color})` }} />
     </span>
   );
 }

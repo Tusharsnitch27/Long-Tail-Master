@@ -66,7 +66,7 @@ export function StoreTargetEditor({ month, cat, catLabel, cats, rows, categoryTa
     ask(out, "upload");
   }
   return (
-    <div className="rounded-xl border border-line bg-white">
+    <div className="card rounded-[18px]">
       <div className="grid gap-3 border-b border-line px-4 py-3 md:grid-cols-4">
         <div><div className="text-[11px] text-zinc-500">Category Stores target</div><div className="tabular text-[16px] font-semibold">{categoryTarget != null ? inr(categoryTarget) : "Not set"}</div></div>
         <div><div className="text-[11px] text-zinc-500">Σ store targets {uploadedAny ? "(uploaded)" : "(Snowflake)"}</div><div className="tabular text-[16px] font-semibold">{inr(sum)}</div></div>

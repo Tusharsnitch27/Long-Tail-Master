@@ -4,6 +4,7 @@ import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 import { inr, num, pct } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { ChartDownload } from "./ChartDownload";
+import { TOOLTIP, GRID } from "./theme";
 
 type Row = { day: string; revenue: number | null; units: number | null; prevRevenue: number | null; prevUnits: number | null; targetPace: number | null; targetBasis: number | null; achievement: number | null };
 
@@ -28,10 +29,10 @@ export function ExecTrend({ data, prevLabel, basisLabel }: { data: Row[]; prevLa
       <div style={{ height: 250 }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 6, right: 12, left: 4, bottom: 0 }}>
-            <CartesianGrid stroke="#efe6da" vertical={false} />
+            <CartesianGrid stroke={GRID} strokeDasharray="2 4" vertical={false} />
             <XAxis dataKey="day" tickLine={false} axisLine={{ stroke: "#e6dbcc" }} tick={{ fontSize: 11, fill: "#7a6c5d" }} minTickGap={14} />
             <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#7a6c5d" }} width={58} tickFormatter={(v) => f(v)} domain={m === "achievement" ? [0, "auto"] : undefined} />
-            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e6dbcc" }} labelFormatter={(d) => `Day ${d}`} formatter={(v, n) => [v == null ? "—" : f(Number(v)), n]} />
+            <Tooltip {...TOOLTIP} labelFormatter={(d) => `Day ${d}`} formatter={(v, n) => [v == null ? "—" : f(Number(v)), n]} />
             <Legend iconType="plainline" wrapperStyle={{ fontSize: 12 }} />
             {series.map((s) => <Line key={s.k} dataKey={s.k} name={s.l} stroke={s.c} strokeWidth={["revenue", "units", "achievement", "targetBasis"].includes(s.k) ? 2.2 : 1.6} strokeDasharray={"dash" in s && s.dash ? "5 4" : undefined} dot={false} connectNulls={false} />)}
           </LineChart>

@@ -30,7 +30,7 @@ export default async function VmDetail({ params, searchParams }: { params: Promi
         subtitle={<><Link href={withQs(ctx, "/vm")} className="text-brand-700 hover:underline">VM Revamp</Link> · {st?.city ?? ""}{st?.am ? ` · AM ${st.am}` : ""} · created by {r.created_by} on {fmtDate(r.created_at.slice(0, 10), true)}</>}
         right={<div className="flex gap-1.5"><Pill tone={sm.tone as never}>{sm.label}</Pill>{od && <Pill tone="bad">Overdue {diffDays(r.target_date!, ctx.today)} days</Pill>}</div>} />
 
-      <div className="mb-3 flex overflow-x-auto rounded-xl border border-line bg-white p-3 scroll-thin">
+      <div className="mb-3 flex overflow-x-auto card rounded-[18px] p-3 scroll-thin">
         {VM_STAGES.map((s, i) => (
           <div key={s.key} className="flex min-w-[130px] flex-1 items-start gap-2">
             <div className="flex flex-col items-center">

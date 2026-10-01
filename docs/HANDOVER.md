@@ -20,7 +20,7 @@ Where the code and this document disagree, the code wins. Tell the user and upda
 ### How the user works (preferences)
 - They give requirements in long pasted specs and many short follow-ups during a turn. Every follow-up is binding.
 - They want production-grade, "leadership / MBA owner" thinking: actionable, data-backed insights, never generic filler.
-- UI should be compact, elegant and "next level". Current theme: **Ocean Teal** in the app; warm beige editorial on the login page.
+- UI should be compact, elegant and "next level". Current theme: **Atelier**, the login page's warm beige editorial look, used across the whole app (1 Oct 2026; replaced Ocean Teal).
 - Never infer targets. Never prescribe discounts without business rules. Don't write simplistic "no sales = bad" actions.
 - Where data is missing, **prompt in the UI** (DataPrompt) for an upload or configuration. Never leave a silent blank or show "coming soon".
 - Say **"Stores"**, never "Offline" ("Offline" in their plan sheet means Stores).
@@ -70,7 +70,7 @@ Where the code and this document disagree, the code wins. Tell the user and upda
 
 | Area | Files |
 |---|---|
-| Registry, nav, theme | `src/lib/categories.ts`, `src/lib/nav.ts` (`APP_NAME="Long Tail"`), `src/lib/colors.ts`, `src/app/globals.css` |
+| Registry, nav, theme | `src/lib/categories.ts`, `src/lib/nav.ts` (`APP_NAME="Long Tail"`), `src/lib/colors.ts`, `src/app/globals.css` (Atelier tokens; see §8a) |
 | Data (Snowflake) | `src/server/data/`: `facts.ts` (store × category × day incl. targets), `channels.ts` (Unicommerce), `sku.ts` (horizontal store × SKU), `products.ts` (Product Master merge), `metafields.ts` (+ `getInwards`), `inventory.ts` (store stock), `warehouse.ts`, `stores.ts`, `freshness.ts` |
 | Data (Postgres) | `targetBook.ts` (month targets, splits, store targets, change log), `targets.ts` (legacy overrides), `remarks.ts`, `vm.ts`, `futureInwards.ts`, `db/migrations.ts` (v1–v7) |
 | Logic | `plan.ts` (targets, projection), `channelData.ts`, `scope.ts` (`loadScope`, `productPerformance`), `analytics.ts`, `actions.ts` (action engine), `executive.ts` (drivers / risks / opportunities), `storeInsights.ts`, `productInsights.ts`, `lab.ts`, `planning.ts`, `splitModel.ts`, `showcase.ts` (login), `rulesDoc.ts` (rule book + tables list) |
@@ -85,7 +85,7 @@ Where the code and this document disagree, the code wins. Tell the user and upda
 ## 4. Scope: categories
 
 The user's categories: **Accessories, Bags, Belts, Perfumes, Shoes (+Footwear, Sandals), Sunglasses**, plus **Trolleys** (Luggage), which they asked for earlier.
-Anything related or similar is included. Nothing else may be mixed in, and **Mitra must decline questions about other categories** such as shirts or jeans.
+Anything related or similar is included. Nothing else may be mixed in, and **Harvey must decline questions about other categories** such as shirts or jeans.
 
 The SKU prefix decides the category, ahead of the master's category field (longest prefix wins):
 
@@ -191,7 +191,7 @@ The top bar shows filters (category / period / channel as relevant) plus timesta
 |---|---|
 | **Executive Summary** `/` | Global category, period and channel filters (default Overall + MTD). **KPIs:** Revenue, Target MTD, Gap, Achievement %, Month-end projection, Projected achievement, Required run rate (days remaining), ASP. **Data prompts:** missing targets and store-target mismatch. **Daily revenue vs target chart:** default last 30 days; switch 7 / 30 / 60 / 90 / MTD / period (`?dr=`). **Channel contribution by category** (stacked bars). **Category comparison:** units, revenue, growth, ASP, discount, share, target, achievement, gap, projection, projected achievement, with a total row. **Drivers, risks, opportunities:** short, 3 each; leadership actions were removed. **Inventory and DOI by category** (store, warehouse, North · South). **Low-inventory top sellers.** **Top 10 / Bottom / At-risk SKUs per category tab**, with image, revenue, units and **current inventory (store · WH) + cover**. In the Overall view, store-only metrics aren't shown |
 | **Daily Overview** `/overview` | Day-level table: revenue, target, achievement, gap, status, vs same day last week, units, bills, orders, stores selling, ASP / ATV / UPT, discount, channel and per-category columns, totals with achievement; daily chart; category and channel filters |
-| **Mitra** `/mitra` | AI analyst (see §9) |
+| **Ask Harvey** `/harvey` | AI analyst (see §9). The old `/mitra` route redirects here, keeping `?q=` |
 | **Category Performance** `/category` | Summary per category (channel contribution, product contribution, scorecard incl. top-10 share and SKUs making up 80% of revenue, inventory: stores vs warehouse split SAPL-WH1 / WH2 / South / North, 60-day inventory trend, watch lists). **Product performance tab:** filters (category, type L1, sub-type L2, colour); **metafield search** ("black shoes" matches colour, type, name, AND words); L7 / vs LW, L30 / vs LM, STR, return %, lifetime sales, inward qty, current inventory; flags |
 | **Product Master** `/products` | Cards (132 px images) or table; filters incl. collection, lifecycle, flag; KPIs; prompts for missing metafields / images |
 | **Product detail** `/products/[sku]` | 184 px image, metafield description, 2-line computed summary, attribute grid, KPIs, 60-day units and revenue by channel, channel split incl. marketplaces, **inward timeline (putaway only)**, store distribution sorted by revenue (units, L7, L30, stock, cover), inventory now (Stores / WH South / North), size-level WH stock, 90-day inventory history, action opportunities (reorder to 45 days, transfers, size gaps, returns, trends, North/South mismatch…) |
@@ -209,11 +209,20 @@ The top bar shows filters (category / period / channel as relevant) plus timesta
 | **Control Centre** `/settings` (admin) | Month targets · Daily split · Store targets · Product attributes (coverage, gaps list, CSV upload incl. `image` column to override a product photo) · Users & access · Rules & data (rule book with where it applies and its value; tables used; freshness; thresholds form) · Change log |
 | **Login** `/login` | Beige editorial collage, no scroll on desktop:<br>• Banner "Welcome to *Long Tail*" (SNITCH wordmark above).<br>• **Footwear:** hero boot + small images per shoe type (sneaker, mules, loafer, sandals).<br>• **Fragrance:** top perfume + 2 more + the State of Mind gift-set tile.<br>• **Bags · Belts · Socks:** a cap shows because socks have no image.<br>• **Luggage:** Vitto and Rubik under the sign-in box (top right).<br>• Only perfumes carry names; **no sunglasses**; no channel or store figures on this public page.<br>• Chosen automatically by L30 gross sales; cached 6 h and warmed at startup (`src/server/showcase.ts`) |
 
+### 8a. Theme: Atelier (from the login page)
+- Tokens in `src/app/globals.css`: bronze accent scale `brand-50…900` (500 = `#a8703f`, 900 = espresso `#1b1712`); `zinc-*` is overridden
+  with warm stone so every neutral utility follows the theme; `canvas #f3ebe1`, `paper #fbf7f1` (cards), `line #e6dbcc`, `ink #1b1712`, `side` espresso.
+- Fonts via `next/font` (self-hosted at build): Inter (`font-sans`) for UI and numbers, **Playfair Display** (`font-serif`) for page titles,
+  section titles, the sidebar wordmark and Harvey. Small labels use wide-tracked uppercase (`.eyebrow`, KPI labels).
+- Solid buttons and selected tabs are espresso (`bg-brand-900`); the app background is `.atelier` (the login's soft warm light).
+- Chart colours: channels are one bronze scale (`CH_COLORS`); WH South caramel, WH North deep teal `#2e6f73`; category colours re-tuned to earthy hues.
+  Green / amber / red still carry status meaning only.
+
 Logout: a button next to the user's name at the bottom of the sidebar, and also in its menu.
 
 ---
 
-## 9. Mitra (AI)
+## 9. Harvey (AI) — formerly Mitra
 
 - Claude `claude-opus-5-5` via **Snowflake Cortex's Anthropic-compatible endpoint** (`/api/v2/cortex/v1/messages`, PAT auth; the user has no Anthropic API key). Adaptive thinking, effort `medium`, streaming.
 - Cortex rejects `strict` tools and `fallbacks`, so those are used only when `AI_PROVIDER=anthropic`.
@@ -226,8 +235,8 @@ Logout: a button next to the user's name at the bottom of the sidebar, and also 
 - **Scope guard** in the prompt and resolvers: out-of-scope categories are declined (tested: "shirts and jeans" declined in ~9 s).
 - The prompt covers: gross revenue, free-gift and DOI rules, the live rule, the plan-wins target rule, remarks, and "chart / table / X vs Y" requests.
 - Answers take ~20–90 s (the Stryker allocation took 79 s). `AI_EFFORT=low` is faster.
-- The page has a hero intro ("I'm Mitra, your Long Tail Mitra…"), grouped suggested questions (Quick answers · Compare · Explain · Act), live tool progress, a Stop button, copy and follow-ups. `?q=` prefills the question.
-- Earlier question from the user: Mitra only sees the tables its tools query. To enforce this at Snowflake level, create a read-only role limited to those tables and issue a PAT for it.
+- Renamed Mitra → **Harvey** on 1 Oct 2026; the nav item and CTAs read **"Ask Harvey"**. The page has a hero intro ("I'm Harvey, your Long Tail analyst…"), grouped suggested questions (Quick answers · Compare · Explain · Act), live tool progress, a Stop button, copy and follow-ups. `?q=` prefills the question.
+- Earlier question from the user: Harvey only sees the tables its tools query. To enforce this at Snowflake level, create a read-only role limited to those tables and issue a PAT for it.
 
 ---
 
@@ -303,5 +312,6 @@ Logout: a button next to the user's name at the bottom of the sidebar, and also 
 | `2783504` | Email-style usernames |
 | `239829f` | Rename; product-wall login; split actuals + recommendations |
 | `fdee4e7` → `fcfcf08` | Login collage iterations; name **Long Tail** |
+| (1 Oct) | Mitra renamed **Harvey** ("Ask Harvey", `/harvey`); Atelier theme across the app |
 
 When continuing, start by reading this file, `docs/SNITCH_LONGTAIL.md` and `src/server/rulesDoc.ts`, then run the type check and build to confirm a clean baseline.

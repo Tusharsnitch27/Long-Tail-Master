@@ -176,7 +176,7 @@ export default async function StoreDetail({ params, searchParams }: { params: Pr
 
         <div className="mt-3">
           <Section title="Daily sales by category · last 30 days">
-            <TrendChart data={trend} height={200} series={[...cats.map((c) => ({ key: c, label: catLabel(c), color: catColor(c), stack: "s" })), { key: "target", label: "Target (all)", color: "#0b3b44", type: "line" as const, dashed: true }]} />
+            <TrendChart data={trend} height={200} series={[...cats.map((c) => ({ key: c, label: catLabel(c), color: catColor(c), stack: "s" })), { key: "target", label: "Target (all)", color: "#1b1712", type: "line" as const, dashed: true }]} />
           </Section>
         </div>
 

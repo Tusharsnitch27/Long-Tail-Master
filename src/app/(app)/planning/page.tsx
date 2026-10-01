@@ -49,13 +49,13 @@ export default async function DemandPlanning({ searchParams }: { searchParams: P
         subtitle={<>{ctx.filters.cat ? catLabel(ctx.filters.cat) : "All categories"} · DOI control, forecast, reorder and open-to-buy · stock as of {fmtDate(ctx.asOf, true)}</>} />
       <WipBanner>v1 planning model — every forward number here is a <b>projection</b> from recent rate of sale, not an actual. Seasonality (festive, EOSS) is only captured where a month target is set in the Control Centre. Share feedback before this becomes a buying tool.</WipBanner>
 
-      <form method="get" className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-white px-4 py-3 text-[12px] shadow-[0_1px_2px_rgba(11,42,48,.04)]">
+      <form method="get" className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-white px-4 py-3 text-[12px] shadow-[0_1px_2px_rgba(60,40,20,.04)]">
         {ctx.filters.cat && <input type="hidden" name="cat" value={ctx.filters.cat} />}
         <label className="flex flex-col gap-1"><span className="text-[11px] text-zinc-500">Target DOI — min</span><input name="lo" type="number" min={1} max={365} defaultValue={pp.lo} className="w-24 rounded-md border border-line px-2 py-1" /></label>
         <label className="flex flex-col gap-1"><span className="text-[11px] text-zinc-500">Target DOI — max</span><input name="hi" type="number" min={1} max={400} defaultValue={pp.hi} className="w-24 rounded-md border border-line px-2 py-1" /></label>
         <label className="flex flex-col gap-1"><span className="text-[11px] text-zinc-500">Lead time (days)</span><input name="lt" type="number" min={0} max={180} defaultValue={pp.lead} className="w-24 rounded-md border border-line px-2 py-1" /></label>
         <label className="flex flex-col gap-1"><span className="text-[11px] text-zinc-500">L7 weight (0–1)</span><input name="w" type="number" min={0} max={1} step={0.1} defaultValue={pp.w} className="w-24 rounded-md border border-line px-2 py-1" /></label>
-        <button className="rounded-md bg-brand-700 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-brand-800">Apply</button>
+        <button className="rounded-md bg-brand-900 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-brand-800">Apply</button>
         <Link href={withQs(ctx, "/planning", { lo: null, hi: null, lt: null, w: null })} className="py-1.5 text-[11.5px] text-zinc-500 hover:underline">Reset</Link>
         <span className="ml-auto self-center text-[11.5px] text-zinc-500">Target cover = mid of band = <b className="text-zinc-700">{tgt} days</b></span>
       </form>

@@ -141,7 +141,7 @@ export default async function ProductDetail({ params, searchParams }: { params: 
     <>
       <Link href={back} className="mb-3 inline-flex items-center gap-1 text-[12px] text-zinc-500 hover:text-ink"><ChevronLeft className="size-3.5" />Product Master</Link>
 
-      <div className="mb-4 grid gap-4 rounded-xl border border-line bg-white p-4 shadow-[0_1px_2px_rgba(11,42,48,.04)] lg:grid-cols-[184px_1fr]">
+      <div className="mb-4 grid gap-4 rounded-xl border border-line bg-white p-4 shadow-[0_1px_2px_rgba(60,40,20,.04)] lg:grid-cols-[184px_1fr]">
         <div>
           {p.image ? (
             <a href={p.image} target="_blank" rel="noreferrer" className="group relative block size-[184px] overflow-hidden rounded-xl border border-line bg-brand-50/40">
@@ -165,7 +165,7 @@ export default async function ProductDetail({ params, searchParams }: { params: 
             </div>
           </div>
           <div className="mt-2 flex flex-wrap gap-1">
-            {cat && <Link href={withQs(ctx, "/category", { cat })} className="rounded bg-brand-700 px-1.5 py-0.5 text-[11px] text-white hover:bg-brand-800">{catLabel(cat)}</Link>}
+            {cat && <Link href={withQs(ctx, "/category", { cat })} className="rounded bg-brand-900 px-1.5 py-0.5 text-[11px] text-white hover:bg-brand-800">{catLabel(cat)}</Link>}
             {[productL1(p), p.l2, p.attrs.colour, p.collection].filter(Boolean).map((t, i) => <span key={i} className="rounded bg-brand-50 px-1.5 py-0.5 text-[11px] text-brand-800">{t}</span>)}
           </div>
           {desc && <p className="mt-2 max-w-3xl text-[12.5px] leading-relaxed text-zinc-700">{desc}</p>}
@@ -196,7 +196,7 @@ export default async function ProductDetail({ params, searchParams }: { params: 
           <TrendChart data={trend} height={220} yFormat="num" series={CHS.map((k) => ({ key: k === "stores" ? "uStores" : k === "online" ? "uOnline" : "uMarketplace", label: CH_LABEL[k], color: CH_COLORS[k], stack: "u" }))} />
         </Section>
         <Section title="Revenue · last 60 days" tip="Daily revenue by channel with the 7-day average (all channels)" right={<span className="text-[11.5px] text-zinc-500">{inr(trend.reduce((a, x) => a + x.stores + x.online + x.marketplace, 0))}</span>}>
-          <TrendChart data={trend} height={220} series={[...CHS.map((k) => ({ key: k, label: CH_LABEL[k], color: CH_COLORS[k], stack: "r" })), { key: "avg", label: "7-day avg", color: "#0b2a30", type: "line" as const, dashed: true }]} />
+          <TrendChart data={trend} height={220} series={[...CHS.map((k) => ({ key: k, label: CH_LABEL[k], color: CH_COLORS[k], stack: "r" })), { key: "avg", label: "7-day avg", color: "#1b1712", type: "line" as const, dashed: true }]} />
         </Section>
       </div>
 
@@ -279,10 +279,10 @@ export default async function ProductDetail({ params, searchParams }: { params: 
             ))}
           </div>
           <div className="mt-3 flex h-3 overflow-hidden rounded bg-zinc-100" title="Stores · WH South · WH North">
-            {totalInv > 0 && [[storeInv, CH_COLORS.stores], [row.whSouth, "#14a3ae"], [row.whNorth, "#d97706"]].map(([v, c], i) => <span key={i} style={{ width: `${(Number(v) / totalInv) * 100}%`, background: String(c) }} />)}
+            {totalInv > 0 && [[storeInv, CH_COLORS.stores], [row.whSouth, "#c08f60"], [row.whNorth, "#2e6f73"]].map(([v, c], i) => <span key={i} style={{ width: `${(Number(v) / totalInv) * 100}%`, background: String(c) }} />)}
           </div>
           <div className="mt-3 space-y-1.5">{facs.map((f) => (
-            <div key={f.f} className="grid grid-cols-[140px_1fr_52px] items-center gap-2 text-[12px]"><span className="text-zinc-600">{f.f} <span className="text-[10.5px] text-zinc-400">{f.zone}</span></span><Meter value={safeDiv(f.u, whInv)} color={f.zone === "North" ? "#d97706" : "#14a3ae"} /><span className="tabular text-right font-medium">{num(f.u)}</span></div>
+            <div key={f.f} className="grid grid-cols-[140px_1fr_52px] items-center gap-2 text-[12px]"><span className="text-zinc-600">{f.f} <span className="text-[10.5px] text-zinc-400">{f.zone}</span></span><Meter value={safeDiv(f.u, whInv)} color={f.zone === "North" ? "#d97706" : "#c08f60"} /><span className="tabular text-right font-medium">{num(f.u)}</span></div>
           ))}</div>
           <div className="mt-4">
             <div className="mb-1.5 flex items-center gap-1 text-[11px] font-medium text-zinc-500">Warehouse by size <Tip text="Live warehouse units per size (all three warehouses). Red = size out of stock at the warehouse." /></div>
@@ -299,8 +299,8 @@ export default async function ProductDetail({ params, searchParams }: { params: 
       <div className="mt-3">
         <Section title="Inventory history · last 90 days" tip="Daily snapshots: store report (all stores) and warehouse history (SNITCH_FINAL_INVENTORY_WH2). Right axis = stores holding stock.">
           {hasInvHist ? <TrendChart data={invTrend} height={220} yFormat="num" rightFormat="num" series={[
-            { key: "store", label: "Stores", color: CH_COLORS.stores, type: "line" }, { key: "south", label: "WH South", color: "#14a3ae", type: "line" },
-            { key: "north", label: "WH North", color: "#d97706", type: "line", dashed: true }, { key: "stores", label: "Stores stocked", color: "#94a3b8", type: "line", dashed: true, axis: "right" },
+            { key: "store", label: "Stores", color: CH_COLORS.stores, type: "line" }, { key: "south", label: "WH South", color: "#c08f60", type: "line" },
+            { key: "north", label: "WH North", color: "#2e6f73", type: "line", dashed: true }, { key: "stores", label: "Stores stocked", color: "#b8a894", type: "line", dashed: true, axis: "right" },
           ]} /> : <div className="py-6 text-center text-[12.5px] text-zinc-500">No inventory snapshots for this product in the last 90 days.</div>}
         </Section>
       </div>

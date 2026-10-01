@@ -6,7 +6,7 @@ Snowflake `SNITCH_DB.MAPLEMONK` on 30 Sep 2026.
 ## Scope
 
 The tool covers Accessories (incl. Caps), Bags, Belts, Perfumes, Shoes (incl. Footwear and Sandals), Sunglasses and Trolleys (Luggage).
-Nothing outside these categories is shown, and Mitra declines questions about other categories. The registry lives in
+Nothing outside these categories is shown, and Harvey declines questions about other categories. The registry lives in
 `src/lib/categories.ts`: source names, SKU prefixes and colours.
 
 | Category | Stores sales | Online / Marketplace | SKU prefixes |
@@ -80,7 +80,7 @@ Rules and their current values are listed under Control Centre → Rules & data.
 |---|---|
 | Executive Summary `/` | Are we on plan? Revenue, target, gap, achievement, projection, run rate, ASP; daily revenue vs target; category comparison; channel contribution by category; drivers, risks, opportunities; inventory and cover by category; top / bottom / at-risk SKUs per category |
 | Daily Overview | Day by day: revenue, target, achievement, gap, status, vs same day last week, units, bills, orders, stores selling, ASP / ATV / UPT, discount |
-| Mitra | Ask anything within scope |
+| Harvey | Ask anything within scope |
 | Category Performance · Product Master · product detail | Which categories and products drive performance; metafield search and filters; product timeline and store distribution |
 | Channel Overview | Which channel drives or drags; channel × category matrix; insights |
 | Store Overview | Store and format performance, states, distribution and expansion, DSR |

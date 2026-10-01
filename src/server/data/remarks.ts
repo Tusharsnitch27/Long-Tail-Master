@@ -3,7 +3,7 @@ import { cached, invalidate } from "@/lib/cache";
 import { dbConfigured, q } from "../db";
 
 /**
- * Team remarks: context the team wants the tool (Action Centre + Mitra) to take into account.
+ * Team remarks: context the team wants the tool (Action Centre + Harvey) to take into account.
  *  - kind "context": keep the item, show the note ("Team note: …"). A scope=date context remark marks an anomaly day
  *    (festival, Snitch birthday, sale) — excluded from week-on-week baselines where the engine can do so.
  *  - kind "not_applicable": suppress matching actions permanently (e.g. "this store has no perfumes" on store × category,

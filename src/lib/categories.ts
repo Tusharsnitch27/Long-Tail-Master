@@ -24,19 +24,19 @@ export interface CategoryDef {
 }
 
 export const CATEGORIES: CategoryDef[] = [
-  { key: "accessories", label: "Accessories", salesCategory: "Accessories", ucCategories: ["Accessories"], masterCategory: ["Accessories", "ACCESSORIES", "Caps", "CAPS"], skuPrefixes: ["4MAC", "4MCP", "4MSCK", "4MBD", "4MHT", "4MSFC", "4MSFL"], source: "sales", color: "#e08a3c" },
-  { key: "bags", label: "Bags", salesCategory: "Bags", ucCategories: ["Bags"], masterCategory: ["Bags", "BAGS"], skuPrefixes: ["BP"], source: "sales", color: "#c2527a" },
-  { key: "belts", label: "Belts", salesCategory: "Belts", ucCategories: ["Belts"], masterCategory: ["Belts", "BELTS"], skuPrefixes: ["4MBL"], source: "sales", color: "#7a6a3a" },
-  { key: "perfumes", label: "Perfumes", salesCategory: "Perfumes", ucCategories: ["Perfumes"], masterCategory: ["PERFUMES", "Perfumes"], skuPrefixes: ["4MSFR"], source: "dsr", dsrTable: "LONG_TAIL_DSR_PERFUMES", targetTable: "MTD_TARGET_PERFUMES", color: "#0e8a96" },
-  { key: "shoes", label: "Shoes", salesCategory: "Shoes", ucCategories: ["Shoes", "Footwear"], masterCategory: ["SHOES", "Shoes", "Footwear", "FOOTWEAR", "Sandals", "SANDALS"], skuPrefixes: ["SH"], source: "dsr", dsrTable: "LONG_TAIL_DSR_SHOES", targetTable: "MTD_TARGET_SHOES", color: "#0b3b44" },
-  { key: "sunglasses", label: "Sunglasses", salesCategory: "Sunglasses", ucCategories: ["Sunglasses"], masterCategory: ["Sunglasses", "SUNGLASSES"], skuPrefixes: ["SN"], source: "sales", color: "#5cc0c7" },
-  { key: "luggage", label: "Trolleys", salesCategory: "Luggage", ucCategories: ["TROLLEY", "Luggage"], masterCategory: ["Luggage", "LUGGAGE", "TROLLEY"], skuPrefixes: ["4MTL"], source: "sales", color: "#6b7fd7" },
+  { key: "accessories", label: "Accessories", salesCategory: "Accessories", ucCategories: ["Accessories"], masterCategory: ["Accessories", "ACCESSORIES", "Caps", "CAPS"], skuPrefixes: ["4MAC", "4MCP", "4MSCK", "4MBD", "4MHT", "4MSFC", "4MSFL"], source: "sales", color: "#d4893a" },
+  { key: "bags", label: "Bags", salesCategory: "Bags", ucCategories: ["Bags"], masterCategory: ["Bags", "BAGS"], skuPrefixes: ["BP"], source: "sales", color: "#a8506a" },
+  { key: "belts", label: "Belts", salesCategory: "Belts", ucCategories: ["Belts"], masterCategory: ["Belts", "BELTS"], skuPrefixes: ["4MBL"], source: "sales", color: "#7d7340" },
+  { key: "perfumes", label: "Perfumes", salesCategory: "Perfumes", ucCategories: ["Perfumes"], masterCategory: ["PERFUMES", "Perfumes"], skuPrefixes: ["4MSFR"], source: "dsr", dsrTable: "LONG_TAIL_DSR_PERFUMES", targetTable: "MTD_TARGET_PERFUMES", color: "#2e6f73" },
+  { key: "shoes", label: "Shoes", salesCategory: "Shoes", ucCategories: ["Shoes", "Footwear"], masterCategory: ["SHOES", "Shoes", "Footwear", "FOOTWEAR", "Sandals", "SANDALS"], skuPrefixes: ["SH"], source: "dsr", dsrTable: "LONG_TAIL_DSR_SHOES", targetTable: "MTD_TARGET_SHOES", color: "#4a3021" },
+  { key: "sunglasses", label: "Sunglasses", salesCategory: "Sunglasses", ucCategories: ["Sunglasses"], masterCategory: ["Sunglasses", "SUNGLASSES"], skuPrefixes: ["SN"], source: "sales", color: "#8aa595" },
+  { key: "luggage", label: "Trolleys", salesCategory: "Luggage", ucCategories: ["TROLLEY", "Luggage"], masterCategory: ["Luggage", "LUGGAGE", "TROLLEY"], skuPrefixes: ["4MTL"], source: "sales", color: "#6672a8" },
 ];
 
 export const DEFAULT_ENABLED = ["accessories", "bags", "belts", "perfumes", "shoes", "sunglasses", "luggage"];
 /** Category keys in A→Z order of their labels (every list and table uses this order). */
 export const sortCats = (keys: string[]) => [...keys].sort((a, b) => (catByKey(a)?.label ?? a).localeCompare(catByKey(b)?.label ?? b));
-/** Scope guard: only these source categories belong to the tool (anything else is out of scope for pages and Mitra). */
+/** Scope guard: only these source categories belong to the tool (anything else is out of scope for pages and Harvey). */
 export const IN_SCOPE_NOTE = "Accessories, Bags, Belts, Perfumes, Shoes (incl. Footwear, Sandals), Sunglasses and Trolleys";
 
 export const catByKey = (k: string) => CATEGORIES.find((c) => c.key === k);

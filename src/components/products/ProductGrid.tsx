@@ -20,7 +20,7 @@ const SORTS: { key: string; label: string; asc?: boolean }[] = [
   { key: "ltStr", label: "Lifetime STR" }, { key: "str30", label: "STR (L30)" }, { key: "returnPct", label: "Return %" }, { key: "stock", label: "Total stock" },
   { key: "doi", label: "Days of cover" }, { key: "daysLive", label: "Newest", asc: true }, { key: "name", label: "Name", asc: true },
 ];
-const CH = ["#0b5f6a", "#14a3ae", "#8fd6da"], CHN = ["Stores", "Online", "Marketplace"];
+const CH = ["#6e4526", "#c08f60", "#e2c9a6"], CHN = ["Stores", "Online", "Marketplace"];
 const PAGE = 48;
 
 export function ProductGrid({ rows, facets, qs, defs }: { rows: GridRow[]; facets: FacetDef[]; qs: string; defs: Record<string, string> }) {
@@ -92,17 +92,17 @@ function Card({ r, href, defs }: { r: GridRow; href: string; defs: Record<string
   const stock = r.storeInv + r.whInv;
   const coverTone = r.doi == null ? (stock > 0 ? "text-amber-700" : "text-zinc-400") : r.doi < 21 ? "text-rose-600" : r.doi > 180 ? "text-amber-700" : "text-emerald-700";
   return (
-    <Link href={href} className="group flex gap-3 rounded-xl border border-line bg-white p-3 shadow-[0_1px_2px_rgba(11,42,48,.04)] transition-colors hover:border-brand-300">
+    <Link href={href} className="group flex gap-3 rounded-xl border border-line bg-white p-3 shadow-[0_1px_2px_rgba(60,40,20,.04)] transition-colors hover:border-brand-300">
       <div className="relative size-[132px] shrink-0 overflow-hidden rounded-lg border border-line bg-brand-50/40">
         {r.image ? <img src={r.image} alt="" loading="lazy" className="size-full object-cover transition-transform duration-300 group-hover:scale-105" /> : <div className="flex size-full items-center justify-center text-[11px] text-brand-400">no image</div>}
-        {r.flag && <span className={cn("absolute bottom-1.5 left-1.5 rounded px-1.5 py-px text-[10px] font-semibold", r.flag === "Low cover" ? "bg-rose-600 text-white" : r.flag === "Slow" ? "bg-amber-500 text-white" : "bg-brand-700 text-white")}>{r.flag}</span>}
+        {r.flag && <span className={cn("absolute bottom-1.5 left-1.5 rounded px-1.5 py-px text-[10px] font-semibold", r.flag === "Low cover" ? "bg-rose-600 text-white" : r.flag === "Slow" ? "bg-amber-500 text-white" : "bg-brand-900 text-white")}>{r.flag}</span>}
         {r.lifecycle && <span className="absolute left-1.5 top-1.5 rounded bg-white/90 px-1 text-[9.5px] font-medium uppercase tracking-wide text-zinc-600">{r.lifecycle.toLowerCase()}</span>}
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-[13px] font-semibold leading-tight">{r.name}</div>
         <div className="mt-0.5 font-mono text-[10.5px] text-zinc-400">{r.sku}{r.mrp ? <span className="ml-1.5 font-sans text-zinc-500">MRP {inr(r.mrp, { compact: false })}</span> : null}</div>
         <div className="mt-1.5 flex flex-wrap gap-1">
-          {[r.catName, r.l1, r.l2, r.colour].filter(Boolean).map((t, i) => <span key={i} className={cn("rounded px-1.5 py-px text-[10.5px]", i === 0 ? "bg-brand-700 text-white" : "bg-brand-50 text-brand-800")}>{t}</span>)}
+          {[r.catName, r.l1, r.l2, r.colour].filter(Boolean).map((t, i) => <span key={i} className={cn("rounded px-1.5 py-px text-[10.5px]", i === 0 ? "bg-brand-900 text-white" : "bg-brand-50 text-brand-800")}>{t}</span>)}
           {r.attrs.slice(0, 2).map((t) => <span key={t} className="rounded bg-zinc-100 px-1.5 py-px text-[10.5px] text-zinc-600">{t}</span>)}
         </div>
         <div className="mt-2 grid grid-cols-3 gap-x-2 gap-y-1.5 text-[11px]">

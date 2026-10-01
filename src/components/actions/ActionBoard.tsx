@@ -53,7 +53,7 @@ export function ActionBoard({ actions, hidden, statuses, categories, initialGrou
             const n = pool.filter((a) => inGroup(a, g.k)).length;
             return (
               <button key={g.k} onClick={() => { setGroup(g.k); setType(""); setLimit(PAGE); }}
-                className={cn("flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-[12.5px] transition-colors", group === g.k ? "bg-brand-700 font-medium text-white" : "text-zinc-600 hover:bg-brand-50 hover:text-ink")}>
+                className={cn("flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-[12.5px] transition-colors", group === g.k ? "bg-brand-900 font-medium text-white" : "text-zinc-600 hover:bg-brand-50 hover:text-ink")}>
                 {g.label}<span className={cn("tabular rounded px-1 text-[10.5px]", group === g.k ? "bg-white/20" : g.k === "urgent" && n ? "bg-rose-50 text-rose-700" : "bg-zinc-100 text-zinc-500")}>{n}</span>
               </button>
             );
@@ -66,7 +66,7 @@ export function ActionBoard({ actions, hidden, statuses, categories, initialGrou
         </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-white p-2 shadow-[0_1px_2px_rgba(11,42,48,.04)]">
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-white p-2 shadow-[0_1px_2px_rgba(60,40,20,.04)]">
         <SlidersHorizontal className="ml-1 size-3.5 text-zinc-400" />
         <label className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-2 size-4 text-zinc-400" />

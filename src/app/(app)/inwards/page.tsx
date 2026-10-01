@@ -107,7 +107,7 @@ export default async function FutureInwards({ searchParams }: { searchParams: Pr
                   <span className="tabular text-[10px] text-zinc-500">{e.n + e.r ? num(e.n + e.r) : ""}</span>
                   <div className="flex w-full max-w-[34px] flex-col-reverse overflow-hidden rounded-t" style={{ height: Math.max(h, 2) }}>
                     <div style={{ height: `${((e.r) / Math.max(1, e.n + e.r)) * 100}%` }} className="bg-brand-300" />
-                    <div style={{ height: `${((e.n) / Math.max(1, e.n + e.r)) * 100}%` }} className="bg-brand-700" />
+                    <div style={{ height: `${((e.n) / Math.max(1, e.n + e.r)) * 100}%` }} className="bg-brand-900" />
                   </div>
                   <span className={`text-[10px] ${k === "late" ? "font-semibold text-rose-600" : "text-zinc-500"}`}>{k.length === 10 ? fmtDate(k) : k}</span>
                 </div>
@@ -115,7 +115,7 @@ export default async function FutureInwards({ searchParams }: { searchParams: Pr
             })}
           </div>
         ) : <div className="py-6 text-center text-[12px] text-zinc-500">No open inwards yet.</div>}
-        <div className="mt-1 flex gap-3 text-[11px] text-zinc-500"><span className="flex items-center gap-1"><span className="size-2 rounded-sm bg-brand-700" />New designs</span><span className="flex items-center gap-1"><span className="size-2 rounded-sm bg-brand-300" />Repeat designs</span></div>
+        <div className="mt-1 flex gap-3 text-[11px] text-zinc-500"><span className="flex items-center gap-1"><span className="size-2 rounded-sm bg-brand-900" />New designs</span><span className="flex items-center gap-1"><span className="size-2 rounded-sm bg-brand-300" />Repeat designs</span></div>
       </Section>
 
       <Section className="mt-3" title="Inward plan" tip="Repeat: current stock, L30 sales, days of cover now and after the inward. New: similar-product benchmark (same category + product type).">

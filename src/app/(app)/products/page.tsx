@@ -47,7 +47,7 @@ export default async function ProductMaster({ searchParams }: { searchParams: Pr
     <>
       <PageHeader title="Product Master" subtitle={<>{title} · {num(rows.length)} products · lifetime performance and live inventory <span className="text-zinc-400">· sales to {fmtDate(ctx.asOf, true)}</span></>}
         right={<div className="flex rounded-lg border border-line bg-white p-0.5 text-[12px]">
-          {(["cards", "table"] as const).map((v) => <Link key={v} href={viewHref(v === "cards" ? null : v)} scroll={false} className={cn("rounded-md px-3 py-1", view === v ? "bg-brand-700 font-medium text-white" : "text-zinc-600 hover:bg-brand-50")}>{v === "cards" ? "Cards" : "Table"}</Link>)}
+          {(["cards", "table"] as const).map((v) => <Link key={v} href={viewHref(v === "cards" ? null : v)} scroll={false} className={cn("rounded-md px-3 py-1", view === v ? "bg-brand-900 font-medium text-white" : "text-zinc-600 hover:bg-brand-50")}>{v === "cards" ? "Cards" : "Table"}</Link>)}
         </div>} />
       <KpiGrid cols={7}>
         <Kpi label="Products" value={num(agg.products)} sub={`${num(rows.filter((r) => r.l30Units > 0).length)} sold in L30`} />

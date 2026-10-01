@@ -27,7 +27,7 @@ export function VmCreateForm({ stores, cats, defaultCat }: { stores: { code: str
     if (!r.ok) return setMsg(r.error ?? "Failed");
     setOpen(false); setF((x) => ({ ...x, branch_code: "", note: "" })); router.refresh();
   }
-  if (!open) return <button onClick={() => setOpen(true)} className="flex items-center gap-1 rounded-md bg-brand-700 px-2.5 py-1.5 text-[12px] font-medium text-white hover:bg-brand-800"><Plus className="size-3.5" />New revamp</button>;
+  if (!open) return <button onClick={() => setOpen(true)} className="flex items-center gap-1 rounded-md bg-brand-900 px-2.5 py-1.5 text-[12px] font-medium text-white hover:bg-brand-800"><Plus className="size-3.5" />New revamp</button>;
   return (
     <div className="w-full rounded-xl border border-brand-200 bg-brand-50/40 p-3">
       <div className="mb-2 flex items-center justify-between text-[12.5px] font-semibold">Start a VM revamp<button onClick={() => setOpen(false)} className="text-zinc-400 hover:text-zinc-600"><X className="size-4" /></button></div>
@@ -41,7 +41,7 @@ export function VmCreateForm({ stores, cats, defaultCat }: { stores: { code: str
         <label className="flex flex-col gap-0.5 text-[11px] text-zinc-500">Category<select className={input} value={f.category} onChange={(e) => set("category", e.target.value)}>{cats.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}</select></label>
         <label className="flex flex-col gap-0.5 text-[11px] text-zinc-500">Owner<input className={input} value={f.owner} onChange={(e) => set("owner", e.target.value)} placeholder="Name" /></label>
         <label className="flex flex-col gap-0.5 text-[11px] text-zinc-500">Target go-live<input type="date" className={input} value={f.target_date} onChange={(e) => set("target_date", e.target.value)} /></label>
-        <div className="flex items-end"><button disabled={busy || !f.branch_code} onClick={save} className="w-full rounded-md bg-brand-700 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-brand-800 disabled:opacity-50">{busy ? "Saving…" : "Create"}</button></div>
+        <div className="flex items-end"><button disabled={busy || !f.branch_code} onClick={save} className="w-full rounded-md bg-brand-900 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-brand-800 disabled:opacity-50">{busy ? "Saving…" : "Create"}</button></div>
         <label className="col-span-2 flex flex-col gap-0.5 text-[11px] text-zinc-500 md:col-span-6">Why this store? (first note)<input className={input} value={f.note} onChange={(e) => set("note", e.target.value)} placeholder="e.g. top-20 store by footfall, shoes at 40% of peer share, wall space available" /></label>
       </div>
       {msg && <div className="mt-2 text-[12px] text-rose-600">{msg}</div>}
@@ -114,7 +114,7 @@ export function VmUpdateForm({ r, admin }: { r: { id: number; stage: string; sta
       </div>
       <label className="flex flex-col gap-0.5 text-[11px] text-zinc-500">Add a note<textarea rows={2} className={input} value={f.note} onChange={(e) => set("note", e.target.value)} placeholder="Progress, blockers, what changed on the floor…" /></label>
       <div className="flex items-center gap-2">
-        <button disabled={busy} onClick={save} className="rounded-md bg-brand-700 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-brand-800 disabled:opacity-50">{busy ? "Saving…" : "Save update"}</button>
+        <button disabled={busy} onClick={save} className="rounded-md bg-brand-900 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-brand-800 disabled:opacity-50">{busy ? "Saving…" : "Save update"}</button>
         {msg && <span className={cn("text-[12px]", msg.ok ? "text-emerald-700" : "text-rose-600")}>{msg.text}</span>}
         {admin && <button onClick={del} className="ml-auto flex items-center gap-1 text-[11.5px] text-zinc-400 hover:text-rose-600"><Trash2 className="size-3.5" />Delete</button>}
       </div>

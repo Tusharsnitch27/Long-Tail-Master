@@ -82,7 +82,7 @@ export function MonthTargetGrid({ months, cats, values, actuals, current, readOn
     <div className="rounded-xl border border-line bg-white">
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
         <div className="flex gap-0.5 rounded-lg border border-line p-0.5">
-          {CH.map((c) => <button key={c.key} onClick={() => setCh(c.key)} className={cn("rounded-md px-2.5 py-1 text-[12.5px]", ch === c.key ? "bg-brand-700 font-medium text-white" : "text-zinc-600 hover:bg-brand-50")}>{c.label}</button>)}
+          {CH.map((c) => <button key={c.key} onClick={() => setCh(c.key)} className={cn("rounded-md px-2.5 py-1 text-[12.5px]", ch === c.key ? "bg-brand-900 font-medium text-white" : "text-zinc-600 hover:bg-brand-50")}>{c.label}</button>)}
         </div>
         <span className="text-[11.5px] text-zinc-500">₹ lakhs · {ch === "overall" ? "sum of the three channels (read-only)" : "click a cell to edit"}</span>
         {pending > 0 && <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11.5px] font-medium text-amber-800 ring-1 ring-amber-200">{pending} upcoming category-months missing a channel target</span>}
@@ -95,7 +95,7 @@ export function MonthTargetGrid({ months, cats, values, actuals, current, readOn
       <div className="overflow-x-auto scroll-thin">
         <table className="w-full whitespace-nowrap text-[12.5px]">
           <thead><tr className="border-b border-line bg-brand-50/50 text-[11px] text-zinc-500">
-            <th className="sticky left-0 bg-[#f4fafa] px-3 py-2 text-left font-medium">Category</th>
+            <th className="sticky left-0 bg-[#faf6f0] px-3 py-2 text-left font-medium">Category</th>
             {months.map((m) => <th key={m} className={cn("px-2 py-2 text-right font-medium", m === current && "text-brand-700")}>{MON[Number(m.slice(5, 7)) - 1]} {m.slice(2, 4)}{m === current ? " · now" : m < current ? "" : ""}</th>)}
             <th className="px-3 py-2 text-right font-medium">FY total</th>
           </tr></thead>
@@ -122,7 +122,7 @@ export function MonthTargetGrid({ months, cats, values, actuals, current, readOn
               </tr>
             ))}
             <tr className="bg-brand-50/50 font-semibold">
-              <td className="sticky left-0 bg-[#f4fafa] px-3 py-2">Total</td>
+              <td className="sticky left-0 bg-[#faf6f0] px-3 py-2">Total</td>
               {months.map((m) => {
                 const t = cats.reduce((s, c) => s + (cell(c.key, m) ?? 0), 0);
                 const a = cats.reduce((s, c) => s + (cell(c.key, m) != null ? act(c.key, m) : 0), 0);
@@ -140,7 +140,7 @@ export function MonthTargetGrid({ months, cats, values, actuals, current, readOn
       </div>
       <div className="flex flex-wrap items-center gap-3 px-4 py-3">
         {!readOnly && ch !== "overall" && <>
-          <button disabled={!dirty.length || invalid || busy} onClick={save} className="flex items-center gap-1.5 rounded-lg bg-brand-700 px-3 py-1.5 text-[12.5px] font-medium text-white hover:bg-brand-800 disabled:opacity-40"><Save className="size-3.5" />Save {dirty.length ? `${dirty.length} change${dirty.length > 1 ? "s" : ""}` : "changes"}</button>
+          <button disabled={!dirty.length || invalid || busy} onClick={save} className="flex items-center gap-1.5 rounded-lg bg-brand-900 px-3 py-1.5 text-[12.5px] font-medium text-white hover:bg-brand-800 disabled:opacity-40"><Save className="size-3.5" />Save {dirty.length ? `${dirty.length} change${dirty.length > 1 ? "s" : ""}` : "changes"}</button>
           {dirty.length > 0 && <button onClick={() => setEdit({})} className="flex items-center gap-1 text-[12px] text-zinc-500 hover:text-ink"><RotateCcw className="size-3.5" />Discard</button>}
         </>}
         {invalid && <span className="text-[12px] text-rose-600">Enter numbers in lakhs (e.g. 12.5).</span>}

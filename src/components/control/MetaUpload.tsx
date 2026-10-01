@@ -29,7 +29,7 @@ export function MetaUpload({ missing }: { missing: { sku: string; name: string; 
   return (
     <div className="flex flex-wrap items-center gap-2">
       <button onClick={() => downloadCsv("product-attributes-template.csv", [COLS, ...missing.slice(0, 500).map((m) => [m.sku])])} className="flex items-center gap-1 rounded-md border border-line bg-white px-2 py-1 text-[12px] text-zinc-600 hover:border-brand-300"><Download className="size-3.5" />Template (products with gaps)</button>
-      <button onClick={() => file.current?.click()} className="flex items-center gap-1 rounded-md bg-brand-700 px-2.5 py-1 text-[12px] font-medium text-white hover:bg-brand-800"><Upload className="size-3.5" />Upload attributes CSV</button>
+      <button onClick={() => file.current?.click()} className="flex items-center gap-1 rounded-md bg-brand-900 px-2.5 py-1 text-[12px] font-medium text-white hover:bg-brand-800"><Upload className="size-3.5" />Upload attributes CSV</button>
       <input ref={file} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
       {msg && <span className={cn("text-[12px]", msg.ok ? "text-emerald-700" : "text-rose-600")}>{msg.text}</span>}
     </div>

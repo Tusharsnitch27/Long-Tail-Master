@@ -10,7 +10,7 @@ import type { SkuStoreFact } from "./data/sku";
 import type { Product } from "./data/products";
 
 export const catLabel = (k: string) => catByKey(k)?.label ?? k;
-export const catColor = (k: string) => catByKey(k)?.color ?? "#71717a";
+export const catColor = (k: string) => catByKey(k)?.color ?? "#7a6c5d";
 
 /** Rows = metrics, columns = categories + total. Values pre-formatted for a compact server-rendered table. */
 export function categoryComparison(ctx: Ctx, facts: Fact[]) {

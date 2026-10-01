@@ -121,7 +121,7 @@ export default async function ExecutiveSummary({ searchParams }: { searchParams:
 
       <div className="mt-3 grid gap-3 xl:grid-cols-[1.7fr_1fr]">
         <Section title={`Daily revenue vs target · ${dr === "mtd" ? "month to date" : dr === "period" ? fmtRange(last30) : `last ${dr} days`}`} tip="Bars coloured by achievement of that day's phased target"
-          right={<div className="flex gap-0.5 rounded-lg border border-line p-0.5">{DR.map((x) => <Link key={x.k} scroll={false} href={withQs(ctx, "/", { dr: x.k === "30" ? null : x.k })} className={cn("rounded-md px-2 py-0.5 text-[11.5px]", dr === x.k ? "bg-brand-700 font-medium text-white" : "text-zinc-600 hover:bg-brand-50")}>{x.l}</Link>)}</div>}>
+          right={<div className="flex gap-0.5 rounded-lg border border-line p-0.5">{DR.map((x) => <Link key={x.k} scroll={false} href={withQs(ctx, "/", { dr: x.k === "30" ? null : x.k })} className={cn("rounded-md px-2 py-0.5 text-[11.5px]", dr === x.k ? "bg-brand-900 font-medium text-white" : "text-zinc-600 hover:bg-brand-50")}>{x.l}</Link>)}</div>}>
           <DailyTargetChart data={daily} height={250} />
         </Section>
         <Section title="Channel contribution by category" tip="Share of each category's revenue in the selected period">
@@ -133,7 +133,7 @@ export default async function ExecutiveSummary({ searchParams }: { searchParams:
                   <div className="mb-1 flex items-baseline justify-between text-[12px]"><Link href={withQs(ctx, "/category", { cat: c.c })} className="flex items-center gap-1.5 font-medium hover:underline"><span className="size-2 rounded-full" style={{ background: catColor(c.c) }} />{catLabel(c.c)}</Link><span className="tabular text-zinc-500">{inr(t)}</span></div>
                   <div className="flex h-5 overflow-hidden rounded-md bg-brand-50">
                     {c.split.map((x) => x.rev > 0 && (
-                      <span key={x.k} title={`${CH_LABEL[x.k]} ${inr(x.rev)} · ${pct(x.rev / t, 0)}`} className="flex items-center justify-center text-[10px] font-semibold" style={{ width: `${(x.rev / t) * 100}%`, background: CH_COLORS[x.k], color: x.k === "marketplace" ? "#0b3b44" : "#fff" }}>{x.rev / t >= 0.12 ? pct(x.rev / t, 0) : ""}</span>
+                      <span key={x.k} title={`${CH_LABEL[x.k]} ${inr(x.rev)} · ${pct(x.rev / t, 0)}`} className="flex items-center justify-center text-[10px] font-semibold" style={{ width: `${(x.rev / t) * 100}%`, background: CH_COLORS[x.k], color: x.k === "marketplace" ? "#1b1712" : "#fff" }}>{x.rev / t >= 0.12 ? pct(x.rev / t, 0) : ""}</span>
                     ))}
                   </div>
                 </div>

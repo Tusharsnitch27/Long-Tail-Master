@@ -8,7 +8,7 @@ import { CATEGORIES } from "@/lib/categories";
 const ALL_CATS = [...CATEGORIES].map((c) => ({ key: c.key, label: c.label })).sort((a, b) => a.label.localeCompare(b.label));
 
 /**
- * Team remark form. Remarks are read by the Action Centre (hide / annotate actions, mark anomaly days) and by Mitra.
+ * Team remark form. Remarks are read by the Action Centre (hide / annotate actions, mark anomaly days) and by Harvey.
  * Used inline on an action card (scopes derived from the action) or standalone (pick a store / category / date).
  */
 export type Kind = "context" | "not_applicable" | "snooze";
@@ -104,11 +104,11 @@ export function RemarkForm({ target, stores, categories = ALL_CATS, onDone, comp
 
   const effect = (() => {
     const who = scope === "action" ? "this action" : scope === "store_category" ? `${storeName || "the store"} × ${catLabel(cat) || "the category"}` : scope === "store" ? `every action for ${storeName || "the store"}` : scope === "product" ? `every action for ${t.product?.name ?? "this product"}` : scope === "category" ? `every ${catLabel(cat) || "category"} action` : scope === "date" ? (day ? fmt(day) : "the date") : "the team";
-    if (scope === "general") return "Shown under Team remarks and read by Mitra as background.";
-    if (scope === "date") return `Marks ${who} as an anomaly day${cat ? ` for ${catLabel(cat)}` : ""}: left out of week-on-week and best-run baselines, and shown on actions that cover it. Mitra reads it too.`;
+    if (scope === "general") return "Shown under Team remarks and read by Harvey as background.";
+    if (scope === "date") return `Marks ${who} as an anomaly day${cat ? ` for ${catLabel(cat)}` : ""}: left out of week-on-week and best-run baselines, and shown on actions that cover it. Harvey reads it too.`;
     if (kind === "not_applicable") return scope === "store_category" ? `Hides store actions for ${who} and treats ${catLabel(cat) || "the category"} as not live there (no push-sales, no expansion nudges).` : `Hides ${who} from now on (you can undo it under Team remarks).`;
     if (kind === "snooze") return `Hides ${who} until ${fmt(until)}; it comes back afterwards if still true.`;
-    return `Keeps ${who} and shows your note on it as “Team note”. Mitra reads it too.`;
+    return `Keeps ${who} and shows your note on it as “Team note”. Harvey reads it too.`;
   })();
 
   async function save() {
@@ -135,7 +135,7 @@ export function RemarkForm({ target, stores, categories = ALL_CATS, onDone, comp
   }
 
   const lbl = "mb-1 block text-[10.5px] font-semibold uppercase tracking-wider text-zinc-400";
-  const seg = (on: boolean) => cn("rounded-md border px-2 py-1 text-[11.5px] transition-colors", on ? "border-brand-700 bg-brand-700 text-white" : "border-line bg-white text-zinc-600 hover:border-brand-300");
+  const seg = (on: boolean) => cn("rounded-md border px-2 py-1 text-[11.5px] transition-colors", on ? "border-brand-700 bg-brand-900 text-white" : "border-line bg-white text-zinc-600 hover:border-brand-300");
   return (
     <div className={cn("rounded-xl border border-brand-100 bg-brand-50/40", compact ? "p-3" : "p-4")}>
       <div className="grid gap-3 md:grid-cols-2">
@@ -196,7 +196,7 @@ export function RemarkForm({ target, stores, categories = ALL_CATS, onDone, comp
       <div className="mt-3">
         <span className={lbl}>Remark</span>
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={2} maxLength={600}
-          placeholder={scope === "date" ? "e.g. Snitch birthday sale — stores did 10× perfumes" : scope === "store_category" ? "e.g. This store doesn't carry perfumes" : "What should the team (and Mitra) keep in mind?"}
+          placeholder={scope === "date" ? "e.g. Snitch birthday sale — stores did 10× perfumes" : scope === "store_category" ? "e.g. This store doesn't carry perfumes" : "What should the team (and Harvey) keep in mind?"}
           className="w-full resize-y rounded-lg border border-line bg-white px-3 py-2 text-[13px] outline-none focus:border-brand-500" />
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {chips.map((s) => <button key={s.text} type="button" onClick={() => pick(s)} className="rounded-full border border-line bg-white px-2.5 py-0.5 text-[11.5px] text-zinc-600 hover:border-brand-400 hover:text-brand-800">{s.text}</button>)}
@@ -209,7 +209,7 @@ export function RemarkForm({ target, stores, categories = ALL_CATS, onDone, comp
           {saved && !err && <span className="text-[11.5px] text-emerald-700">Saved — the team will see it.</span>}
           {err && <span role="alert" className="text-[11.5px] text-rose-700">{err}</span>}
           {onDone && <button type="button" onClick={onDone} className="rounded-md px-2.5 py-1.5 text-[12px] text-zinc-600 hover:bg-white">Cancel</button>}
-          <button type="button" disabled={busy} onClick={save} className="flex items-center gap-1.5 rounded-md bg-brand-700 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-brand-800 disabled:opacity-50">{busy && <Loader2 className="size-3.5 animate-spin" />}Save remark</button>
+          <button type="button" disabled={busy} onClick={save} className="flex items-center gap-1.5 rounded-md bg-brand-900 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-brand-800 disabled:opacity-50">{busy && <Loader2 className="size-3.5 animate-spin" />}Save remark</button>
         </div>
       </div>
 

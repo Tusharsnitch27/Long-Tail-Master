@@ -42,7 +42,7 @@ export default async function VmRevampPage({ searchParams }: { searchParams: Pro
           const n = revamps.filter((r) => r.stage === s.key && r.status !== "dropped").length;
           return (
             <div key={s.key} className="flex min-w-[120px] flex-1 items-center gap-2 rounded-lg border border-line bg-white px-2.5 py-2" title={s.hint}>
-              <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full text-[10.5px] font-semibold", n ? "bg-brand-700 text-white" : "bg-brand-50 text-brand-400")}>{i + 1}</span>
+              <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full text-[10.5px] font-semibold", n ? "bg-brand-900 text-white" : "bg-brand-50 text-brand-400")}>{i + 1}</span>
               <span className="min-w-0 leading-tight"><span className="block truncate text-[11.5px] font-medium">{s.label}</span><span className="text-[10.5px] text-zinc-500">{n} store{n === 1 ? "" : "s"}</span></span>
             </div>
           );

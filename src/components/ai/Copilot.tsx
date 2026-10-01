@@ -1,7 +1,7 @@
 "use client";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
-  ArrowUp, Check, CircleAlert, Loader2, MessageSquarePlus, Sparkles, ThumbsDown, ThumbsUp, History, Database, Square,
+  ArrowUp, Check, CircleAlert, Loader2, MessageSquarePlus, ThumbsDown, ThumbsUp, History, Database, Square,
   Zap, GitCompareArrows, Lightbulb, Target, Timer, ShieldCheck, NotebookPen, Copy, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -22,7 +22,7 @@ interface Turn { key: string; question: string; running: boolean; status?: strin
 
 const CATS = ["Accessories", "Bags", "Belts", "Perfumes", "Shoes", "Sunglasses", "Trolleys"];
 
-/** Suggested questions — all answerable with Mitra's governed tools. */
+/** Suggested questions — all answerable with Harvey's governed tools. */
 const GROUPS: { key: string; title: string; hint: string; icon: typeof Zap; qs: string[] }[] = [
   { key: "quick", title: "Quick answers", hint: "One number, one list", icon: Zap, qs: [
     "How are we doing MTD against target, by category?",
@@ -67,8 +67,8 @@ function Md({ text }: { text: string }) {
 
 function Avatar({ size = 32 }: { size?: number }) {
   return (
-    <span className="flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 via-brand-700 to-brand-900 text-white shadow-[0_4px_12px_rgba(11,95,106,.25)]" style={{ width: size, height: size }}>
-      <Sparkles style={{ width: size * 0.5, height: size * 0.5 }} />
+    <span className="flex shrink-0 items-center justify-center rounded-full bg-brand-900 font-serif italic leading-none text-brand-300 shadow-[0_6px_16px_-6px_rgba(60,40,20,.5)] ring-1 ring-brand-300/40" style={{ width: size, height: size, fontSize: size * 0.52 }}>
+      H
     </span>
   );
 }
@@ -162,7 +162,7 @@ export function Copilot({ firstName, initialQuestion }: { firstName: string; ini
 
   const composer = (hero: boolean) => (
     <form onSubmit={(e) => { e.preventDefault(); ask(input); }}
-      className={cn("flex items-end gap-2 rounded-2xl border bg-white p-2 transition-shadow focus-within:border-brand-500 focus-within:shadow-[0_0_0_4px_rgba(14,138,150,.12)]", hero ? "border-white/40 shadow-[0_10px_30px_rgba(11,59,68,.25)]" : "border-line shadow-[0_6px_20px_rgba(11,42,48,.08)]")}>
+      className={cn("flex items-end gap-2 rounded-2xl border bg-white p-2 transition-shadow focus-within:border-brand-500 focus-within:shadow-[0_0_0_4px_rgba(168,112,63,.12)]", hero ? "border-white/40 shadow-[0_10px_30px_rgba(60,40,20,.25)]" : "border-line shadow-[0_6px_20px_rgba(60,40,20,.08)]")}>
       <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} rows={1}
         placeholder={hero ? "Ask about sales, targets, stores, channels, products or inventory…" : "Ask a follow-up — e.g. “only Bengaluru”, “as a chart”, “vs last month”"}
         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(input); } }}
@@ -170,7 +170,7 @@ export function Copilot({ firstName, initialQuestion }: { firstName: string; ini
       {busy ? (
         <button type="button" onClick={() => abortRef.current?.abort()} aria-label="Stop" title="Stop waiting" className="flex size-10 items-center justify-center rounded-xl border border-line bg-white text-zinc-600 hover:border-rose-200 hover:text-rose-700"><Square className="size-3.5 fill-current" /></button>
       ) : (
-        <button type="submit" disabled={input.trim().length < 2} aria-label="Ask" className="flex size-10 items-center justify-center rounded-xl bg-brand-700 text-white transition-colors hover:bg-brand-800 disabled:bg-zinc-200 disabled:text-zinc-400"><ArrowUp className="size-4" /></button>
+        <button type="submit" disabled={input.trim().length < 2} aria-label="Ask" className="flex size-10 items-center justify-center rounded-xl bg-brand-900 text-canvas transition-colors hover:bg-brand-800 disabled:bg-zinc-200 disabled:text-zinc-400"><ArrowUp className="size-4" /></button>
       )}
     </form>
   );
@@ -182,15 +182,15 @@ export function Copilot({ firstName, initialQuestion }: { firstName: string; ini
         <div className="flex items-center gap-2.5">
           <Avatar size={34} />
           <div className="leading-tight">
-            <h1 className="text-[18px] font-semibold tracking-[-0.015em] text-ink">Mitra</h1>
-            <div className="text-[11.5px] text-zinc-500">Your Long Tail Mitra · governed data only</div>
+            <h1 className="font-serif text-[24px] leading-none tracking-[-0.02em] text-ink">Ask <span className="italic text-brand-500">Harvey</span></h1>
+            <div className="mt-1 text-[11.5px] text-zinc-500">Your Long Tail analyst · governed data only</div>
           </div>
         </div>
         <div className="relative flex gap-1">
           <button onClick={() => setShowHistory((s) => !s)} className={cn("flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12.5px] transition-colors", showHistory ? "border-brand-300 bg-brand-50 text-brand-800" : "border-line bg-white text-zinc-600 hover:border-brand-300")}><History className="size-3.5" />History</button>
           <button onClick={newChat} disabled={busy} className="flex items-center gap-1.5 rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12.5px] text-zinc-600 hover:border-brand-300 disabled:opacity-40"><MessageSquarePlus className="size-3.5" />New chat</button>
           {showHistory && (
-            <div className="absolute right-0 top-10 z-40 max-h-[420px] w-80 overflow-y-auto rounded-xl border border-line bg-white p-1 shadow-[0_12px_32px_rgba(11,42,48,.14)] scroll-thin">
+            <div className="absolute right-0 top-10 z-40 max-h-[420px] w-80 overflow-y-auto rounded-xl border border-line bg-white p-1 shadow-[0_12px_32px_rgba(60,40,20,.14)] scroll-thin">
               <div className="px-2.5 pb-1 pt-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-zinc-400">Recent conversations</div>
               {history.length === 0 && <div className="px-2.5 py-3 text-[12.5px] text-zinc-500">No saved conversations yet.</div>}
               {history.map((h) => <button key={h.id} onClick={() => openConversation(h.id)} className="block w-full truncate rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-zinc-700 hover:bg-brand-50">{h.title}</button>)}
@@ -202,23 +202,23 @@ export function Copilot({ firstName, initialQuestion }: { firstName: string; ini
       {turns.length === 0 ? (
         <>
           {/* hero */}
-          <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-900 via-brand-700 to-brand-500 p-6 text-white shadow-[0_12px_40px_rgba(11,59,68,.22)] sm:p-8">
-            <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-white/10 blur-2xl" />
-            <div className="pointer-events-none absolute -bottom-32 left-1/3 size-72 rounded-full bg-brand-300/20 blur-3xl" />
+          <section className="relative overflow-hidden rounded-[20px] bg-brand-900 p-6 text-[#f3ebe1] shadow-[0_30px_60px_-30px_rgba(60,40,20,.6)] sm:p-8">
+            <div className="pointer-events-none absolute -right-24 -top-24 size-80 rounded-full bg-brand-500/30 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-32 left-1/3 size-72 rounded-full bg-brand-300/10 blur-3xl" />
             <div className="relative">
-              <div className="text-[12px] font-medium uppercase tracking-[0.14em] text-brand-100/80">Hi {firstName}</div>
-              <h2 className="mt-1.5 max-w-2xl text-[24px] font-semibold leading-tight tracking-[-0.02em] sm:text-[27px]">I’m Mitra, your Long Tail Mitra.</h2>
-              <p className="mt-2.5 max-w-2xl text-[14px] leading-relaxed text-brand-50/90">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.4em] text-brand-300">Hi {firstName}</div>
+              <h2 className="mt-2.5 max-w-2xl font-serif text-[30px] leading-[1.05] tracking-[-0.02em] sm:text-[40px]">I’m <span className="italic text-brand-300">Harvey</span>, your Long Tail analyst.</h2>
+              <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-[#f3ebe1]/80">
                 I know your sales, targets, stores, channels, products and inventory. Ask in plain words — I’ll pull the numbers from governed data,
                 show them the way you need (charts, tables, side-by-side comparisons), explain what changed and why, and help you decide the next step.
               </p>
               <div className="mt-4 flex flex-wrap gap-1.5">
                 {["Sales & targets", "Stores & channels", "Products & inventory", "Charts · tables · X vs Y", "Why it changed", "What to do next"].map((c) => (
-                  <span key={c} className="rounded-full bg-white/12 px-2.5 py-1 text-[11.5px] text-white ring-1 ring-white/20 backdrop-blur-sm">{c}</span>
+                  <span key={c} className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[11.5px] text-[#f3ebe1]/90 ring-1 ring-brand-300/25">{c}</span>
                 ))}
               </div>
               <div className="mt-5">{composer(true)}</div>
-              <div className="mt-2 text-[11px] text-brand-100/70">Enter to send · Shift + Enter for a new line</div>
+              <div className="mt-2 text-[11px] text-[#f3ebe1]/50">Enter to send · Shift + Enter for a new line</div>
             </div>
           </section>
 
@@ -231,12 +231,12 @@ export function Copilot({ firstName, initialQuestion }: { firstName: string; ini
 
           {/* suggestions */}
           <div className="mt-6 flex items-baseline justify-between">
-            <h3 className="text-[13px] font-semibold text-ink">Try one of these</h3>
+            <h3 className="font-serif text-[18px] text-ink">Try one of these</h3>
             <span className="text-[11.5px] text-zinc-400">Click to ask · follow up with “as a chart”, “only South”, “vs last month”</span>
           </div>
           <div className="mt-2.5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {GROUPS.map((g) => (
-              <div key={g.key} className="flex flex-col rounded-xl border border-line bg-white p-3 shadow-[0_1px_2px_rgba(11,42,48,.04)]">
+              <div key={g.key} className="flex flex-col rounded-[16px] border border-line bg-paper p-3 shadow-[0_1px_2px_rgba(60,40,20,.04)]">
                 <div className="mb-2 flex items-center gap-2">
                   <span className="flex size-7 items-center justify-center rounded-lg bg-brand-50 text-brand-700"><g.icon className="size-3.5" /></span>
                   <div className="leading-tight"><div className="text-[12.5px] font-semibold text-ink">{g.title}</div><div className="text-[10.5px] text-zinc-400">{g.hint}</div></div>
@@ -257,11 +257,11 @@ export function Copilot({ firstName, initialQuestion }: { firstName: string; ini
           {turns.map((t) => (
             <div key={t.key} className="space-y-3">
               <div className="flex justify-end">
-                <div className="max-w-[78%] rounded-2xl rounded-br-md bg-brand-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-white shadow-[0_4px_14px_rgba(11,95,106,.18)]">{t.question}</div>
+                <div className="max-w-[78%] rounded-2xl rounded-br-md bg-brand-900 px-4 py-2.5 text-[13.5px] leading-relaxed text-[#f3ebe1] shadow-[0_4px_14px_rgba(110,69,38,.18)]">{t.question}</div>
               </div>
               <div className="flex items-start gap-3">
                 <Avatar size={30} />
-                <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-line bg-white p-4 shadow-[0_1px_3px_rgba(11,42,48,.05)] sm:p-5">
+                <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-line bg-paper p-4 shadow-[0_1px_3px_rgba(60,40,20,.05)] sm:p-5">
                   {(t.running || (!t.answer && t.steps.length > 0)) && <Progress t={t} />}
                   {t.error && <div role="alert" className={cn("rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[12.5px] text-rose-900", (t.running || t.steps.length > 0) && "mt-3")}>{t.error}</div>}
                   {t.answer && <AnswerView a={t.answer} onAsk={ask} />}
@@ -287,7 +287,7 @@ export function Copilot({ firstName, initialQuestion }: { firstName: string; ini
       {turns.length > 0 && (
         <div className="sticky bottom-0 z-30 -mx-1 bg-gradient-to-t from-canvas via-canvas/95 to-transparent px-1 pb-3 pt-8">
           {composer(false)}
-          <div className="mt-1.5 text-center text-[10.5px] text-zinc-400">Mitra answers from governed data for {CATS.join(", ")} · answers take ~20–90 s</div>
+          <div className="mt-1.5 text-center text-[10.5px] text-zinc-400">Harvey answers from governed data for {CATS.join(", ")} · answers take ~20–90 s</div>
         </div>
       )}
     </div>
@@ -296,7 +296,7 @@ export function Copilot({ firstName, initialQuestion }: { firstName: string; ini
 
 function KeyPoint({ icon: I, title, children }: { icon: typeof Zap; title: string; children: React.ReactNode }) {
   return (
-    <div className="flex gap-2.5 rounded-xl border border-line bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(11,42,48,.04)]">
+    <div className="flex gap-2.5 rounded-[16px] border border-line bg-paper px-3.5 py-3 shadow-[0_1px_2px_rgba(60,40,20,.04)]">
       <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700"><I className="size-3.5" /></span>
       <div className="min-w-0"><div className="text-[12.5px] font-semibold text-ink">{title}</div><div className="mt-0.5 text-[11.5px] leading-relaxed text-zinc-500">{children}</div></div>
     </div>
@@ -314,7 +314,7 @@ function Progress({ t }: { t: Turn }) {
         </div>
         {t.running && t.startedAt && <div className="flex items-center gap-1.5 text-[11.5px] text-zinc-400"><Timer className="size-3" /><Elapsed since={t.startedAt} /> · usually 20–90s</div>}
       </div>
-      {t.running && <div className="mt-2 h-1 overflow-hidden rounded-full bg-brand-50"><div className="mitra-bar h-full w-1/3 rounded-full bg-gradient-to-r from-brand-300 via-brand-500 to-brand-700" /></div>}
+      {t.running && <div className="mt-2 h-1 overflow-hidden rounded-full bg-brand-50"><div className="harvey-bar h-full w-1/3 rounded-full bg-gradient-to-r from-brand-300 via-brand-500 to-brand-700" /></div>}
       {t.steps.length > 0 && (
         <ol className="mt-3 space-y-1.5 border-l-2 border-brand-100 pl-3">
           {t.steps.map((s) => (
@@ -326,7 +326,7 @@ function Progress({ t }: { t: Turn }) {
         </ol>
       )}
       {t.running && t.steps.length > 0 && <div className="mt-2 text-[11px] text-zinc-400">{done} of {t.steps.length} lookups complete</div>}
-      <style>{`@keyframes mitraBar{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}.mitra-bar{animation:mitraBar 1.6s ease-in-out infinite}`}</style>
+      <style>{`@keyframes harveyBar{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}.harvey-bar{animation:harveyBar 1.6s ease-in-out infinite}`}</style>
     </div>
   );
 }
@@ -363,7 +363,7 @@ function AnswerView({ a, onAsk }: { a: Answer; onAsk: (q: string) => void }) {
           <div className="mb-2 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-brand-700"><Target className="size-3.5" />Recommended next steps</div>
           <ol className="space-y-2">{a.actions.map((x, i) => (
             <li key={i} className="flex gap-2.5 text-[13px]">
-              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-brand-700 text-[10.5px] font-semibold text-white">{i + 1}</span>
+              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-brand-900 text-[10.5px] font-semibold text-white">{i + 1}</span>
               <div className="min-w-0">
                 <div className="text-zinc-800"><span className={cn("mr-1.5 rounded px-1.5 py-px text-[10px] font-semibold uppercase", x.priority === "high" ? "bg-rose-50 text-rose-700" : x.priority === "medium" ? "bg-amber-50 text-amber-800" : "bg-zinc-100 text-zinc-600")}>{x.priority}</span>{x.text}</div>
                 <div className="mt-0.5 text-[11.5px] text-zinc-500">Evidence: {x.evidence}</div>

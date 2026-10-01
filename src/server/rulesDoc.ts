@@ -24,7 +24,7 @@ export function ruleBook(s: AppSettings) {
     { group: "Stores", name: "Distribution opportunity", where: "Merchandising → Distribution", value: `Top ${p(1 - RULES.distTopQuantile)} sellers in ≤${p(RULES.distMaxPenetration)} of live stores, warehouse ≥${RULES.distMinWarehouse}`, why: "Winners that most stores don't carry" },
     { group: "Channels", name: "Channel decline", where: "Action Centre (Channel), risks", value: `WoW ≤${p(RULES.channelDropPct)} and ≥₹${RULES.channelDropMin.toLocaleString("en-IN")} (urgent ≥₹${(RULES.urgentChannelDrop / 1e5).toFixed(0)}L)`, why: "Material drops only" },
     { group: "Channels", name: "Return risk", where: "Action Centre (Channel), high-return lists", value: `Lifetime return % ≥ category average +${p(RULES.returnExcessPp)} with ≥₹${(RULES.returnMinSales / 1e5).toFixed(0)}L sales`, why: "Value-based return % from the Product Master (lifetime)" },
-    { group: "Remarks", name: "Remarks", where: "Action Centre, store / product pages, Mitra", value: "Not applicable → hides matching actions · Snooze → hides until the date · Context → shown next to the data", why: "Your team's knowledge (no stock, events, closures) is taken into account" },
+    { group: "Remarks", name: "Remarks", where: "Action Centre, store / product pages, Harvey", value: "Not applicable → hides matching actions · Snooze → hides until the date · Context → shown next to the data", why: "Your team's knowledge (no stock, events, closures) is taken into account" },
   ];
 }
 

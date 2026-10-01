@@ -81,7 +81,7 @@ export function SplitEditor({ month, days, states, saved, suggested, recommended
     <div className="rounded-xl border border-line bg-white">
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
         <div className="flex gap-0.5 rounded-lg border border-line p-0.5">
-          {(["stores", "online", "marketplace"] as Ch[]).map((c) => <button key={c} onClick={() => { setCh(c); if (c !== "stores") setState("*"); }} className={cn("rounded-md px-2.5 py-1 text-[12.5px] capitalize", ch === c ? "bg-brand-700 font-medium text-white" : "text-zinc-600 hover:bg-brand-50")}>{c}</button>)}
+          {(["stores", "online", "marketplace"] as Ch[]).map((c) => <button key={c} onClick={() => { setCh(c); if (c !== "stores") setState("*"); }} className={cn("rounded-md px-2.5 py-1 text-[12.5px] capitalize", ch === c ? "bg-brand-900 font-medium text-white" : "text-zinc-600 hover:bg-brand-50")}>{c}</button>)}
         </div>
         {ch === "stores" && (
           <select value={state} onChange={(e) => setState(e.target.value)} className="h-8 rounded-lg border border-line bg-white px-2 text-[12.5px]">
@@ -117,7 +117,7 @@ export function SplitEditor({ month, days, states, saved, suggested, recommended
       <div className="flex flex-wrap items-center gap-3 border-t border-line px-4 py-3">
         <span className={cn("tabular text-[12.5px] font-semibold", Math.abs(sum - 100) < 0.5 ? "text-emerald-700" : "text-amber-700")}>Total {sum.toFixed(1)}%</span>
         {Math.abs(sum - 100) >= 0.5 && <span className="text-[11.5px] text-zinc-500">Weights are normalised to 100% when saved.</span>}
-        {!readOnly && <button disabled={!draft[k]} onClick={() => ask(days.map((d) => ({ day: d, weight: Number(pctOf(d)) || 0 })))} className="ml-auto flex items-center gap-1.5 rounded-lg bg-brand-700 px-3 py-1.5 text-[12.5px] font-medium text-white hover:bg-brand-800 disabled:opacity-40"><Save className="size-3.5" />Save split</button>}
+        {!readOnly && <button disabled={!draft[k]} onClick={() => ask(days.map((d) => ({ day: d, weight: Number(pctOf(d)) || 0 })))} className="ml-auto flex items-center gap-1.5 rounded-lg bg-brand-900 px-3 py-1.5 text-[12.5px] font-medium text-white hover:bg-brand-800 disabled:opacity-40"><Save className="size-3.5" />Save split</button>}
         {!readOnly && has && <button onClick={() => ask(null)} className="text-[12px] text-zinc-500 hover:text-rose-600">Clear split</button>}
         {msg && <span className={cn("text-[12px]", msg.ok ? "text-emerald-700" : "text-rose-600")}>{msg.text}</span>}
       </div>

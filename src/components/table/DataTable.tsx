@@ -271,7 +271,7 @@ function Cell({ c, r, first, max }: { c: Col; r: Row; first: boolean; max?: numb
   if (t === "split") {
     // [stores, online, marketplace] shares → compact stacked bar
     const parts = (Array.isArray(v) ? v : []) as (number | null)[];
-    const colors = ["#0e8a96", "#14a3ae", "#8fd6da"], names = ["Stores", "Online", "Marketplace"];
+    const colors = ["#a8703f", "#c08f60", "#e2c9a6"], names = ["Stores", "Online", "Marketplace"];
     const tip = parts.map((x, i) => `${names[i]} ${x == null ? "—" : Math.round(x * 100) + "%"}`).join(" · ");
     return (
       <td className={base} title={tip}>

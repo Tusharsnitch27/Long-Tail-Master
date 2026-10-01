@@ -21,7 +21,7 @@ export function SkuTabs({ tabs, qs = "", empty = "No sales in this period.", lim
       {tabs.length > 1 && (
         <div className="mb-3 flex flex-wrap gap-1">
           {tabs.map((t) => (
-            <button key={t.key} onClick={() => setK(t.key)} className={cn("flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] transition-colors", t.key === cur.key ? "border-brand-700 bg-brand-700 text-white" : "border-line bg-white text-zinc-600 hover:border-brand-300")}>
+            <button key={t.key} onClick={() => setK(t.key)} className={cn("flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] transition-colors", t.key === cur.key ? "border-brand-700 bg-brand-900 text-white" : "border-line bg-white text-zinc-600 hover:border-brand-300")}>
               {t.color && <span className="size-1.5 rounded-full" style={{ background: t.key === cur.key ? "#fff" : t.color }} />}{t.label}
             </button>
           ))}

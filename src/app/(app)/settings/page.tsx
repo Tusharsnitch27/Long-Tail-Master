@@ -41,7 +41,7 @@ export default async function ControlCentre({ searchParams }: { searchParams: Pr
     <div className="mb-3 flex flex-wrap items-center gap-1">
       {Array.from({ length: 7 }, (_, i) => addMonths(cur, i - 3)).map((m) => (
         <Link key={m} href={`/settings?tab=${tabKey}&m=${m.slice(0, 7)}${tabKey === "stores" && typeof ctx.sp.tc === "string" ? `&tc=${ctx.sp.tc}` : ""}`}
-          className={cn("rounded-full border px-2.5 py-1 text-[12px]", m === monthParam ? "border-brand-700 bg-brand-700 text-white" : "border-line bg-white text-zinc-600 hover:border-brand-300", m > cur && m !== monthParam && "border-dashed")}>
+          className={cn("rounded-full border px-2.5 py-1 text-[12px]", m === monthParam ? "border-brand-700 bg-brand-900 text-white" : "border-line bg-white text-zinc-600 hover:border-brand-300", m > cur && m !== monthParam && "border-dashed")}>
           {mLabel(m)}{m === cur ? " · now" : m > cur ? " · upcoming" : ""}
         </Link>
       ))}
@@ -71,7 +71,7 @@ export default async function ControlCentre({ searchParams }: { searchParams: Pr
     body = (
       <>
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          {[fy - 1, fy, fy + 1].map((y) => <Link key={y} href={`/settings?tab=targets&fy=${y}`} className={cn("rounded-full border px-2.5 py-1 text-[12px]", y === fy ? "border-brand-700 bg-brand-700 text-white" : "border-line bg-white text-zinc-600 hover:border-brand-300")}>FY {String(y).slice(2)}-{String(y + 1).slice(2)}</Link>)}
+          {[fy - 1, fy, fy + 1].map((y) => <Link key={y} href={`/settings?tab=targets&fy=${y}`} className={cn("rounded-full border px-2.5 py-1 text-[12px]", y === fy ? "border-brand-700 bg-brand-900 text-white" : "border-line bg-white text-zinc-600 hover:border-brand-300")}>FY {String(y).slice(2)}-{String(y + 1).slice(2)}</Link>)}
           <span className="text-[11.5px] text-zinc-500">Month targets by channel and category · the FY 26-27 plan was loaded from the business plan sheet; edit anything here</span>
         </div>
         {upcomingMissing.length > 0 && <div className="mb-3"><DataPrompt compact title={`${upcomingMissing.length} upcoming target${upcomingMissing.length > 1 ? "s" : ""} not set (next 2 months)`}>{upcomingMissing.slice(0, 8).join(" · ")}{upcomingMissing.length > 8 ? " …" : ""}</DataPrompt></div>}
@@ -158,7 +158,7 @@ export default async function ControlCentre({ searchParams }: { searchParams: Pr
     body = (
       <>
         {monthNav("stores")}
-        <div className="mb-3 flex flex-wrap gap-1">{cats.map((c) => <Link key={c.key} href={`/settings?tab=stores&m=${monthParam.slice(0, 7)}&tc=${c.key}`} className={cn("flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px]", c.key === cat ? "border-brand-700 bg-brand-700 text-white" : "border-line bg-white text-zinc-600 hover:border-brand-300")}><span className="size-1.5 rounded-full" style={{ background: c.key === cat ? "#fff" : c.color }} />{c.label}</Link>)}</div>
+        <div className="mb-3 flex flex-wrap gap-1">{cats.map((c) => <Link key={c.key} href={`/settings?tab=stores&m=${monthParam.slice(0, 7)}&tc=${c.key}`} className={cn("flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px]", c.key === cat ? "border-brand-700 bg-brand-900 text-white" : "border-line bg-white text-zinc-600 hover:border-brand-300")}><span className="size-1.5 rounded-full" style={{ background: c.key === cat ? "#fff" : c.color }} />{c.label}</Link>)}</div>
         {!CATEGORIES.find((c) => c.key === cat)?.dsrTable && <div className="mb-3"><DataPrompt compact title={`${catLabel(cat)} has no Snowflake store targets`}>Upload store targets here (CSV: branch_code, category, month, target), or rely on the category Stores target, which is phased at category level.</DataPrompt></div>}
         <StoreTargetEditor key={`${cat}-${monthParam}`} month={monthParam} cat={cat} catLabel={catLabel(cat)} cats={catOpts} rows={rows} categoryTarget={book.month("stores", [cat], monthParam)} readOnly={ro} />
       </>

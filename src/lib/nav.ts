@@ -7,7 +7,7 @@ export const APP_TAGLINE = "Same style. A bigger universe.";
 export const NAV: NavItem[] = [
   { href: "/", label: "Executive Summary", icon: "executive", group: "main" },
   { href: "/overview", label: "Daily Overview", icon: "overview", group: "main" },
-  { href: "/mitra", label: "Mitra", icon: "mitra", group: "main", badge: "AI" },
+  { href: "/harvey", label: "Ask Harvey", icon: "harvey", group: "main", badge: "AI" },
   { href: "/category", label: "Category Performance", icon: "category", group: "analyse" },
   { href: "/products", label: "Product Master", icon: "products", group: "analyse" },
   { href: "/channels", label: "Channel Overview", icon: "channels", group: "analyse" },
@@ -30,7 +30,7 @@ export const NAV_GROUPS: { key: NavItem["group"]; label: string | null }[] = [
 /** Which global context controls a route shows (channel only where it is a real choice). */
 export function filterScope(path: string) {
   const none = { category: false, period: false, channel: false };
-  if (path.startsWith("/mitra") || path.startsWith("/settings") || path.startsWith("/ads")) return none;
+  if (path.startsWith("/harvey") || path.startsWith("/mitra") || path.startsWith("/settings") || path.startsWith("/ads")) return none;
   if (path.startsWith("/actions") || path.startsWith("/merchandising") || path.startsWith("/planning") || path.startsWith("/inwards") || path.startsWith("/vm")) return { category: true, period: false, channel: false };
   if (path === "/" || path.startsWith("/overview") || path.startsWith("/category") || path.startsWith("/products") || path.startsWith("/lab")) return { category: true, period: true, channel: true };
   return { category: true, period: true, channel: false };

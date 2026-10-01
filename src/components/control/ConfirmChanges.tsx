@@ -42,7 +42,7 @@ export function ConfirmChanges({ open, title, changes, note, busy, onConfirm, on
         </div>
         <div className="flex justify-end gap-2 border-t border-line px-5 py-3">
           <button onClick={onCancel} className="rounded-lg border border-line px-3 py-1.5 text-[12.5px] text-zinc-700 hover:border-zinc-300">Cancel</button>
-          <button disabled={busy} onClick={onConfirm} className="rounded-lg bg-brand-700 px-3.5 py-1.5 text-[12.5px] font-semibold text-white hover:bg-brand-800 disabled:opacity-50">{busy ? "Saving…" : `Confirm ${changes.length} change${changes.length === 1 ? "" : "s"}`}</button>
+          <button disabled={busy} onClick={onConfirm} className="rounded-lg bg-brand-900 px-3.5 py-1.5 text-[12.5px] font-semibold text-white hover:bg-brand-800 disabled:opacity-50">{busy ? "Saving…" : `Confirm ${changes.length} change${changes.length === 1 ? "" : "s"}`}</button>
         </div>
       </div>
     </div>

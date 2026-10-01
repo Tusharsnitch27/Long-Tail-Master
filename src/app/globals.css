@@ -1,49 +1,69 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: var(--font-inter), "Inter", ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-serif: var(--font-playfair), "Playfair Display", "Didot", "Bodoni 72", "Times New Roman", ui-serif, Georgia, serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
-  /* Ocean Teal — one accent scale; green / amber / red carry status meaning only */
-  --color-brand-50: #eaf6f7;
-  --color-brand-100: #d3eef0;
-  --color-brand-200: #bfe6e8;
-  --color-brand-300: #8fd6da;
-  --color-brand-400: #5cc0c7;
-  --color-brand-500: #0e8a96;
-  --color-brand-600: #0b7480;
-  --color-brand-700: #0b5f6a;
-  --color-brand-800: #0b4b55;
-  --color-brand-900: #0b3b44;
-  --color-side: #0b3b44;
-  --color-side-2: #12525e;
-  --color-ink: #0b2a30;
-  --color-canvas: #f3f8f9;
-  --color-line: #dbe8ea;
+  /* Atelier — the login page's warm editorial theme. One bronze accent scale on beige paper with espresso ink;
+     green / amber / red carry status meaning only. */
+  --color-brand-50: #f8f1e7;
+  --color-brand-100: #f0e2cf;
+  --color-brand-200: #e4cdb0;
+  --color-brand-300: #d3b089;
+  --color-brand-400: #c08f60;
+  --color-brand-500: #a8703f;
+  --color-brand-600: #8c5a30;
+  --color-brand-700: #6e4526;
+  --color-brand-800: #47301f;
+  --color-brand-900: #1b1712;
+  /* neutrals are warm stone, so every zinc-* utility follows the theme */
+  --color-zinc-50: #faf6f0;
+  --color-zinc-100: #f2ebe1;
+  --color-zinc-200: #e7ddd0;
+  --color-zinc-300: #d5c9b9;
+  --color-zinc-400: #9e8f7d;
+  --color-zinc-500: #7a6c5d;
+  --color-zinc-600: #5d5246;
+  --color-zinc-700: #453b32;
+  --color-zinc-800: #2d2620;
+  --color-zinc-900: #1b1712;
+  --color-side: #1b1712;
+  --color-side-2: #2b241d;
+  --color-ink: #1b1712;
+  --color-canvas: #f3ebe1;
+  --color-paper: #fbf7f1;
+  --color-line: #e6dbcc;
 }
 
 html, body { background: var(--color-canvas); color: var(--color-ink); }
+/* soft warm light, as on the login page */
+.atelier { background: radial-gradient(900px 500px at 85% -10%, #fbf6ef 0%, transparent 60%), radial-gradient(700px 420px at 0% 110%, #eadbc8 0%, transparent 60%), var(--color-canvas); }
+/* small wide-tracked section labels (FOOTWEAR · FRAGRANCE on the login page) */
+.eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.32em; text-transform: uppercase; color: rgb(27 23 18 / 0.62); }
+.font-serif { font-family: var(--font-serif); letter-spacing: -0.01em; }
+::selection { background: #e4cdb0; color: #1b1712; }
 body { font-size: 13px; font-feature-settings: "tnum" 1, "cv11" 1, "ss01" 1; -webkit-font-smoothing: antialiased; letter-spacing: -0.003em; }
 .tabular { font-variant-numeric: tabular-nums; }
 
 .scroll-thin::-webkit-scrollbar { height: 8px; width: 8px; }
-.scroll-thin::-webkit-scrollbar-thumb { background: #c7dcdf; border-radius: 8px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: #d5c9b9; border-radius: 8px; }
 .scroll-thin::-webkit-scrollbar-track { background: transparent; }
 
 @keyframes shimmer { 0% { background-position: -400px 0 } 100% { background-position: 400px 0 } }
-.skeleton { background: linear-gradient(90deg, #eeeef1 25%, #f5f5f7 37%, #eeeef1 63%); background-size: 800px 100%; animation: shimmer 1.4s ease infinite; border-radius: 8px; }
+.skeleton { background: linear-gradient(90deg, #ece2d5 25%, #f6efe6 37%, #ece2d5 63%); background-size: 800px 100%; animation: shimmer 1.4s ease infinite; border-radius: 8px; }
 
 [data-tip] { position: relative; }
 [data-tip]:hover::after {
   content: attr(data-tip); position: absolute; z-index: 60; left: 50%; top: calc(100% + 6px); transform: translateX(-50%);
   width: max-content; max-width: 260px; white-space: normal; text-align: left; font-weight: 400; text-transform: none; letter-spacing: 0;
-  background: #0b3b44; color: #f1fafb; font-size: 11.5px; line-height: 1.35; padding: 6px 8px; border-radius: 6px; pointer-events: none;
+  background: #1b1712; color: #f3ebe1; font-size: 11.5px; line-height: 1.35; padding: 6px 8px; border-radius: 6px; pointer-events: none;
 }
 
 /* product thumbnail with hover preview */
 .thumb { position: relative; }
 .thumb img.preview { display: none; }
 .thumb:hover img.preview { display: block; position: absolute; left: 110%; top: 50%; transform: translateY(-50%); width: 240px; height: 240px; object-fit: contain;
-  background: white; border: 1px solid var(--color-line); border-radius: 10px; box-shadow: 0 8px 24px rgba(17,17,20,.12); z-index: 70; padding: 6px; }
+  background: white; border: 1px solid var(--color-line); border-radius: 10px; box-shadow: 0 18px 40px -16px rgba(60,40,20,.35); z-index: 70; padding: 6px; }
 
 /* status helpers */
 .chip { display: inline-flex; align-items: center; gap: 4px; border-radius: 6px; padding: 1px 6px; font-size: 11px; font-weight: 500; }

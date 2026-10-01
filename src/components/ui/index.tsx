@@ -8,8 +8,8 @@ export function PageHeader({ title, subtitle, right }: { title: string; subtitle
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-[19px] font-semibold tracking-[-0.015em]">{title}</h1>
-        {subtitle && <div className="mt-0.5 text-[12.5px] text-zinc-500">{subtitle}</div>}
+        <h1 className="font-serif text-[26px] leading-[1.05] tracking-[-0.02em] text-ink sm:text-[30px]">{title}</h1>
+        {subtitle && <div className="mt-1.5 text-[12.5px] text-zinc-500">{subtitle}</div>}
       </div>
       {right}
     </div>
@@ -28,10 +28,10 @@ export function Section({ title, tip, right, children, className, pad = true }: 
   title?: React.ReactNode; tip?: string; right?: React.ReactNode; children: React.ReactNode; className?: string; pad?: boolean;
 }) {
   return (
-    <section className={cn("rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(11,42,48,.04)]", className)}>
+    <section className={cn("rounded-[16px] border border-line bg-paper shadow-[0_1px_2px_rgba(60,40,20,.04),0_18px_40px_-34px_rgba(60,40,20,.45)]", className)}>
       {(title || right) && (
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-1 pt-3">
-          <h2 className="flex items-center gap-1.5 text-[12.5px] font-semibold text-zinc-800">{title}{tip && <Tip text={tip} />}</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-1 pt-3.5">
+          <h2 className="flex items-center gap-1.5 font-serif text-[15.5px] leading-tight text-ink">{title}{tip && <Tip text={tip} />}</h2>
           {right}
         </div>
       )}
@@ -71,9 +71,9 @@ export function Kpi({ label, value, sub, delta, deltaLabel, tip, className, href
 }) {
   const body = (
     <>
-      {tone && <span className={cn("absolute inset-x-0 top-0 h-[3px] rounded-t-xl", TONE_BAR[tone])} />}
-      <div className="flex items-center gap-1 text-[11.5px] text-zinc-500">{label}{tip && <Tip text={tip} />}</div>
-      <div className={cn("tabular mt-1 truncate text-[20px] font-semibold leading-tight tracking-[-0.02em]", tone && tone !== "info" && tone !== "muted" && TONE_TEXT[tone])}>{value}</div>
+      {tone && <span className={cn("absolute inset-x-0 top-0 h-[3px]", TONE_BAR[tone])} />}
+      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">{label}{tip && <Tip text={tip} />}</div>
+      <div className={cn("tabular mt-1.5 truncate text-[21px] font-semibold leading-tight tracking-[-0.02em]", tone && tone !== "info" && tone !== "muted" && TONE_TEXT[tone])}>{value}</div>
       <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11.5px] text-zinc-500">
         {delta !== undefined && <Delta v={delta} />}
         {deltaLabel && <span>{deltaLabel}</span>}
@@ -81,7 +81,7 @@ export function Kpi({ label, value, sub, delta, deltaLabel, tip, className, href
       </div>
     </>
   );
-  const cls = cn("relative block min-w-0 rounded-xl border border-line bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(11,42,48,.04)]", href && "transition-colors hover:border-brand-300", className);
+  const cls = cn("relative block min-w-0 overflow-hidden rounded-[14px] border border-line bg-paper px-3.5 py-3 shadow-[0_1px_2px_rgba(60,40,20,.04)]", href && "transition-colors hover:border-brand-300", className);
   return href ? <Link href={href} className={cls}>{body}</Link> : <div className={cls}>{body}</div>;
 }
 
@@ -92,10 +92,10 @@ export function KpiGrid({ children, cols = 5 }: { children: React.ReactNode; col
 
 export function Tabs({ tabs, active }: { tabs: { href: string; label: string; key: string; count?: number }[]; active: string }) {
   return (
-    <div className="mb-4 flex w-fit max-w-full gap-0.5 overflow-x-auto rounded-lg border border-line bg-white p-0.5 scroll-thin">
+    <div className="mb-4 flex w-fit max-w-full gap-0.5 overflow-x-auto rounded-xl border border-line bg-paper p-0.5 scroll-thin">
       {tabs.map((t) => (
         <Link key={t.key} href={t.href} scroll={false}
-          className={cn("flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-[12.5px] transition-colors", t.key === active ? "bg-brand-700 font-medium text-white" : "text-zinc-600 hover:bg-brand-50 hover:text-ink")}>
+          className={cn("flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-[12.5px] transition-colors", t.key === active ? "bg-brand-900 font-medium text-canvas" : "text-zinc-600 hover:bg-brand-50 hover:text-ink")}>
           {t.label}{t.count != null && <span className={cn("tabular rounded px-1 text-[10.5px]", t.key === active ? "bg-white/20" : "bg-zinc-100 text-zinc-500")}>{t.count}</span>}
         </Link>
       ))}
@@ -105,8 +105,8 @@ export function Tabs({ tabs, active }: { tabs: { href: string; label: string; ke
 
 export function Empty({ title = "Nothing to show", children }: { title?: string; children?: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-300 bg-white px-6 py-10 text-center">
-      <div className="text-[13px] font-medium text-zinc-700">{title}</div>
+    <div className="flex flex-col items-center justify-center rounded-[16px] border border-dashed border-zinc-300 bg-paper px-6 py-10 text-center">
+      <div className="font-serif text-[16px] text-zinc-800">{title}</div>
       {children && <div className="mt-1 max-w-md text-[12.5px] text-zinc-500">{children}</div>}
     </div>
   );
@@ -156,7 +156,7 @@ export function DataPrompt({ title, children, href, cta, compact }: { title: str
         <div className="font-semibold">{title}</div>
         {children && <div className="mt-0.5 text-[12px] text-brand-800/80">{children}</div>}
       </div>
-      {href && <Link href={href} className="shrink-0 rounded-lg bg-brand-700 px-2.5 py-1 text-[11.5px] font-medium text-white hover:bg-brand-800">{cta ?? "Set up"} →</Link>}
+      {href && <Link href={href} className="shrink-0 rounded-lg bg-brand-900 px-2.5 py-1 text-[11.5px] font-medium text-canvas hover:bg-brand-800">{cta ?? "Set up"} →</Link>}
     </div>
   );
 }
@@ -167,7 +167,7 @@ export function Pill({ tone = "info", children, className }: { tone?: Tone; chil
 }
 
 /** Horizontal share bar. */
-export function Meter({ value, color = "#0e8a96", className }: { value: number | null; color?: string; className?: string }) {
+export function Meter({ value, color = "#a8703f", className }: { value: number | null; color?: string; className?: string }) {
   return (
     <span className={cn("block h-1.5 w-full overflow-hidden rounded-full bg-zinc-100", className)}>
       <span className="block h-full rounded-full" style={{ width: `${Math.max(0, Math.min(1, value ?? 0)) * 100}%`, background: color }} />
@@ -178,7 +178,7 @@ export function Meter({ value, color = "#0e8a96", className }: { value: number |
 export function Stat({ label, value, sub }: { label: string; value: React.ReactNode; sub?: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <div className="text-[11px] text-zinc-500">{label}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">{label}</div>
       <div className="tabular truncate text-[14px] font-semibold">{value}</div>
       {sub && <div className="text-[11px] text-zinc-500">{sub}</div>}
     </div>

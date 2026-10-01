@@ -72,14 +72,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const nav = { role: user.role, name: user.name, username: user.username, actionCount: urgent };
   return (
-    <div className="flex h-dvh overflow-hidden bg-canvas">
+    <div className="atelier flex h-dvh overflow-hidden">
       <aside className="hidden w-[236px] shrink-0 md:block">
         <Suspense><Sidebar {...nav} /></Suspense>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex h-11 items-center gap-3 border-b border-line px-4 md:hidden">
+        <div className="flex h-11 items-center gap-3 border-b border-line bg-paper/80 px-4 backdrop-blur md:hidden">
           <Suspense><MobileNav {...nav} /></Suspense>
-          <span className="text-[13.5px] font-semibold">{APP_NAME}</span>
+          <span className="font-serif text-[16px] italic text-brand-500">{APP_NAME}</span>
         </div>
         <main className="min-h-0 flex-1 overflow-y-auto">
           {options && <Suspense><ContextBar options={options} /></Suspense>}

@@ -22,10 +22,10 @@ const CHANNELS = [{ key: "all", label: "Overall" }, { key: "stores", label: "Sto
 
 function Seg({ items, value, onChange }: { items: { key: string; label: string }[]; value: string; onChange: (k: string) => void }) {
   return (
-    <div className="flex h-8 items-center gap-0.5 rounded-lg border border-line bg-white p-0.5">
+    <div className="flex h-8 items-center gap-0.5 rounded-lg border border-line bg-paper p-0.5">
       {items.map((i) => (
         <button key={i.key} onClick={() => onChange(i.key)}
-          className={cn("h-full whitespace-nowrap rounded-md px-2.5 text-[12.5px] transition-colors", value === i.key ? "bg-brand-700 font-medium text-white" : "text-zinc-600 hover:bg-brand-50 hover:text-ink")}>
+          className={cn("h-full whitespace-nowrap rounded-md px-2.5 text-[12.5px] transition-colors", value === i.key ? "bg-brand-900 font-medium text-canvas" : "text-zinc-600 hover:bg-brand-50 hover:text-ink")}>
           {i.label}
         </button>
       ))}
@@ -45,7 +45,7 @@ function Dropdown({ label, value, items, onChange }: { label: string; value: str
   const cur = items.find((i) => i.key === value) ?? items[0];
   return (
     <div className="relative" ref={ref}>
-      <button onClick={() => setOpen((o) => !o)} className="flex h-8 items-center gap-2 rounded-lg border border-line bg-white px-2.5 text-[12.5px] hover:border-zinc-300">
+      <button onClick={() => setOpen((o) => !o)} className="flex h-8 items-center gap-2 rounded-lg border border-line bg-paper px-2.5 text-[12.5px] hover:border-zinc-300">
         <span className="text-zinc-500">{label}</span>
         {cur?.color && <span className="size-2 rounded-full" style={{ background: cur.color }} />}
         <span className="font-medium">{cur?.label}</span>
@@ -77,12 +77,12 @@ export function ContextBar({ options }: { options: ContextOptions }) {
   const show = scope.category || scope.period || scope.channel;
 
   return (
-    <div className="sticky top-0 z-30 border-b border-line bg-canvas/90 backdrop-blur">
+    <div className="sticky top-0 z-30 border-b border-line bg-canvas/85 backdrop-blur-md">
       <div className={cn("h-px w-full bg-brand-500 transition-opacity", pending ? "animate-pulse opacity-100" : "opacity-0")} />
       <div className="flex flex-wrap items-center gap-2 px-6 py-2.5">
         {scope.category && (
           <Dropdown label="Category" value={cat} onChange={(k) => set({ cat: k === "overall" ? null : k })}
-            items={[{ key: "overall", label: "Overall", color: "#0b2a30" }, ...options.categories]} />
+            items={[{ key: "overall", label: "Overall", color: "#1b1712" }, ...options.categories]} />
         )}
         {scope.period && (
           <>
@@ -107,7 +107,7 @@ export function ContextBar({ options }: { options: ContextOptions }) {
         )}
         {!show && <div className="h-8" />}
         <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-500">
-          <span className="font-medium uppercase tracking-wider text-zinc-400">Updated</span>
+          <span className="eyebrow !text-zinc-400">Updated</span>
           {options.freshness.map((f) => (
             <span key={f.label} className="flex items-center gap-1.5" title={f.tip}><span className={cn("size-1.5 rounded-full", f.stale ? "bg-amber-500" : "bg-emerald-500")} />{f.label} <span className="font-medium text-zinc-700">{f.value}</span></span>
           ))}

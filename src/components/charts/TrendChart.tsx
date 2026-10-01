@@ -16,14 +16,14 @@ export function TrendChart({ data, series, xKey = "date", yFormat = "inr", right
     <div style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 8, right: hasRight ? 4 : 12, left: 4, bottom: 0 }}>
-          <CartesianGrid stroke="#e6f0f1" vertical={false} />
-          <XAxis dataKey={xKey} tickLine={false} axisLine={{ stroke: "#e4e4e7" }} tick={{ fontSize: 11, fill: "#71717a" }} minTickGap={16}
+          <CartesianGrid stroke="#efe6da" vertical={false} />
+          <XAxis dataKey={xKey} tickLine={false} axisLine={{ stroke: "#e6dbcc" }} tick={{ fontSize: 11, fill: "#7a6c5d" }} minTickGap={16}
             tickFormatter={(v) => (xIsDate ? fmtDate(String(v)) : String(v))} />
-          <YAxis yAxisId="left" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#71717a" }} width={56} tickFormatter={(v) => F[yFormat](v)} />
-          {hasRight && <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#71717a" }} width={44} tickFormatter={(v) => F[rightFormat](v)} />}
+          <YAxis yAxisId="left" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#7a6c5d" }} width={56} tickFormatter={(v) => F[yFormat](v)} />
+          {hasRight && <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#7a6c5d" }} width={44} tickFormatter={(v) => F[rightFormat](v)} />}
           <Tooltip
-            cursor={{ fill: "rgba(14,138,150,0.06)" }}
-            contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e4e4e7" }}
+            cursor={{ fill: "rgba(168,112,63,0.06)" }}
+            contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e6dbcc" }}
             labelFormatter={(v) => (xIsDate ? `${weekday(String(v))}, ${fmtDate(String(v), true)}` : String(v))}
             formatter={(v, name, item) => {
               const s = series.find((x) => x.label === name || x.key === item.dataKey);

@@ -34,7 +34,7 @@ export default async function VmDetail({ params, searchParams }: { params: Promi
         {VM_STAGES.map((s, i) => (
           <div key={s.key} className="flex min-w-[130px] flex-1 items-start gap-2">
             <div className="flex flex-col items-center">
-              <span className={cn("flex size-6 items-center justify-center rounded-full text-[11px] font-semibold", i < cur ? "bg-brand-500 text-white" : i === cur ? "bg-brand-700 text-white ring-4 ring-brand-100" : "bg-zinc-100 text-zinc-400")}>{i < cur ? "✓" : i + 1}</span>
+              <span className={cn("flex size-6 items-center justify-center rounded-full text-[11px] font-semibold", i < cur ? "bg-brand-500 text-white" : i === cur ? "bg-brand-900 text-white ring-4 ring-brand-100" : "bg-zinc-100 text-zinc-400")}>{i < cur ? "✓" : i + 1}</span>
             </div>
             <div className="min-w-0 pr-2 leading-tight">
               <div className={cn("text-[12px] font-medium", i > cur && "text-zinc-400")}>{s.label}</div>
@@ -61,7 +61,7 @@ export default async function VmDetail({ params, searchParams }: { params: Promi
                 <span>Store <Delta v={perf.change} /></span><span>Peers <Delta v={perf.control} /></span><span>Lift <b><Delta v={perf.lift} /></b></span>
                 <span>Incremental <b className="tabular">{perf.incrementalPerDay == null ? "—" : inr(perf.incrementalPerDay * 30)}</b>/month</span>
               </div>
-              <TrendChart data={perf.series} height={240} series={[{ key: "store", label: "This store", color: "#0b5f6a" }, { key: "peer", label: "Avg peer store", color: "#8fd6da", type: "line", dashed: true }]} />
+              <TrendChart data={perf.series} height={240} series={[{ key: "store", label: "This store", color: "#6e4526" }, { key: "peer", label: "Avg peer store", color: "#e2c9a6", type: "line", dashed: true }]} />
             </>
           ) : <Empty title="No read-out yet">Performance tracking starts once the revamp has a live date. The chart then compares 28 days before vs after, against peer stores.</Empty>}
         </Section>

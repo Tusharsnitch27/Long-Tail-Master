@@ -100,7 +100,7 @@ export function StoreTargetEditor({ month, cat, catLabel, cats, rows, categoryTa
         </table>
       </div>
       <div className="flex items-center gap-3 border-t border-line px-4 py-3">
-        {!readOnly && <button disabled={!dirty.length} onClick={() => ask(dirty.map(([b, v]) => ({ branch_code: b, category: cat, month, target: v.trim() === "" ? null : Math.round(Number(v)) })), "manual")} className="flex items-center gap-1.5 rounded-lg bg-brand-700 px-3 py-1.5 text-[12.5px] font-medium text-white hover:bg-brand-800 disabled:opacity-40"><Save className="size-3.5" />Save {dirty.length || ""} change{dirty.length === 1 ? "" : "s"}</button>}
+        {!readOnly && <button disabled={!dirty.length} onClick={() => ask(dirty.map(([b, v]) => ({ branch_code: b, category: cat, month, target: v.trim() === "" ? null : Math.round(Number(v)) })), "manual")} className="flex items-center gap-1.5 rounded-lg bg-brand-900 px-3 py-1.5 text-[12.5px] font-medium text-white hover:bg-brand-800 disabled:opacity-40"><Save className="size-3.5" />Save {dirty.length || ""} change{dirty.length === 1 ? "" : "s"}</button>}
         {msg && <span className={cn("text-[12px]", msg.ok ? "text-emerald-700" : "text-rose-600")}>{msg.text}</span>}
       </div>
       <ConfirmChanges open={!!pend} title={pend?.source === "upload" ? "Apply uploaded store targets?" : "Save store target changes?"} changes={pend?.changes ?? []}

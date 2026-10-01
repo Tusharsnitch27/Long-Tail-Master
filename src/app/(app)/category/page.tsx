@@ -298,7 +298,7 @@ export default async function CategoryPerformance({ searchParams }: { searchPara
             <div className="mb-2 flex flex-wrap gap-4 text-[11.5px] text-zinc-500">
               {([["store", "Stores"], ["south", "WH South"], ["north", "WH North"]] as const).map(([k, l]) => <span key={k}>{l} <b className="tabular font-semibold text-zinc-800">{compactNum(lastWith(k))}</b> <Delta v={invDelta(k)} className="text-[11px]" /> <span className="text-zinc-400">in 60d</span></span>)}
             </div>
-            <TrendChart data={invTrend} height={220} yFormat="num" series={[{ key: "store", label: "Stores", color: CH_COLORS.stores, type: "line" }, { key: "south", label: "WH South", color: "#14a3ae", type: "line" }, { key: "north", label: "WH North", color: "#d97706", type: "line", dashed: true }]} />
+            <TrendChart data={invTrend} height={220} yFormat="num" series={[{ key: "store", label: "Stores", color: CH_COLORS.stores, type: "line" }, { key: "south", label: "WH South", color: "#c08f60", type: "line" }, { key: "north", label: "WH North", color: "#2e6f73", type: "line", dashed: true }]} />
           </> : <DataPrompt title="No inventory history in the last 60 days">The store report and warehouse history tables returned no snapshots for this scope.</DataPrompt>}
         </Section>
         <Section title="Warehouse split" tip={DEF.wh}>
@@ -306,14 +306,14 @@ export default async function CategoryPerformance({ searchParams }: { searchPara
             {([["South", all.whSouth, [["SAPL-WH1", all.wh1], ["SAPL-WH2", all.wh2]]], ["North", all.whNorth, [["SAPL-NORTH-TAURU", all.whNorth]]]] as const).map(([z, v, facs]) => (
               <div key={z}>
                 <div className="mb-1 flex items-baseline justify-between text-[12px]"><span className="font-medium">{z}</span><span className="tabular"><b className="font-semibold">{num(v)}</b> <span className="text-zinc-400">{pct(safeDiv(v, all.whInv), 0)}</span></span></div>
-                {facs.map(([f, u]) => <div key={f} className="grid grid-cols-[128px_1fr_56px] items-center gap-2 text-[11.5px] text-zinc-600"><span>{f}</span><Meter value={safeDiv(u, all.whInv)} color={z === "North" ? "#d97706" : "#14a3ae"} /><span className="tabular text-right">{num(u)}</span></div>)}
+                {facs.map(([f, u]) => <div key={f} className="grid grid-cols-[128px_1fr_56px] items-center gap-2 text-[11.5px] text-zinc-600"><span>{f}</span><Meter value={safeDiv(u, all.whInv)} color={z === "North" ? "#d97706" : "#c08f60"} /><span className="tabular text-right">{num(u)}</span></div>)}
               </div>
             ))}
             <div className="border-t border-zinc-100 pt-2">
               <div className="mb-1.5 text-[11px] font-medium text-zinc-500">North share by {gl.toLowerCase()}</div>
               <div className="space-y-1">{groups.filter((g) => g.agg.whInv > 0).slice(0, 8).map((g) => (
                 <div key={g.key} className="grid grid-cols-[100px_1fr_40px] items-center gap-2 text-[11.5px]"><span className="truncate">{g.label}</span>
-                  <span className="flex h-2.5 overflow-hidden rounded bg-zinc-100"><span style={{ width: `${(g.agg.whSouth / g.agg.whInv) * 100}%`, background: "#14a3ae" }} /><span style={{ width: `${(g.agg.whNorth / g.agg.whInv) * 100}%`, background: "#d97706" }} /></span>
+                  <span className="flex h-2.5 overflow-hidden rounded bg-zinc-100"><span style={{ width: `${(g.agg.whSouth / g.agg.whInv) * 100}%`, background: "#c08f60" }} /><span style={{ width: `${(g.agg.whNorth / g.agg.whInv) * 100}%`, background: "#2e6f73" }} /></span>
                   <span className="tabular text-right text-zinc-500">{pct(g.agg.whNorth / g.agg.whInv, 0)}</span></div>
               ))}</div>
             </div>

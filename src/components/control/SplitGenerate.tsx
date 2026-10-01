@@ -40,7 +40,7 @@ export function SplitGenerate({ months, readOnly }: { months: string[]; readOnly
   if (readOnly) return null;
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <button disabled={busy} onClick={preview} className="flex items-center gap-1.5 rounded-lg bg-brand-700 px-3 py-1.5 text-[12.5px] font-medium text-white hover:bg-brand-800 disabled:opacity-50"><Sparkles className="size-3.5" />{busy ? "Working…" : "Generate splits for the year"}</button>
+      <button disabled={busy} onClick={preview} className="flex items-center gap-1.5 rounded-lg bg-brand-900 px-3 py-1.5 text-[12.5px] font-medium text-white hover:bg-brand-800 disabled:opacity-50"><Sparkles className="size-3.5" />{busy ? "Working…" : "Generate splits for the year"}</button>
       <label className="flex items-center gap-1.5 text-[12px] text-zinc-600"><input type="checkbox" checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)} />replace custom splits</label>
       {msg && <span className={cn("text-[12px]", msg.ok ? "text-emerald-700" : "text-rose-600")}>{msg.text}</span>}
       <ConfirmChanges open={!!pend} title="Generate daily splits?" changes={pend ?? []} busy={busy}

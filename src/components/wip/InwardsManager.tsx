@@ -66,13 +66,13 @@ export function InwardsManager({ rows, cats, admin, warehouses }: { rows: Inward
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <button onClick={() => setForm(blank)} className="flex items-center gap-1 rounded-md bg-brand-700 px-2.5 py-1 text-[12px] font-medium text-white hover:bg-brand-800"><Plus className="size-3.5" />Add inward</button>
+        <button onClick={() => setForm(blank)} className="flex items-center gap-1 rounded-md bg-brand-900 px-2.5 py-1 text-[12px] font-medium text-white hover:bg-brand-800"><Plus className="size-3.5" />Add inward</button>
         <button onClick={() => file.current?.click()} className="flex items-center gap-1 rounded-md border border-line bg-white px-2.5 py-1 text-[12px] text-zinc-700 hover:border-brand-300"><Upload className="size-3.5" />Upload CSV</button>
         <button onClick={() => downloadCsv("future-inwards-template.csv", [CSV_COLS, ["shoes", "Chelsea boot — tan suede", "", "new", "600", "2026-11-15", warehouses[0] ?? "SAPL-WH1", "planned", ""], ["perfumes", "Oud Noir 100ml repeat", "4MSFR0012-01", "repeat", "1200", "2026-10-28", warehouses[0] ?? "SAPL-WH1", "confirmed", ""]])}
           className="flex items-center gap-1 rounded-md border border-line bg-white px-2 py-1 text-[12px] text-zinc-600 hover:border-brand-300"><Download className="size-3.5" />Template</button>
         <input ref={file} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
         <span className="ml-auto flex gap-0.5 rounded-lg border border-line bg-white p-0.5 text-[11.5px]">
-          {(["open", "all"] as const).map((k) => <button key={k} onClick={() => setShow(k)} className={cn("rounded-md px-2 py-0.5", show === k ? "bg-brand-700 text-white" : "text-zinc-600")}>{k === "open" ? "Open" : "All incl. received"}</button>)}
+          {(["open", "all"] as const).map((k) => <button key={k} onClick={() => setShow(k)} className={cn("rounded-md px-2 py-0.5", show === k ? "bg-brand-900 text-white" : "text-zinc-600")}>{k === "open" ? "Open" : "All incl. received"}</button>)}
         </span>
         {msg && <span className={cn("w-full text-[12px]", msg.ok ? "text-emerald-700" : "text-rose-600")}>{msg.text}</span>}
       </div>
@@ -90,7 +90,7 @@ export function InwardsManager({ rows, cats, admin, warehouses }: { rows: Inward
             <label className="flex flex-col gap-0.5 text-[11px] text-zinc-500">Warehouse<input className={input} list="wh-list" value={form.warehouse} onChange={(e) => set("warehouse", e.target.value)} /><datalist id="wh-list">{warehouses.map((w) => <option key={w} value={w} />)}</datalist></label>
             <label className="flex flex-col gap-0.5 text-[11px] text-zinc-500">Status<select className={input} value={form.status} onChange={(e) => set("status", e.target.value)}>{INWARD_STATUSES.map((s) => <option key={s} value={s}>{INWARD_STATUS_LABEL[s]}</option>)}</select></label>
             <label className="col-span-2 flex flex-col gap-0.5 text-[11px] text-zinc-500 md:col-span-3 xl:col-span-6">Note<input className={input} value={form.note} onChange={(e) => set("note", e.target.value)} placeholder="Vendor, PO number, launch plan …" /></label>
-            <div className="flex items-end"><button disabled={busy || !form.design || !form.category} onClick={save} className="w-full rounded-md bg-brand-700 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-brand-800 disabled:opacity-50">{busy ? "Saving…" : "Save"}</button></div>
+            <div className="flex items-end"><button disabled={busy || !form.design || !form.category} onClick={save} className="w-full rounded-md bg-brand-900 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-brand-800 disabled:opacity-50">{busy ? "Saving…" : "Save"}</button></div>
           </div>
         </div>
       )}

@@ -64,7 +64,7 @@ export default async function Actions({ searchParams }: { searchParams: Promise<
           </KpiGrid>
           <div className="mt-3">
             <Notice>
-              <b>How to read this.</b> Every action is a measurable opportunity or risk with its evidence. Store actions only target stores where the category is <b>live</b> (stock on the latest store report, or a sale in the last 60 days); where it isn’t, you’ll see expansion or distribution suggestions instead of “push sales”. Something doesn’t apply? Use <b>Add remark</b> on the card — the engine and Mitra take it into account.
+              <b>How to read this.</b> Every action is a measurable opportunity or risk with its evidence. Store actions only target stores where the category is <b>live</b> (stock on the latest store report, or a sale in the last 60 days); where it isn’t, you’ll see expansion or distribution suggestions instead of “push sales”. Something doesn’t apply? Use <b>Add remark</b> on the card — the engine and Harvey take it into account.
               {coverage.anomalyDays.length > 0 && (
                 <span className="mt-1.5 flex flex-wrap items-center gap-1.5"><CalendarDays className="size-3.5" />Anomaly days excluded from baselines:
                   {coverage.anomalyDays.map((d) => <Pill key={`${d.day}${d.category}`} tone="warn">{fmtDate(d.day)} · {d.text.slice(0, 40)}{d.category ? ` (${catByKey(d.category)?.label})` : ""}</Pill>)}
@@ -107,7 +107,7 @@ function RemarksTab({ remarks, actions, ctx, stores, cats, db }: {
   const expired = (r: Remark) => r.kind === "snooze" && r.until != null && r.until < new Date().toISOString().slice(0, 10);
   return (
     <div className="grid gap-4 xl:grid-cols-[1fr_440px]">
-      <Section title="Active team remarks" tip="Remarks the Action Centre and Mitra take into account. Remove a remark when it no longer applies — nothing is deleted, it is kept in the audit log.">
+      <Section title="Active team remarks" tip="Remarks the Action Centre and Harvey take into account. Remove a remark when it no longer applies — nothing is deleted, it is kept in the audit log.">
         {!db ? <Empty title="Database not configured">Remarks need DATABASE_URL.</Empty> : remarks.length === 0 ? (
           <Empty title="No remarks yet">Add context the numbers can’t see — a store that doesn’t carry a category, a festival spike, a VM revamp, stock in transit. Use <b>Add remark</b> on any action, or the form on the right.</Empty>
         ) : (
@@ -142,7 +142,7 @@ function RemarksTab({ remarks, actions, ctx, stores, cats, db }: {
             <li><b className="text-zinc-800">Context</b> keeps the action and shows your note on it (“Team note”). On a <b>date</b>, it marks an anomaly day: left out of week-on-week and best-run baselines, and flagged on actions whose window includes it.</li>
             <li><b className="text-zinc-800">Not applicable</b> hides matching actions. On a <b>store × category</b> it also makes the category not live there, so no push-sales or expansion nudges appear.</li>
             <li><b className="text-zinc-800">Snooze</b> hides matching actions until the date, then they return if still true.</li>
-            <li>Mitra reads active remarks, so its answers respect the same context.</li>
+            <li>Harvey reads active remarks, so its answers respect the same context.</li>
           </ul>
         </Section>
       </div>

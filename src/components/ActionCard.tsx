@@ -27,7 +27,7 @@ export function ActionCard({ a, compact, qs = "", status }: { a: Action; compact
   const links = (
     <span className="flex flex-wrap items-center gap-3 text-[11.5px]">
       {a.links.map((l) => <Link key={l.href} href={withQs(l.href)} className="font-medium text-brand-700 hover:underline">{l.label} →</Link>)}
-      {!compact && <Link href={`/mitra?q=${encodeURIComponent(`Explain this action and what I should do: ${a.title}`)}`} className="text-zinc-500 hover:text-brand-700">Ask Mitra</Link>}
+      {!compact && <Link href={`/harvey?q=${encodeURIComponent(`Explain this action and what I should do: ${a.title}`)}`} className="text-zinc-500 hover:text-brand-700">Ask Harvey</Link>}
     </span>
   );
 
@@ -55,7 +55,7 @@ export function ActionCard({ a, compact, qs = "", status }: { a: Action; compact
   }
 
   return (
-    <article className={cn("relative overflow-hidden rounded-xl border border-line bg-white p-4 pl-5 shadow-[0_1px_2px_rgba(11,42,48,.04)] transition-colors hover:border-brand-200", closed && "opacity-70")}>
+    <article className={cn("relative overflow-hidden rounded-xl border border-line bg-white p-4 pl-5 shadow-[0_1px_2px_rgba(60,40,20,.04)] transition-colors hover:border-brand-200", closed && "opacity-70")}>
       <span className={cn("absolute inset-y-0 left-0 w-1", STRIPE[a.priority])} />
       <div className="flex items-start gap-3">
         {a.product ? <Thumb src={a.product.image} size={56} /> : <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600"><Icon className="size-5" /></span>}

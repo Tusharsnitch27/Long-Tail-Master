@@ -99,11 +99,11 @@ export default async function AdminLab({ searchParams }: { searchParams: Promise
                 <div key={b.c}>
                   <div className="mb-0.5 flex items-center justify-between text-[11.5px]"><Cat c={b.c} /><span className="tabular text-zinc-500">ASP {inr(b.asp, { compact: false })} <Delta v={b.drift} /> · realisation {pct(b.realisation, 0)} of MRP</span></div>
                   <div className="flex h-4 overflow-hidden rounded bg-zinc-100">
-                    {b.by.map((x, i) => x.share > 0 && <span key={x.key} title={`${x.label}: ${pct(x.share, 0)}`} className="flex items-center justify-center text-[9.5px] font-semibold text-white" style={{ width: `${x.share * 100}%`, background: ["#8fd6da", "#5cc0c7", "#14a3ae", "#0e8a96", "#0b3b44"][i] }}>{x.share >= 0.1 ? pct(x.share, 0) : ""}</span>)}
+                    {b.by.map((x, i) => x.share > 0 && <span key={x.key} title={`${x.label}: ${pct(x.share, 0)}`} className="flex items-center justify-center text-[9.5px] font-semibold text-white" style={{ width: `${x.share * 100}%`, background: ["#e2c9a6", "#d3b089", "#c08f60", "#a8703f", "#1b1712"][i] }}>{x.share >= 0.1 ? pct(x.share, 0) : ""}</span>)}
                   </div>
                 </div>
               ))}
-              <div className="flex flex-wrap gap-2.5 pt-1 text-[10.5px] text-zinc-500">{L.bands[0]?.by.map((x, i) => <span key={x.key} className="flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: ["#8fd6da", "#5cc0c7", "#14a3ae", "#0e8a96", "#0b3b44"][i] }} />{x.label} MRP</span>)}</div>
+              <div className="flex flex-wrap gap-2.5 pt-1 text-[10.5px] text-zinc-500">{L.bands[0]?.by.map((x, i) => <span key={x.key} className="flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: ["#e2c9a6", "#d3b089", "#c08f60", "#a8703f", "#1b1712"][i] }} />{x.label} MRP</span>)}</div>
             </div>
           </LabCard>
         </div>
@@ -152,7 +152,7 @@ export default async function AdminLab({ searchParams }: { searchParams: Promise
                     {ctx.filters.cats.map((c) => {
                       const x = r.cells[c];
                       const idx = x.idx ?? 0;
-                      const bg = !x.live ? "#fef3c7" : idx < 0.5 ? "#fde68a" : `rgba(14,138,150,${Math.min(0.85, 0.1 + idx * 0.3)})`;
+                      const bg = !x.live ? "#fef3c7" : idx < 0.5 ? "#fde68a" : `rgba(168,112,63,${Math.min(0.85, 0.1 + idx * 0.3)})`;
                       return <td key={c} className="px-0.5 py-0.5"><div title={`${catLabel(c)}: ${pct(x.share, 2)} of units · ${num(idx, 2)}× median`} className={cn("tabular rounded px-1 py-0.5 text-center", idx > 1.6 ? "text-white" : "text-zinc-800")} style={{ background: bg }}>{x.live ? pct(x.share, 1) : "not live"}</div></td>;
                     })}
                   </tr>

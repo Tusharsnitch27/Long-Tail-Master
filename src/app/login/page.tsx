@@ -23,7 +23,7 @@ async function showcase(): Promise<Tile[]> {
   return (await Promise.race([getShowcase().catch(() => null), timeout])) ?? [];
 }
 
-const serif = { fontFamily: '"Playfair Display", "Didot", "Bodoni 72", "Times New Roman", ui-serif, Georgia, serif' };
+const serif = { fontFamily: "var(--font-serif)" };
 
 /** One collage tile — only fragrances carry their name. */
 function Tile({ t, className = "", i, small }: { t: Tile; className?: string; i: number; small?: boolean }) {

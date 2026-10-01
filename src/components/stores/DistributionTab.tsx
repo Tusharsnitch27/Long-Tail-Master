@@ -63,7 +63,7 @@ export function DistributionTab({ ctx, model }: { ctx: Ctx; model: StoreModel })
         <span className="mr-1 text-[11.5px] text-zinc-500">Category</span>
         {cats.map((c) => (
           <Link key={c} href={withQs(ctx, "/stores", { tab: "distribution", dc: c })} scroll={false}
-            className={cn("flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px]", c === dc ? "border-brand-700 bg-brand-700 text-white" : "border-line bg-white text-zinc-600 hover:border-brand-300", ctx.filters.cat && c !== dc && "pointer-events-none opacity-50")}>
+            className={cn("flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px]", c === dc ? "border-brand-700 bg-brand-900 text-white" : "border-line bg-white text-zinc-600 hover:border-brand-300", ctx.filters.cat && c !== dc && "pointer-events-none opacity-50")}>
             <span className="size-1.5 rounded-full" style={{ background: c === dc ? "#fff" : catColor(c) }} />{catLabel(c)}
           </Link>
         ))}

@@ -11,9 +11,9 @@ Perfumes, Shoes (incl. Footwear), Sunglasses and Trolleys. It covers Stores, Onl
 See [docs/SNITCH_LONGTAIL.md](docs/SNITCH_LONGTAIL.md) for scope, the source map, targets logic, the metric dictionary and the question each page
 answers. Rules and their current values are listed in the app under Control Centre → Rules & data.
 
-## Mitra (AI)
+## Harvey (AI)
 
-`/mitra` answers natural-language questions with Claude (`AI_MODEL`, default `claude-opus-5-5`). By default Claude runs
+`/harvey` answers natural-language questions with Claude (`AI_MODEL`, default `claude-opus-5-5`). By default Claude runs
 through **Snowflake Cortex's Anthropic-compatible endpoint**, authenticated with the same `SNOWFLAKE_PAT` and billed to Snowflake
 credits, so no Anthropic API key is needed (`AI_PROVIDER=snowflake`). Set `AI_PROVIDER=anthropic` with `ANTHROPIC_API_KEY` to call
 Anthropic directly. The model never queries Snowflake itself: it calls approved tools that run governed queries.

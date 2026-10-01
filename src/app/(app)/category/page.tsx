@@ -10,7 +10,8 @@ import { getStoreInventory, getStoreInventoryHistory } from "@/server/data/inven
 import { getWarehouseHistory } from "@/server/data/warehouse";
 import { productRows, rollup, DEF, type ProductRow } from "@/server/productInsights";
 import { catColor, catLabel } from "@/server/views";
-import { PageHeader, Tabs, Kpi, KpiGrid, Section, Meter, Delta, ProductCell, Pill, achTone, DataPrompt, Tip } from "@/components/ui";
+import { PageHeader, Tabs, Kpi, KpiGrid, Section, Meter, Delta, ProductCell, Pill, achTone, DataPrompt, Tip, MixBar } from "@/components/ui";
+import { ChartDownload } from "@/components/charts/ChartDownload";
 import { ActionCard } from "@/components/ActionCard";
 import { DataTable, type Col } from "@/components/table/DataTable";
 import { TrendChart } from "@/components/charts/TrendChart";
@@ -167,25 +168,12 @@ export default async function CategoryPerformance({ searchParams }: { searchPara
 
       <div className="mt-3 grid gap-3 xl:grid-cols-[1.6fr_1fr]">
         <Section title={multiCat ? "Revenue trend by category" : "Revenue trend by channel"} tip={`Daily revenue, ${chName}`}>
-          <TrendChart data={trend} height={230} series={multiCat ? ctx.filters.cats.map((c) => ({ key: c, label: catLabel(c), color: catColor(c), stack: "s" })) : CHS.map((k) => ({ key: k, label: CH_LABEL[k], color: CH_COLORS[k], stack: "s" }))} />
+          <TrendChart name={multiCat ? "revenue-trend-by-category" : "revenue-trend-by-channel"} data={trend} height={230} series={multiCat ? ctx.filters.cats.map((c) => ({ key: c, label: catLabel(c), color: catColor(c), stack: "s" })) : CHS.map((k) => ({ key: k, label: CH_LABEL[k], color: CH_COLORS[k], stack: "s" }))} />
         </Section>
-        <Section title="Channel contribution" tip="Share of revenue in the period and growth vs the comparison period (all channels)">
+        <Section title="Channel contribution" tip="Share of revenue in the period and growth vs the comparison period (all channels). The per-category split is in the scorecard below." right={<ChartDownload name="channel-contribution" data={channels.map((c) => ({ channel: c.label, revenue: c.revenue, share: c.share, growth: c.growth }))} columns={[{ key: "channel", label: "Channel" }, { key: "revenue", label: "Revenue" }, { key: "share", label: "Share" }, { key: "growth", label: "Growth" }]} />}>
           <div className="space-y-2.5">{channels.map((c) => (
             <div key={c.key} className="grid grid-cols-[92px_1fr_64px_40px_56px] items-center gap-2 text-[12px]"><span className="flex items-center gap-1.5"><span className="size-2 rounded-full" style={{ background: CH_COLORS[c.key] }} />{c.label}</span><Meter value={c.share} color={CH_COLORS[c.key]} /><span className="tabular text-right text-zinc-600">{inr(c.revenue)}</span><span className="tabular text-right font-medium">{pct(c.share, 0)}</span><Delta v={c.growth} className="text-right" /></div>
           ))}</div>
-          {multiCat && <div className="mt-4 space-y-2">
-            <div className="text-[11px] font-medium text-zinc-500">By category</div>
-            {groups.map((g) => {
-              const t = g.chRev.reduce((a, x) => a + x, 0);
-              return (
-                <div key={g.key} className="grid grid-cols-[92px_1fr_56px] items-center gap-2 text-[11.5px]">
-                  <Link href={withQs(ctx, "/category", { cat: g.key })} className="truncate hover:underline">{g.label}</Link>
-                  <span className="flex h-3.5 overflow-hidden rounded bg-brand-50">{t > 0 && g.chRev.map((x, i) => x > 0 && <span key={i} title={`${CH_LABEL[CHS[i]]} ${inr(x)} · ${pct(x / t, 0)}`} style={{ width: `${(x / t) * 100}%`, background: CH_COLORS[CHS[i]] }} />)}</span>
-                  <span className="tabular text-right text-zinc-500">{inr(t)}</span>
-                </div>
-              );
-            })}
-          </div>}
         </Section>
       </div>
 
@@ -195,9 +183,9 @@ export default async function CategoryPerformance({ searchParams }: { searchPara
           <div className="overflow-x-auto scroll-thin">
             <table className="w-full whitespace-nowrap text-[12.5px]">
               <thead>
-                <tr className="text-[10.5px] uppercase tracking-wide text-zinc-400"><th /><th colSpan={4} className="border-b border-line px-3 pt-2 text-center font-medium">{ctx.period.preset.toUpperCase()} · {chName}</th><th colSpan={3} className="border-b border-line px-3 pt-2 text-center font-medium">Channel share</th>{multiCat && <th colSpan={2} className="border-b border-line px-3 pt-2 text-center font-medium">Target · MTD</th>}<th colSpan={4} className="border-b border-line px-3 pt-2 text-center font-medium">Products</th><th colSpan={3} className="border-b border-line px-3 pt-2 text-center font-medium">Health</th></tr>
+                <tr className="text-[10.5px] uppercase tracking-wide text-zinc-400"><th /><th colSpan={4} className="border-b border-line px-3 pt-2 text-center font-medium">{ctx.period.preset.toUpperCase()} · {chName}</th><th colSpan={3} className="border-b border-line px-3 pt-2 text-center font-medium">Channel share</th>{multiCat && <th colSpan={2} className="border-b border-line px-3 pt-2 text-center font-medium">Target · MTD</th>}<th colSpan={4} className="border-b border-line px-3 pt-2 text-center font-medium">Products</th><th colSpan={2} className="border-b border-line px-3 pt-2 text-center font-medium">Health</th><th colSpan={5} className="border-b border-line px-3 pt-2 text-center font-medium">Inventory · live</th></tr>
                 <tr className="border-b border-line text-[11px] text-zinc-500">
-                  {[gl, "Revenue", "Growth", "Share", "ASP", "Stores", "Online", "Mktplace", ...(multiCat ? ["Target", "Ach."] : []), "Selling", "Top 10 share", "80% of rev", "L30 vs P30", "Return %", "STR L30", "Cover"].map((h, i) => <th key={h} className={cn(TH, i ? "text-right" : "text-left")}>{h}</th>)}
+                  {[gl, "Revenue", "Growth", "Share", "ASP", "Stores", "Online", "Mktplace", ...(multiCat ? ["Target", "Ach."] : []), "Selling", "Top 10 share", "80% of rev", "L30 vs P30", "Return %", "STR L30", "Store", "Warehouse", "WH S · N", "Total", "DOI"].map((h, i) => <th key={h} className={cn(TH, i ? "text-right" : "text-left")}>{h}</th>)}
                 </tr>
               </thead>
               <tbody>{groups.map((g) => {
@@ -215,6 +203,8 @@ export default async function CategoryPerformance({ searchParams }: { searchPara
                     <td className="tabular px-3 text-right" title="Fewest products that make 80% of the period revenue">{num(g.agg.n80)} <span className="text-zinc-400">SKUs</span></td>
                     <td className="px-3 text-right"><Delta v={growth(g.agg.l30, g.agg.p30)} /></td>
                     <td className="tabular px-3 text-right">{pct(g.agg.returnPct, 1)}</td><td className="tabular px-3 text-right">{pct(g.agg.str30, 0)}</td>
+                    <td className="tabular px-3 text-right" title={`${num(stocked.get(g.key)?.size ?? 0)} stores stocked`}>{compactNum(g.agg.storeInv)}</td><td className="tabular px-3 text-right">{compactNum(g.agg.whInv)}</td>
+                    <td className="tabular px-3 text-right text-zinc-500">{compactNum(g.agg.whSouth)} · {compactNum(g.agg.whNorth)}</td><td className="tabular px-3 text-right font-medium">{compactNum(g.agg.totalInv)}</td>
                     <td className="px-3 text-right">{g.agg.doi != null ? <Pill tone={g.agg.doi < 21 ? "bad" : g.agg.doi > 180 ? "warn" : "good"}>{num(g.agg.doi)} d</Pill> : "—"}</td>
                   </tr>
                 );
@@ -225,12 +215,14 @@ export default async function CategoryPerformance({ searchParams }: { searchPara
                 {CHS.map((k, i) => { const t = groups.reduce((a, g) => a + g.chRev.reduce((x, y) => x + y, 0), 0); return <td key={k} className="tabular px-3 text-right">{t ? pct(groups.reduce((a, g) => a + g.chRev[i], 0) / t, 0) : "—"}</td>; })}
                 {multiCat && (hasT ? <><td className="tabular px-3 text-right">{inr(plan.mtdTarget)}</td><td className="px-3 text-right"><Pill tone={achTone(plan.achievement, th)}>{pct(plan.achievement, 0)}</Pill></td></> : <td colSpan={2} className="px-3 text-right text-[11.5px] font-normal text-zinc-400">not set</td>)}
                 <td className="tabular px-3 text-right">{num(all.selling)} <span className="font-normal text-zinc-400">/ {num(all.products)}</span></td><td className="tabular px-3 text-right">{pct(all.top10, 0)}</td><td className="tabular px-3 text-right">{num(all.n80)}</td>
-                <td className="px-3 text-right"><Delta v={growth(all.l30, all.p30)} /></td><td className="tabular px-3 text-right">{pct(all.returnPct, 1)}</td><td className="tabular px-3 text-right">{pct(all.str30, 0)}</td><td className="tabular px-3 text-right">{all.doi != null ? `${num(all.doi)} d` : "—"}</td>
+                <td className="px-3 text-right"><Delta v={growth(all.l30, all.p30)} /></td><td className="tabular px-3 text-right">{pct(all.returnPct, 1)}</td><td className="tabular px-3 text-right">{pct(all.str30, 0)}</td>
+                <td className="tabular px-3 text-right">{compactNum(all.storeInv)}</td><td className="tabular px-3 text-right">{compactNum(all.whInv)}</td><td className="tabular px-3 text-right">{compactNum(all.whSouth)} · {compactNum(all.whNorth)}</td><td className="tabular px-3 text-right">{compactNum(all.totalInv)}</td>
+                <td className="tabular px-3 text-right">{all.doi != null ? `${num(all.doi)} d` : "—"}</td>
               </tr></tfoot>
             </table>
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-2 text-[11px] text-zinc-500">
-            <span>Top 10 share = revenue of the 10 best products ÷ group revenue</span><span>80% of rev = fewest products making 80% of revenue</span><span>Return %: lifetime, value-based</span><span>STR / cover: {DEF.str30.split("=")[1]?.trim()}</span>
+            <span>Top 10 share = revenue of the 10 best products ÷ group revenue</span><span>80% of rev = fewest products making 80% of revenue</span><span>Return %: lifetime, value-based</span><span>STR / cover: {DEF.str30.split("=")[1]?.trim()}</span><span>Inventory: store = latest store report, warehouse = live; DOI = (store + warehouse) ÷ L30 daily units, all channels</span>
           </div>
         </Section>
       </div>
@@ -298,22 +290,22 @@ export default async function CategoryPerformance({ searchParams }: { searchPara
             <div className="mb-2 flex flex-wrap gap-4 text-[11.5px] text-zinc-500">
               {([["store", "Stores"], ["south", "WH South"], ["north", "WH North"]] as const).map(([k, l]) => <span key={k}>{l} <b className="tabular font-semibold text-zinc-800">{compactNum(lastWith(k))}</b> <Delta v={invDelta(k)} className="text-[11px]" /> <span className="text-zinc-400">in 60d</span></span>)}
             </div>
-            <TrendChart data={invTrend} height={220} yFormat="num" series={[{ key: "store", label: "Stores", color: CH_COLORS.stores, type: "line" }, { key: "south", label: "WH South", color: "#c08f60", type: "line" }, { key: "north", label: "WH North", color: "#2e6f73", type: "line", dashed: true }]} />
+            <TrendChart name="inventory-trend-60-days" data={invTrend} height={220} yFormat="num" series={[{ key: "store", label: "Stores", color: CH_COLORS.stores, type: "line" }, { key: "south", label: "WH South", color: "#c08f60", type: "line" }, { key: "north", label: "WH North", color: "#2e6f73", type: "line", dashed: true }]} />
           </> : <DataPrompt title="No inventory history in the last 60 days">The store report and warehouse history tables returned no snapshots for this scope.</DataPrompt>}
         </Section>
-        <Section title="Warehouse split" tip={DEF.wh}>
+        <Section title="Warehouse split" tip={DEF.wh} right={<ChartDownload name="warehouse-split" data={groups.map((g) => ({ group: g.label, wh1: g.agg.wh1, wh2: g.agg.wh2, south: g.agg.whSouth, north: g.agg.whNorth, total: g.agg.whInv }))} columns={[{ key: "group", label: gl }, { key: "wh1", label: "SAPL-WH1" }, { key: "wh2", label: "SAPL-WH2" }, { key: "south", label: "South" }, { key: "north", label: "North" }, { key: "total", label: "Warehouse total" }]} />}>
           {all.whInv > 0 ? <div className="space-y-3">
             {([["South", all.whSouth, [["SAPL-WH1", all.wh1], ["SAPL-WH2", all.wh2]]], ["North", all.whNorth, [["SAPL-NORTH-TAURU", all.whNorth]]]] as const).map(([z, v, facs]) => (
               <div key={z}>
                 <div className="mb-1 flex items-baseline justify-between text-[12px]"><span className="font-medium">{z}</span><span className="tabular"><b className="font-semibold">{num(v)}</b> <span className="text-zinc-400">{pct(safeDiv(v, all.whInv), 0)}</span></span></div>
-                {facs.map(([f, u]) => <div key={f} className="grid grid-cols-[128px_1fr_56px] items-center gap-2 text-[11.5px] text-zinc-600"><span>{f}</span><Meter value={safeDiv(u, all.whInv)} color={z === "North" ? "#d97706" : "#c08f60"} /><span className="tabular text-right">{num(u)}</span></div>)}
+                {facs.map(([f, u]) => <div key={f} className="grid grid-cols-[128px_1fr_56px] items-center gap-2 text-[11.5px] text-zinc-600"><span>{f}</span><Meter value={safeDiv(u, all.whInv)} color={z === "North" ? "#2e6f73" : "#c08f60"} /><span className="tabular text-right">{num(u)}</span></div>)}
               </div>
             ))}
             <div className="border-t border-zinc-100 pt-2">
               <div className="mb-1.5 text-[11px] font-medium text-zinc-500">North share by {gl.toLowerCase()}</div>
               <div className="space-y-1">{groups.filter((g) => g.agg.whInv > 0).slice(0, 8).map((g) => (
                 <div key={g.key} className="grid grid-cols-[100px_1fr_40px] items-center gap-2 text-[11.5px]"><span className="truncate">{g.label}</span>
-                  <span className="flex h-2.5 overflow-hidden rounded bg-zinc-100"><span style={{ width: `${(g.agg.whSouth / g.agg.whInv) * 100}%`, background: "#c08f60" }} /><span style={{ width: `${(g.agg.whNorth / g.agg.whInv) * 100}%`, background: "#2e6f73" }} /></span>
+                  <MixBar format="num" barClass="h-2.5 rounded" title={`${g.label} · warehouse`} parts={[{ label: "South (WH1 + WH2)", value: g.agg.whSouth, color: "#c08f60" }, { label: "North (Tauru)", value: g.agg.whNorth, color: "#2e6f73" }]} />
                   <span className="tabular text-right text-zinc-500">{pct(g.agg.whNorth / g.agg.whInv, 0)}</span></div>
               ))}</div>
             </div>

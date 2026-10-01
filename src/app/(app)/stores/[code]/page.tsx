@@ -133,7 +133,7 @@ export default async function StoreDetail({ params, searchParams }: { params: Pr
 
         <div className="mt-3 grid gap-3 xl:grid-cols-[1.6fr_1fr]">
           <Section title="Daily revenue vs target · last 30 days" tip="Target = store targets on live categories">
-            <DailyTargetChart data={daily} height={220} />
+            <DailyTargetChart name={`store-${s.b}-daily-vs-target`} data={daily} height={220} />
           </Section>
           <Section title={`What to do · ${s.todos.filter((t) => t.kind !== "ok").length}`} tip="Computed from this store's sales, target pace, store stock and format peers">
             <ul className="divide-y divide-zinc-100">{s.todos.slice(0, 8).map((t, i) => (
@@ -176,7 +176,7 @@ export default async function StoreDetail({ params, searchParams }: { params: Pr
 
         <div className="mt-3">
           <Section title="Daily sales by category · last 30 days">
-            <TrendChart data={trend} height={200} series={[...cats.map((c) => ({ key: c, label: catLabel(c), color: catColor(c), stack: "s" })), { key: "target", label: "Target (all)", color: "#1b1712", type: "line" as const, dashed: true }]} />
+            <TrendChart name={`store-${s.b}-sales-by-category`} data={trend} height={200} series={[...cats.map((c) => ({ key: c, label: catLabel(c), color: catColor(c), stack: "s" })), { key: "target", label: "Target (all)", color: "#1b1712", type: "line" as const, dashed: true }]} />
           </Section>
         </div>
 

@@ -33,7 +33,7 @@ type SplitRow = { channel: TChannel; state: string; day: string; weight: number 
 export async function getTargetBook(fromMonth: string, toMonth: string = fromMonth): Promise<TargetBook> {
   const [months, splits, stores] = await Promise.all([
     listMonthTargets(fromMonth, toMonth),
-    dbConfigured() ? cached(`split:${fromMonth}:${toMonth}`, 60, () => q<SplitRow>("select channel, state, to_char(day,'YYYY-MM-DD') as day, weight::float8 weight from day_splits where day between $1 and $2", [startOfMonth(fromMonth), endOfMonth(toMonth)]).catch(() => [])) : Promise.resolve([]),
+    dbConfigured() ? cached(`split:${fromMonth}:${toMonth}`, 60, () => q<SplitRow>("select channel, state, to_char(day,'YYYY-MM-DD') as day, weight::float8 weight from day_splits where day between $1 and $2", [startOfMonth(fromMonth), endOfMonth(toMonth)])).catch(() => []) : Promise.resolve([]),
     listStoreTargets(fromMonth, toMonth),
   ]);
   // month totals of weights per channel/state/month for normalisation
@@ -66,14 +66,17 @@ export function listMonthTargets(fromMonth: string, toMonth: string): Promise<Mo
     q<Record<string, unknown>>(
       "select channel, category, to_char(month,'YYYY-MM-DD') as month, target::float8 target, note, updated_by, updated_at::text from month_targets where month between $1 and $2 order by month, channel, category",
       [startOfMonth(fromMonth), startOfMonth(toMonth)],
-    ).then((r) => r as unknown as MonthTarget[]).catch(() => []));
+    ).then((r) => r as unknown as MonthTarget[]))
+    // a failed read is never cached as "no targets"
+    .catch((e) => { console.error("[targets] read failed", e); return []; });
 }
 
 export function listStoreTargets(fromMonth: string, toMonth: string): Promise<StoreMonthTarget[]> {
   if (!dbConfigured()) return Promise.resolve([]);
   return cached(`smt:${fromMonth}:${toMonth}`, 60, () =>
     q<Record<string, unknown>>("select branch_code, category, to_char(month,'YYYY-MM-DD') as month, target::float8 target from store_month_targets where month between $1 and $2", [startOfMonth(fromMonth), startOfMonth(toMonth)])
-      .then((r) => r as unknown as StoreMonthTarget[]).catch(() => []));
+      .then((r) => r as unknown as StoreMonthTarget[]))
+    .catch((e) => { console.error("[targets] store read failed", e); return []; });
 }
 
 export async function listSplits(month: string) {
@@ -111,8 +114,17 @@ export async function saveMonthTargets(rows: { channel: TChannel; category: stri
     }
     if (changes.length) await log(c, actor, source, "month_targets", { changes });
   });
-  invalidate("mt:"); invalidate("facts:");
-  return { changed: changes.length, changes };
+  invalidate("mt:"); invalidate("facts:"); invalidate("actions:"); invalidate("plan:");
+  // read back what is now stored, so the screen shows the database — not what we hoped we wrote
+  const keys = rows.map((r) => [r.channel, r.category, r.month] as const);
+  const stored = keys.length ? await q<{ channel: string; category: string; month: string; target: number }>(
+    "select channel, category, to_char(month,'YYYY-MM-DD') as month, target::float8 target from month_targets where (channel, category, month) in (select * from unnest($1::text[], $2::text[], $3::date[]))",
+    [keys.map((k) => k[0]), keys.map((k) => k[1]), keys.map((k) => k[2])]) : [];
+  const saved: Record<string, number | null> = {};
+  for (const r of rows) saved[`${r.channel}|${r.category}|${r.month}`] = null;
+  for (const r of stored) saved[`${r.channel}|${r.category}|${r.month}`] = r.target;
+  const mismatched = rows.filter((r) => { const v = saved[`${r.channel}|${r.category}|${r.month}`]; return r.target == null ? v != null : v == null || Math.abs(v - r.target) >= 0.5; }).length;
+  return { changed: changes.length, changes, saved, mismatched };
 }
 
 /** Replace the daily split for channel × state × month (weights; normalised when used). */

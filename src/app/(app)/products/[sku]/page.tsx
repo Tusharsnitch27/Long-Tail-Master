@@ -8,6 +8,9 @@ import { getSkuFacts, getSkuDailyMulti } from "@/server/data/sku";
 import { getChannelSku, getChannelSkuDaily } from "@/server/data/channels";
 import { getStoreInventory, getProductStoreHistory } from "@/server/data/inventory";
 import { getInwards } from "@/server/data/metafields";
+import { listRemarks } from "@/server/data/remarks";
+import { ProductRemarks } from "@/components/products/ProductRemarks";
+import { productTagLabel } from "@/lib/productTags";
 import { buildActions, actionStatuses } from "@/server/actions";
 import { ucChannel, CH_LABEL, type ChKey } from "@/server/channelData";
 import { rollingBySku, isFreeGift, describeProduct, attrList, performanceSummary, productOpportunities, DEF, type DetailFacts, type StoreLine, type Opp } from "@/server/productInsights";
@@ -15,6 +18,7 @@ import { catLabel } from "@/server/views";
 import { Kpi, KpiGrid, Section, Meter, Empty, DataPrompt, Pill, Delta, Tip } from "@/components/ui";
 import { ActionCard } from "@/components/ActionCard";
 import { TrendChart } from "@/components/charts/TrendChart";
+import { SwitchTrend } from "@/components/charts/SwitchTrend";
 import { compactNum, inr, num, pct } from "@/lib/format";
 import { addDays, diffDays, eachDay, fmtDate, fmtRange } from "@/lib/dates";
 import { growth, safeDiv } from "@/lib/metrics";
@@ -50,6 +54,8 @@ export default async function ProductDetail({ params, searchParams }: { params: 
     getProductWarehouseHistory(sku, hist.from, hist.to).catch(() => []),
     buildActions(cctx).catch(() => ({ actions: [] as Awaited<ReturnType<typeof buildActions>>["actions"] })), actionStatuses(),
   ]);
+  const remarks = (await listRemarks()).filter((r) => r.scope === "product" && r.scope_id === sku);
+  const tagLabels = remarks.map((r) => productTagLabel(r.tag)).filter((x): x is string => !!x);
   const w = wh.bySku.get(sku);
   const rl = roll.map.get(sku);
   const storeInv = p.invOffline ?? 0, whInv = w?.units ?? 0, totalInv = storeInv + whInv;
@@ -153,7 +159,8 @@ export default async function ProductDetail({ params, searchParams }: { params: 
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
-              <h1 className="text-[19px] font-semibold leading-tight tracking-[-0.015em]">{p.name ?? sku}</h1>
+              <h1 className="font-serif text-[26px] leading-tight tracking-[-0.02em]">{p.name ?? sku}</h1>
+              {tagLabels.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{tagLabels.map((t) => <span key={t} className="rounded-md bg-brand-900 px-1.5 py-0.5 text-[11px] font-medium text-canvas">{t}</span>)}</div>}
               <div className="mt-0.5 text-[12px] text-zinc-500"><span className="font-mono">{sku}</span> · MRP {inr(p.mrp, { compact: false })}{p.sellingPrice && p.sellingPrice !== p.mrp ? ` · selling ${inr(p.sellingPrice, { compact: false })}` : ""}{p.liveDate ? ` · live ${fmtDate(p.liveDate.slice(0, 10), true)}${p.daysSinceLive != null ? ` (${num(p.daysSinceLive)} days)` : ""}` : ""}{p.lastInward ? ` · last inward ${fmtDate(p.lastInward.slice(0, 10), true)}` : ""}</div>
             </div>
             <div className="flex flex-wrap gap-1">
@@ -191,12 +198,12 @@ export default async function ProductDetail({ params, searchParams }: { params: 
         <Kpi label="Days of cover" value={row.doi != null ? num(row.doi) : totalInv > 0 ? "No sales" : "—"} sub={`STR L30 ${pct(row.str30, 0)}`} tone={row.doi == null ? (totalInv > 0 ? "warn" : undefined) : row.doi < 21 ? "bad" : row.doi > 180 ? "warn" : "good"} tip={`${DEF.doi}. ${DEF.str30}`} />
       </KpiGrid>
 
-      <div className="mt-3 grid gap-3 xl:grid-cols-2">
-        <Section title="Units sold · last 60 days" tip="Daily units by channel. Stores = store sales lines; Online / Marketplace = Unicommerce items incl. cancellations" right={<span className="text-[11.5px] text-zinc-500">{num(t60Units)} units</span>}>
-          <TrendChart data={trend} height={220} yFormat="num" series={CHS.map((k) => ({ key: k === "stores" ? "uStores" : k === "online" ? "uOnline" : "uMarketplace", label: CH_LABEL[k], color: CH_COLORS[k], stack: "u" }))} />
-        </Section>
-        <Section title="Revenue · last 60 days" tip="Daily revenue by channel with the 7-day average (all channels)" right={<span className="text-[11.5px] text-zinc-500">{inr(trend.reduce((a, x) => a + x.stores + x.online + x.marketplace, 0))}</span>}>
-          <TrendChart data={trend} height={220} series={[...CHS.map((k) => ({ key: k, label: CH_LABEL[k], color: CH_COLORS[k], stack: "r" })), { key: "avg", label: "7-day avg", color: "#1b1712", type: "line" as const, dashed: true }]} />
+      <div className="mt-3">
+        <Section title="Sales · last 60 days" tip="Daily revenue (with the 7-day average, all channels) or units by channel. Stores = store sales lines; Online / Marketplace = Unicommerce items incl. cancellations">
+          <SwitchTrend name={`${sku}-sales-60d`} data={trend} height={230} views={[
+            { key: "revenue", label: "Revenue", total: inr(trend.reduce((a, x) => a + x.stores + x.online + x.marketplace, 0)), series: [...CHS.map((k) => ({ key: k, label: CH_LABEL[k], color: CH_COLORS[k], stack: "r" })), { key: "avg", label: "7-day avg", color: "#1b1712", type: "line" as const, dashed: true }] },
+            { key: "units", label: "Units", yFormat: "num", total: `${num(t60Units)} units`, series: CHS.map((k) => ({ key: k === "stores" ? "uStores" : k === "online" ? "uOnline" : "uMarketplace", label: CH_LABEL[k], color: CH_COLORS[k], stack: "u" })) },
+          ]} />
         </Section>
       </div>
 
@@ -298,10 +305,16 @@ export default async function ProductDetail({ params, searchParams }: { params: 
 
       <div className="mt-3">
         <Section title="Inventory history · last 90 days" tip="Daily snapshots: store report (all stores) and warehouse history (SNITCH_FINAL_INVENTORY_WH2). Right axis = stores holding stock.">
-          {hasInvHist ? <TrendChart data={invTrend} height={220} yFormat="num" rightFormat="num" series={[
+          {hasInvHist ? <TrendChart name={`${sku}-inventory-history-90d`} data={invTrend} height={220} yFormat="num" rightFormat="num" series={[
             { key: "store", label: "Stores", color: CH_COLORS.stores, type: "line" }, { key: "south", label: "WH South", color: "#c08f60", type: "line" },
             { key: "north", label: "WH North", color: "#2e6f73", type: "line", dashed: true }, { key: "stores", label: "Stores stocked", color: "#b8a894", type: "line", dashed: true, axis: "right" },
           ]} /> : <div className="py-6 text-center text-[12.5px] text-zinc-500">No inventory snapshots for this product in the last 90 days.</div>}
+        </Section>
+      </div>
+
+      <div className="mt-3">
+        <Section title={`Team remarks${remarks.length ? ` · ${remarks.length}` : ""}`} tip="Product-level context for everyone. A tag (e.g. Not to be sent to stores) stops the actions it contradicts for this SKU; Harvey reads remarks too.">
+          <ProductRemarks sku={sku} category={cat} remarks={remarks.map((r) => ({ id: r.id, tag: r.tag, text: r.text, by: r.created_by, at: r.created_at, canRemove: ctx.user?.role === "admin" || ctx.user?.username === r.created_by }))} />
         </Section>
       </div>
 

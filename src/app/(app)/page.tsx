@@ -8,7 +8,8 @@ import { drivers, risks, opportunities } from "@/server/executive";
 import { getTargetBook } from "@/server/data/targetBook";
 import { summarize } from "@/server/analytics";
 import { catColor, catLabel } from "@/server/views";
-import { PageHeader, Kpi, KpiGrid, Section, Delta, DataPrompt, Pill, achTone, Tip, Thumb } from "@/components/ui";
+import { PageHeader, Kpi, KpiGrid, Section, Delta, DataPrompt, Pill, achTone, Tip, MixBar } from "@/components/ui";
+import { ChartDownload } from "@/components/charts/ChartDownload";
 import { InsightList } from "@/components/Insights";
 import { DailyTargetChart } from "@/components/charts/DailyTargetChart";
 import { SkuTabs, type SkuTab } from "@/components/SkuTabs";
@@ -80,10 +81,9 @@ export default async function ExecutiveSummary({ searchParams }: { searchParams:
   const toRow = (r: (typeof perf.rows)[number], note?: string | null, tone?: "good" | "bad" | "warn" | null) => ({ sku: r.sku, name: r.name, image: r.image, revenue: r.revenue, units: r.units, growth: r.growth, note, tone });
   const topTabs: SkuTab[] = byCat(perf.rows.filter((r) => r.units > 0)).map((t) => ({ ...t, rows: t.rows.slice(0, 10).map((r) => toRow(r, `${num((r.storeInv ?? 0) + r.whInv)} in stock (${num(r.storeInv ?? 0)} store · ${num(r.whInv)} WH)${r.doi != null ? ` · ${num(r.doi)}d cover` : ""}`, r.doi != null && r.doi < 14 ? "bad" : null)) }));
   const bottomTabs: SkuTab[] = byCat(perf.rows.filter((r) => (r.storeInv ?? 0) + r.whInv >= 30 && (r.p?.daysSinceLive ?? 999) >= 45))
-    .map((t) => ({ ...t, rows: [...t.rows].sort((a, b) => a.l30Units / ((a.storeInv ?? 0) + a.whInv) - b.l30Units / ((b.storeInv ?? 0) + b.whInv)).slice(0, 10).map((r) => toRow(r, `${num((r.storeInv ?? 0) + r.whInv)} in stock · ${num(r.l30Units)} sold L30`, "warn")) }));
+    .map((t) => ({ ...t, rows: [...t.rows].sort((a, b) => a.l30Units / ((a.storeInv ?? 0) + a.whInv) - b.l30Units / ((b.storeInv ?? 0) + b.whInv)).slice(0, 10).map((r) => toRow(r, `${num((r.storeInv ?? 0) + r.whInv)} in stock (${num(r.storeInv ?? 0)} store · ${num(r.whInv)} WH) · ${num(r.l30Units)} sold L30`, "warn")) }));
   const riskRows = perf.rows.filter((r) => r.l30Units >= 15 && ((r.doi != null && r.doi < 21) || (r.p7 > 0 && r.l7 / r.p7 < 0.6)));
-  const riskTabs: SkuTab[] = byCat(riskRows).map((t) => ({ ...t, rows: t.rows.slice(0, 10).map((r) => toRow(r, r.doi != null && r.doi < 21 ? `only ${num(r.doi)} days of cover` : `L7 ${pct(r.l7 / r.p7 - 1, 0)} vs prior week`, "bad")) }));
-  const lowInv = perf.rows.filter((r) => r.l30Units >= 10 && r.doi != null && r.doi < 21).sort((a, b) => b.l30Units - a.l30Units).slice(0, 8);
+  const riskTabs: SkuTab[] = byCat(riskRows).map((t) => ({ ...t, rows: t.rows.slice(0, 10).map((r) => toRow(r, `${r.doi != null && r.doi < 21 ? `only ${num(r.doi)} days of cover` : `L7 ${pct(r.l7 / r.p7 - 1, 0)} vs prior week`} · ${num(r.storeInv ?? 0)} store · ${num(r.whInv)} WH`, "bad")) }));
 
   const drv = drivers(ctx, sc.facts, sc.uc, range, compare, ch).slice(0, 3);
   const rsk = risks(ctx, plan, sc.facts, sc.uc, range, act.actions).slice(0, 3);
@@ -122,23 +122,16 @@ export default async function ExecutiveSummary({ searchParams }: { searchParams:
       <div className="mt-3 grid gap-3 xl:grid-cols-[1.7fr_1fr]">
         <Section title={`Daily revenue vs target · ${dr === "mtd" ? "month to date" : dr === "period" ? fmtRange(last30) : `last ${dr} days`}`} tip="Bars coloured by achievement of that day's phased target"
           right={<div className="flex gap-0.5 rounded-lg border border-line p-0.5">{DR.map((x) => <Link key={x.k} scroll={false} href={withQs(ctx, "/", { dr: x.k === "30" ? null : x.k })} className={cn("rounded-md px-2 py-0.5 text-[11.5px]", dr === x.k ? "bg-brand-900 font-medium text-white" : "text-zinc-600 hover:bg-brand-50")}>{x.l}</Link>)}</div>}>
-          <DailyTargetChart data={daily} height={250} />
+          <DailyTargetChart name={`daily-revenue-vs-target-${dr}`} data={daily} height={250} />
         </Section>
-        <Section title="Channel contribution by category" tip="Share of each category's revenue in the selected period">
+        <Section title="Channel contribution by category" tip="Share of each category's revenue in the selected period — hover a bar for the split" right={<ChartDownload name="channel-contribution-by-category" data={cats.map((c) => ({ category: catLabel(c.c), ...Object.fromEntries(c.split.map((x) => [x.k, x.rev])) }))} columns={[{ key: "category", label: "Category" }, { key: "stores", label: "Stores" }, { key: "online", label: "Online" }, { key: "marketplace", label: "Marketplace" }]} />}>
           <div className="space-y-2.5">
-            {cats.map((c) => {
-              const t = c.split.reduce((a, x) => a + x.rev, 0);
-              return (
-                <div key={c.c}>
-                  <div className="mb-1 flex items-baseline justify-between text-[12px]"><Link href={withQs(ctx, "/category", { cat: c.c })} className="flex items-center gap-1.5 font-medium hover:underline"><span className="size-2 rounded-full" style={{ background: catColor(c.c) }} />{catLabel(c.c)}</Link><span className="tabular text-zinc-500">{inr(t)}</span></div>
-                  <div className="flex h-5 overflow-hidden rounded-md bg-brand-50">
-                    {c.split.map((x) => x.rev > 0 && (
-                      <span key={x.k} title={`${CH_LABEL[x.k]} ${inr(x.rev)} · ${pct(x.rev / t, 0)}`} className="flex items-center justify-center text-[10px] font-semibold" style={{ width: `${(x.rev / t) * 100}%`, background: CH_COLORS[x.k], color: x.k === "marketplace" ? "#1b1712" : "#fff" }}>{x.rev / t >= 0.12 ? pct(x.rev / t, 0) : ""}</span>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+            {cats.map((c) => (
+              <div key={c.c}>
+                <div className="mb-1 flex items-baseline justify-between text-[12px]"><Link href={withQs(ctx, "/category", { cat: c.c })} className="flex items-center gap-1.5 font-medium hover:underline"><span className="size-2 rounded-full" style={{ background: catColor(c.c) }} />{catLabel(c.c)}</Link><span className="tabular text-zinc-500">{inr(c.split.reduce((a, x) => a + x.rev, 0))}</span></div>
+                <MixBar barClass="h-5 rounded-md" labelMin={0.12} title={`${catLabel(c.c)} · channel split`} parts={c.split.map((x) => ({ label: CH_LABEL[x.k], value: x.rev, color: CH_COLORS[x.k] }))} />
+              </div>
+            ))}
             <div className="flex gap-3 pt-1 text-[11px] text-zinc-500">{(["stores", "online", "marketplace"] as ChKey[]).map((k) => <span key={k} className="flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: CH_COLORS[k] }} />{CH_LABEL[k]}</span>)}</div>
           </div>
         </Section>
@@ -203,7 +196,7 @@ export default async function ExecutiveSummary({ searchParams }: { searchParams:
         <Section title="Opportunities" tip="Calculated potential — estimates, not guaranteed revenue"><InsightList items={opp} qs={ctx.qs} empty="No material opportunities." /></Section>
       </div>
 
-      <div className="mt-3 grid gap-3 xl:grid-cols-[1.3fr_1fr]">
+      <div className="mt-3">
         <Section title="Inventory and days of cover by category" pad={false} tip="Store = latest store report (live); Warehouse = live (North: SAPL-NORTH-TAURU, South: SAPL-WH1 + SAPL-WH2). Days of cover = total ÷ L30 daily units, all channels.">
           <table className="w-full whitespace-nowrap text-[12.5px]">
             <thead><tr className="border-b border-line text-[11px] text-zinc-500">{["Category", "Store", "Warehouse", "North · South", "Total", "L30 units", "Days of cover"].map((h, i) => <th key={h} className={`px-4 py-2 font-medium ${i ? "text-right" : "text-left"}`}>{h}</th>)}</tr></thead>
@@ -217,15 +210,6 @@ export default async function ExecutiveSummary({ searchParams }: { searchParams:
               </tr>
             ))}</tbody>
           </table>
-        </Section>
-        <Section title="Low inventory · top sellers" tip="Products selling ≥10 units in 30 days with under 21 days of total cover" right={<Link href={withQs(ctx, "/merchandising")} className="text-[11.5px] text-zinc-500 hover:text-ink">Merchandising →</Link>}>
-          {lowInv.length ? <ul className="space-y-1.5">{lowInv.map((r) => (
-            <li key={r.sku}><Link href={withQs(ctx, `/products/${encodeURIComponent(r.sku)}`)} className="-mx-2 flex items-center gap-2.5 rounded-lg px-2 py-1 hover:bg-brand-50/60">
-              <Thumb src={r.image} size={44} />
-              <span className="min-w-0 flex-1"><span className="block truncate text-[12.5px] font-medium">{r.name}</span><span className="text-[11px] text-zinc-500">{num(r.l30Units)} sold L30 · {num((r.storeInv ?? 0) + r.whInv)} in stock</span></span>
-              <Pill tone={r.doi! < 10 ? "bad" : "warn"}>{num(r.doi)} days</Pill>
-            </Link></li>
-          ))}</ul> : <div className="py-6 text-center text-[12.5px] text-zinc-500">No top seller is short of stock.</div>}
         </Section>
       </div>
 

@@ -2,17 +2,21 @@
 import { Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { inr, num, pct } from "@/lib/format";
 import { fmtDate, weekday } from "@/lib/dates";
+import { ChartDownload } from "./ChartDownload";
 
 export interface Series { key: string; label: string; color: string; type?: "bar" | "line"; stack?: string; dashed?: boolean; axis?: "left" | "right" }
 type Fmt = "inr" | "num" | "pct";
 const F: Record<Fmt, (v: number) => string> = { inr: (v) => inr(v, { decimals: 1 }), num: (v) => num(v), pct: (v) => pct(v, 0) };
 
-export function TrendChart({ data, series, xKey = "date", yFormat = "inr", rightFormat = "pct", height = 260, xIsDate = true }: {
+export function TrendChart({ data, series, xKey = "date", yFormat = "inr", rightFormat = "pct", height = 260, xIsDate = true, name = "chart" }: {
   data: Record<string, unknown>[]; series: Series[]; xKey?: string; yFormat?: Fmt; rightFormat?: Fmt; height?: number; xIsDate?: boolean;
+  /** download file name */ name?: string;
 }) {
   if (!data.length) return <div className="flex items-center justify-center text-[13px] text-zinc-500" style={{ height }}>No data for this period</div>;
   const hasRight = series.some((s) => s.axis === "right");
   return (
+    <div>
+    <div className="mb-1 flex justify-end"><ChartDownload name={name} data={data} columns={[{ key: xKey, label: xIsDate ? "Date" : xKey }, ...series.map((s) => ({ key: s.key, label: s.label }))]} /></div>
     <div style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 8, right: hasRight ? 4 : 12, left: 4, bottom: 0 }}>
@@ -41,6 +45,7 @@ export function TrendChart({ data, series, xKey = "date", yFormat = "inr", right
           )}
         </ComposedChart>
       </ResponsiveContainer>
+    </div>
     </div>
   );
 }

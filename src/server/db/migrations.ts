@@ -486,4 +486,13 @@ insert into app_settings(key, value, updated_by) values ('enabledCategories', '[
 alter table day_splits add column source text not null default 'manual';
 `,
   },
+  {
+    version: 8,
+    name: "remark_tags",
+    sql: `
+-- product-level remark tags (e.g. not to be sent to stores, being called back) that change which actions apply
+alter table remarks add column tag text;
+create index remarks_tag on remarks(tag) where active and tag is not null;
+`,
+  },
 ];

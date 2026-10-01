@@ -12,7 +12,7 @@ import { dbConfigured, q } from "../db";
  *    "Longtail Metafields" workbook (src/data/shoe-metafields.json; L1 / L2 deliberately not taken from it)
  *  - Admin edits / uploads in the tool (Postgres product_meta) win over both.
  */
-export interface Meta { sku: string; l1: string | null; l2: string | null; name: string | null; image: string | null; imageOverride?: boolean; category: string | null; collection: string | null; attrs: Record<string, string> }
+export interface Meta { sku: string; l1: string | null; l2: string | null; name: string | null; image: string | null; imageOverride?: boolean; nameOverride?: boolean; category: string | null; collection: string | null; attrs: Record<string, string> }
 
 export const ATTR_LABEL: Record<string, string> = {
   colour: "Colour", occasion: "Occasion", aesthetic: "Fashion aesthetic", bestWith: "Best with", closure: "Closure", upperMaterial: "Upper material",
@@ -44,8 +44,10 @@ export function getMetafields(): Promise<Map<string, Meta>> {
     for (const [sku, a] of Object.entries(seed as Record<string, Record<string, string>>)) Object.assign(get(sku).attrs, a);
     for (const o of overrides) {
       const e = get(o.sku_group.toUpperCase());
-      const { l1, l2, image, ...attrs } = o.attrs ?? {};
+      const { l1, l2, image, name, category: _c, collection, ...attrs } = o.attrs ?? {};
       if (l1) e.l1 = l1; if (l2) e.l2 = l2; if (image) { e.image = image; e.imageOverride = true; }
+      if (name) { e.name = name; e.nameOverride = true; }
+      if (collection) e.collection = collection;
       Object.assign(e.attrs, attrs);
     }
     return m;
@@ -58,7 +60,7 @@ export async function saveProductMeta(rows: { sku: string; attrs: Record<string,
     await q(`insert into product_meta(sku_group, attrs, updated_by) values ($1, $2, $3)
              on conflict (sku_group) do update set attrs = product_meta.attrs || excluded.attrs, updated_by = excluded.updated_by, updated_at = now()`, [r.sku.toUpperCase(), JSON.stringify(r.attrs), actor]);
   }
-  await q("insert into audit_log(actor, action, entity, detail) values ($1,'upload','product_meta',$2)", [actor, JSON.stringify({ rows: rows.length })]);
+  await q("insert into audit_log(actor, action, entity, detail) values ($1,$2,'product_meta',$3)", [actor, rows.length === 1 ? "edit" : "upload", JSON.stringify({ rows: rows.length, changes: rows.slice(0, 50).map((r) => ({ sku: r.sku.toUpperCase(), ...r.attrs })) })]);
   invalidate("meta:");
   invalidate("products:");
 }

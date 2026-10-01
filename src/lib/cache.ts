@@ -14,7 +14,9 @@ export async function cached<T>(key: string, ttlSeconds: number, fn: () => Promi
     if (!hit.refreshing) {
       hit.refreshing = true;
       fn().then(
-        (v) => store.set(key, { expires: Date.now() + ttlSeconds * 1000, value: Promise.resolve(v), settled: true, refreshing: false }),
+        // only write back if nobody invalidated / replaced the entry meanwhile — otherwise a refresh that started
+        // before a save would put the pre-save value back (e.g. targets appearing to revert)
+        (v) => { if (store.get(key) === hit) store.set(key, { expires: Date.now() + ttlSeconds * 1000, value: Promise.resolve(v), settled: true, refreshing: false }); },
         () => { hit.refreshing = false; }, // keep serving the stale value; retry on next access
       );
     }

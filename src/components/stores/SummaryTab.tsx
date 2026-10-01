@@ -139,7 +139,7 @@ export async function SummaryTab({ ctx, facts, model }: { ctx: Ctx; facts: Fact[
       <div className="mt-3 grid gap-3 xl:grid-cols-[1.6fr_1fr]">
         <Section title="Daily Stores revenue vs target · last 30 days" tip="Bars coloured by achievement of that day's phased target"
           right={<span className={cn("rounded-md px-2 py-0.5 text-[11px] font-medium ring-1", STATUS_META[plan.status].cls)}>{EXEC_LABEL[plan.status]}</span>}>
-          <DailyTargetChart data={daily} height={240} />
+          <DailyTargetChart name="stores-daily-revenue-vs-target" data={daily} height={240} />
         </Section>
         <Section title="Key pointers" tip="Computed from this period's store data — click through for the list">
           <Pointers items={pointers.slice(0, 7)} />

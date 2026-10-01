@@ -6,7 +6,9 @@ import { Notice } from "@/components/ui";
 import { ltLabel, ctLabel, TODO_LABEL } from "./parts";
 import { safeDiv } from "@/lib/metrics";
 
-export function StoresTab({ ctx, model }: { ctx: Ctx; model: StoreModel }) {
+export interface StoreMeta { totals: Map<string, { revenue: number; units: number; stock: number; l30Units: number; skus: number; storeRevenue: number }>; label: string }
+
+export function StoresTab({ ctx, model, meta }: { ctx: Ctx; model: StoreModel; meta?: StoreMeta | null }) {
   const nCats = ctx.filters.cats.length;
   const one = ctx.filters.cat;
   const rows = model.stores.map((s) => {
@@ -19,10 +21,18 @@ export function StoresTab({ ctx, model }: { ctx: Ctx; model: StoreModel }) {
       nonLiveTarget: s.nonLiveTarget || null, pen: s.pen, inv: s.inFeed ? s.inv : null, cover: s.cover, storeUnits: s.inFeed ? s.storeUnits30 : null,
       stockOuts: s.stockOuts.length, dead: s.dead.length, todo: t && t.kind !== "ok" ? `${TODO_LABEL[t.kind]}: ${t.text}` : "—",
       l7: s.l7, wow: safeDiv(s.l7 - s.p7, s.p7),
+      ...(meta ? (() => { const m = meta.totals.get(s.b); return { mRev: m?.revenue ?? 0, mUnits: m?.units ?? 0, mStock: m?.stock ?? 0, mSkus: m?.skus ?? 0, mShare: safeDiv(m?.revenue ?? 0, m?.storeRevenue ?? 0), mCover: m && m.l30Units > 0 ? m.stock / (m.l30Units / 30) : null }; })() : {}),
     };
   });
+  const mg = meta ? `Matching: ${meta.label}` : "";
   const cols: Col[] = [
     { key: "store", label: "Store", sub: "city", width: 210 },
+    ...(meta ? [
+      { key: "mRev", label: "Revenue", type: "inr", bar: true, group: mg, tip: "Store sales of products matching the filter, selected period" },
+      { key: "mShare", label: "Share", type: "pct", group: mg, tip: "Matching revenue ÷ the store's revenue in the selected categories" },
+      { key: "mUnits", label: "Units", type: "num", group: mg }, { key: "mStock", label: "Stock", type: "num", group: mg, tip: "Latest store report" },
+      { key: "mCover", label: "Cover", type: "num", group: mg, tip: "Matching stock ÷ their L30 daily units" }, { key: "mSkus", label: "SKUs", type: "num", group: mg, tip: "Matching products sold or stocked" },
+    ] as Col[] : []),
     { key: "state", label: "State", hidden: true }, { key: "region", label: "Region", hidden: true },
     { key: "lt", label: "Format", tip: "Location type: High street (HS) or Mall" }, { key: "ct", label: "City type" },
     ...(one ? [] : [{ key: "live", label: "Live cats", tip: "In-scope categories live in the store: stock on the latest store report or a sale in the last 60 days" } as Col, { key: "notLive", label: "Not live", hidden: true } as Col]),
@@ -54,7 +64,7 @@ export function StoresTab({ ctx, model }: { ctx: Ctx; model: StoreModel }) {
   return (
     <>
       <Notice>Achievement, projection and ranking count only <b>live</b> store × category cells (stock on the latest store report or a sale in the last 60 days). Click a store for its category mix, inventory and products.</Notice>
-      <DataTable title={one ? `Stores where ${catLabel(one)} is live` : "Stores with a live long-tail category"} rows={liveRows} columns={cols} rowHref="/stores/{b}" defaultSort={{ key: "revenue" }}
+      <DataTable key={meta?.label ?? "all"} title={one ? `Stores where ${catLabel(one)} is live` : "Stores with a live long-tail category"} rows={liveRows} columns={cols} rowHref="/stores/{b}" defaultSort={{ key: meta ? "mRev" : "revenue" }}
         csvName={`stores-${ctx.period.range.from}-${ctx.period.range.to}`} searchKeys={["store", "city", "state", "region", "b", "lt", "ct", "am"]} height={640}
         totals={sumT(model.stores.filter((s) => liveSet.has(s.b)))} />
       {notLiveRows.length > 0 && (

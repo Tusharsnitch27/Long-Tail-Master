@@ -5,6 +5,7 @@ import { channelMetrics, channelSeries, marketplaceBreakdown, marketplacesWithDa
 import { buildActions, actionStatuses } from "@/server/actions";
 import { catColor, catLabel } from "@/server/views";
 import { PageHeader, Tabs, Kpi, KpiGrid, Section, Delta, Meter, ProductCell, DataPrompt, Pill, achTone } from "@/components/ui";
+import { ChartDownload } from "@/components/charts/ChartDownload";
 import { DailyTargetChart } from "@/components/charts/DailyTargetChart";
 import { SkuTabs } from "@/components/SkuTabs";
 import { computePlan, dailyTarget } from "@/server/plan";
@@ -55,10 +56,9 @@ export async function ChannelDetail({ ctx: base, channel }: { ctx: Ctx; channel:
     { key: "name", label: "Product", image: "image", sub: "sku", width: 250 }, { key: "category", label: "Category" },
     { key: "revenue", label: "Revenue", type: "inr", bar: true }, { key: "units", label: "Units", type: "num" }, { key: "growth", label: "Growth", type: "delta" },
     { key: "returnPct", label: "Return %", type: "pct", tip: `Lifetime ${channel} return % (returned ₹ ÷ sold ₹)` },
-    { key: "whInv", label: "Warehouse", type: "num" }, { key: "doi", label: "Days of inventory", type: "num", tip: "(store + warehouse) ÷ L30 daily units, all channels" },
+    { key: "storeInv", label: "Store stock", type: "num" }, { key: "whInv", label: "Warehouse", type: "num" }, { key: "doi", label: "Days of inventory", type: "num", tip: "(store + warehouse) ÷ L30 daily units, all channels" },
   ];
   const highRet = [...sc.products].filter((x) => (x.sales[channel] ?? 0) >= 100_000 && x.returnPct[channel] != null).sort((a, b) => (b.returnPct[channel] ?? 0) - (a.returnPct[channel] ?? 0)).slice(0, 6);
-  const avail = rows.filter((r) => r.units > 0).slice(0, 8);
   const risk = act.actions.filter((a) => (a.type === "channel_decline" && (channel === "online" ? a.key.includes(":online:") : a.key.includes(":marketplace:") || (mps.some((x) => a.key.includes(`:${x}:`)) && (!mp || a.key.includes(`:${mp}:`))))) || (a.type === "return_risk" && a.key.startsWith(`ret:${channel}:`)));
   const tabsMp = channel === "marketplace" && mps.length > 1
     ? <Tabs active={mp ?? "all"} tabs={[{ key: "all", label: "All marketplaces", href: withQs(base, "/marketplace", { mp: null }) }, ...mps.map((x) => ({ key: x, label: x[0] + x.slice(1).toLowerCase(), href: withQs(base, "/marketplace", { mp: x }) }))]} /> : null;
@@ -70,7 +70,7 @@ export async function ChannelDetail({ ctx: base, channel }: { ctx: Ctx; channel:
     return { c, wh, north, l30, cover: l30 > 0 ? wh / (l30 / 30) : null };
   });
   const oos = perf.rows.filter((r) => r.l30Units >= 5 && r.whInv <= 0).sort((a, b) => b.l30Units - a.l30Units);
-  const topTabs = ctx.filters.cats.map((c) => ({ key: c, label: catLabel(c), color: catColor(c), rows: perf.rows.filter((r) => r.category === c && r.units > 0).slice(0, 10).map((r) => ({ sku: r.sku, name: r.name, image: r.image, revenue: r.revenue, units: r.units, growth: r.growth, note: `${num(r.whInv)} in WH`, tone: r.whInv <= 0 ? ("bad" as const) : null })) }));
+  const topTabs = ctx.filters.cats.map((c) => ({ key: c, label: catLabel(c), color: catColor(c), rows: perf.rows.filter((r) => r.category === c && r.units > 0).slice(0, 10).map((r) => ({ sku: r.sku, name: r.name, image: r.image, revenue: r.revenue, units: r.units, growth: r.growth, note: `${num(r.whInv)} WH (S ${num(sc.wh.bySku.get(r.sku)?.byZone.South ?? 0)} · N ${num(sc.wh.bySku.get(r.sku)?.byZone.North ?? 0)}) · ${num(r.storeInv ?? 0)} store${r.doi != null ? ` · ${num(r.doi)}d cover` : ""}`, tone: r.whInv <= 0 ? ("bad" as const) : null })) }));
   // marketplace-only blocks
   const bd = channel === "marketplace" ? marketplaceBreakdown(sc.uc, range, compare) : [];
   const onlineStrong = channel === "marketplace" ? (await productPerformance(ctx, sc.pm, whUnits, "online", null)).rows.slice(0, 30) : [];
@@ -110,8 +110,8 @@ export async function ChannelDetail({ ctx: base, channel }: { ctx: Ctx; channel:
         </div>
       )}
       <div className="mt-3 grid gap-3 xl:grid-cols-[1.6fr_1fr]">
-        <Section title={`${label} · daily revenue vs target · last 30 days`} tip="Bars coloured by achievement of the day's phased target"><DailyTargetChart data={daily} height={220} /></Section>
-        <Section title="Category performance">
+        <Section title={`${label} · daily revenue vs target · last 30 days`} tip="Bars coloured by achievement of the day's phased target"><DailyTargetChart name={`${label}-daily-revenue-vs-target`} data={daily} height={220} /></Section>
+        <Section title="Category performance" right={<ChartDownload name={`${label}-category-performance`} data={cats.map((r) => ({ category: catLabel(r.c), revenue: r.revenue, share: r.share, growth: r.growth, units: r.units }))} columns={[{ key: "category", label: "Category" }, { key: "revenue", label: "Revenue" }, { key: "share", label: "Share" }, { key: "growth", label: "Growth" }, { key: "units", label: "Units" }]} />}>
           <div className="space-y-3">{cats.map((r) => (
             <div key={r.c}>
               <div className="flex items-baseline justify-between text-[12.5px]"><span className="flex items-center gap-2 font-medium"><span className="size-2 rounded-full" style={{ background: catColor(r.c) }} />{catLabel(r.c)}</span><span className="tabular font-semibold">{inr(r.revenue)}</span></div>
@@ -120,25 +120,8 @@ export async function ChannelDetail({ ctx: base, channel }: { ctx: Ctx; channel:
           ))}</div>
         </Section>
       </div>
-      <div className="mt-3 grid gap-3 xl:grid-cols-3">
-        <Section title="Top products">
-          <ul className="space-y-1.5">{rows.slice(0, 6).map((r) => (
-            <li key={r.sku} className="flex items-center justify-between gap-2"><ProductCell name={r.name} sku={r.sku} image={r.image} href={withQs(base, `/products/${encodeURIComponent(r.sku)}`)} /><span className="tabular shrink-0 text-right text-[12px]"><b className="font-semibold">{inr(r.revenue)}</b><Delta v={r.growth} className="block text-[11px]" /></span></li>
-          ))}</ul>
-        </Section>
-        <Section title="High-return products" tip={`Lifetime ${channel} return %, products with ≥ ₹1L lifetime ${channel} sales`}>
-          <ul className="space-y-1.5">{highRet.map((x) => (
-            <li key={x.sku} className="flex items-center justify-between gap-2"><ProductCell name={x.name} sku={x.sku} image={x.image} href={withQs(base, `/products/${encodeURIComponent(x.sku)}`)} /><span className="tabular shrink-0 text-right text-[12px]"><b className="font-semibold text-rose-600">{pct(x.returnPct[channel])}</b><span className="block text-[11px] text-zinc-500">{inr(x.sales[channel])} sold</span></span></li>
-          ))}</ul>
-        </Section>
-        <Section title="Inventory availability" tip="Warehouse stock and days of cover for the top sellers">
-          <ul className="space-y-1.5">{avail.map((r) => (
-            <li key={r.sku} className="flex items-center justify-between gap-2"><ProductCell name={r.name} sku={r.sku} image={r.image} href={withQs(base, `/products/${encodeURIComponent(r.sku)}`)} /><span className="tabular shrink-0 text-right text-[12px]"><b className="font-semibold">{num(r.whInv)}</b> WH<span className={`block text-[11px] ${r.doi != null && r.doi < 14 ? "font-semibold text-rose-600" : "text-zinc-500"}`}>{r.doi != null ? `${num(r.doi)} days` : "—"}</span></span></li>
-          ))}</ul>
-        </Section>
-      </div>
-      {(risk.length > 0 || listing.length > 0) && (
-        <div className="mt-3 grid gap-3 xl:grid-cols-2">
+      {(
+        <div className={`mt-3 grid gap-3 ${channel === "marketplace" ? "xl:grid-cols-3" : "xl:grid-cols-2"}`}>
           <Section title="Risks">
             <div className="space-y-2">{risk.length ? risk.slice(0, 4).map((a) => <ActionCard key={a.key} a={a} compact qs={base.qs} status={statuses.get(a.key)} />) : <div className="py-4 text-center text-[12.5px] text-zinc-500">No material risks.</div>}</div>
           </Section>
@@ -149,6 +132,11 @@ export async function ChannelDetail({ ctx: base, channel }: { ctx: Ctx; channel:
               ))}</ul> : <div className="py-4 text-center text-[12.5px] text-zinc-500">No clear listing gaps.</div>}
             </Section>
           )}
+            <Section title="High-return products" tip={`Lifetime ${channel} return %, products with ≥ ₹1L lifetime ${channel} sales`}>
+          <ul className="space-y-1.5">{highRet.map((x) => (
+            <li key={x.sku} className="flex items-center justify-between gap-2"><ProductCell name={x.name} sku={x.sku} image={x.image} href={withQs(base, `/products/${encodeURIComponent(x.sku)}`)} /><span className="tabular shrink-0 text-right text-[12px]"><b className="font-semibold text-rose-600">{pct(x.returnPct[channel])}</b><span className="block text-[11px] text-zinc-500">{inr(x.sales[channel])} sold</span></span></li>
+          ))}</ul>
+          </Section>
         </div>
       )}
       <div className="mt-3 grid gap-3 xl:grid-cols-[1fr_1.3fr]">

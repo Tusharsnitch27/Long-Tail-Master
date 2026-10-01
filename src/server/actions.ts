@@ -10,6 +10,8 @@ import { getChannelSku, getChannelDaily } from "./data/channels";
 import { getProductMap, type Product } from "./data/products";
 import { getWarehouseStock } from "./data/warehouse";
 import { getStoreInventory, getStoreInventoryCoverage, catKey } from "./data/inventory";
+import { getRecentInwards } from "./data/metafields";
+import { PRODUCT_TAGS, type ProductTag } from "@/lib/productTags";
 import { getTargetBook } from "./data/targetBook";
 import { effectiveRemarks, remarksSig, type Remark, type RemarkKind, type RemarkScope } from "./data/remarks";
 import { computePlan } from "./plan";
@@ -24,7 +26,7 @@ import { CH_LABEL, ucChannel, type ChKey } from "./channelData";
  * OR sold it in the last 60 days — and no "not applicable" remark says otherwise. Store actions (recovery, category gap,
  * idle stock, allocation) only target live pairs; not-live pairs get expansion / distribution suggestions instead.
  */
-export type ActionGroup = "channel" | "store" | "sku" | "merchandising";
+export type ActionGroup = "channel" | "store" | "sku" | "merchandising" | "marketing";
 export type Priority = "urgent" | "high" | "medium";
 export interface TeamNote { id: number; text: string; by: string; at: string; kind: RemarkKind; scope: RemarkScope; day: string | null; until: string | null }
 export interface Action {
@@ -64,6 +66,8 @@ export const RULES = {
   idleSellThroughRatio: 0.3, idleMinUnits: 15,
   catGapRatio: 0.4,
   liveDays: 60, expansionMinLiveShare: 0.2, expansionPerCategory: 6, expansionMinWarehouse: 30,
+  // marketing boosts: stock is there, demand needs a push (never a discount prescription)
+  boostInwardDays: 30, boostInwardMinQty: 50, boostInwardMinCover: 45, boostOnlineMinL30: 5, boostOnlineCoverDays: 60, boostOnlineMinWh: 50, boostSlowRatio: 0.75, boostSlowMinPrev: 30,
 };
 
 const inr = (v: number) => (Math.abs(v) >= 1e7 ? `₹${(v / 1e7).toFixed(2)} Cr` : Math.abs(v) >= 1e5 ? `₹${(v / 1e5).toFixed(1)} L` : Math.abs(v) >= 1e3 ? `₹${(v / 1e3).toFixed(1)}K` : `₹${Math.round(v)}`);
@@ -82,11 +86,11 @@ export interface ActionsResult {
 
 export async function buildActions(ctx: Ctx): Promise<ActionsResult> {
   const remarks = await effectiveRemarks(ctx.today).catch(() => [] as Remark[]);
-  const key = `actions:v10:${ctx.asOf}:${ctx.filters.cats.join(",")}:${remarksSig(remarks)}`;
+  const key = `actions:v12:${ctx.asOf}:${ctx.filters.cats.join(",")}:${remarksSig(remarks)}`;
   return cached(key, 600, () => compute(ctx, remarks));
 }
 
-const note = (r: Remark): TeamNote => ({ id: r.id, text: r.text, by: r.created_by, at: r.created_at, kind: r.kind, scope: r.scope, day: r.day, until: r.until });
+const note = (r: Remark): TeamNote => ({ id: r.id, text: r.tag && r.tag in PRODUCT_TAGS ? `${PRODUCT_TAGS[r.tag as ProductTag].label}${r.text && r.text !== PRODUCT_TAGS[r.tag as ProductTag].label ? ` — ${r.text}` : ""}` : r.text, by: r.created_by, at: r.created_at, kind: r.kind, scope: r.scope, day: r.day, until: r.until });
 /** action key without its trailing date/month, so snoozes and notes carry over to the same action on later days */
 const baseKey = (k: string) => k.replace(/:\d{4}-\d{2}(-\d{2})?$/, "");
 
@@ -107,6 +111,7 @@ async function compute(ctx: Ctx, remarks: Remark[]): Promise<ActionsResult> {
     getStoreInventoryCoverage(),
     getTargetBook(month).catch(() => null),
   ]);
+  const inwards = await getRecentInwards(RULES.boostInwardDays).catch(() => [] as Awaited<ReturnType<typeof getRecentInwards>>);
   // store × SKU sales keyed to branch codes (CHANNEL = store name)
   const storeSku = storeSkuRaw.map((f) => { const st = ctx.byName.get(f.ch.toUpperCase()); return { ...f, b: st?.branch_code ?? null, store: st?.short_name ?? f.ch.replace(/^SNITCH\s*-\s*/i, "") }; });
   const known = new Set(pm.keys());
@@ -303,6 +308,52 @@ async function compute(ctx: Ctx, remarks: Remark[]): Promise<ActionsResult> {
         impact: lost, impactLabel: `${inr(lost)} less in 30 days`, confidence: e.p30 >= 100 ? "high" : "medium", period: { from: p30.from, to: a },
         evidence: [{ label: "L30 units", value: num(e.l30) }, { label: "Prior 30", value: num(e.p30) }, { label: "L7 / prior 7", value: `${num(e.l7)} / ${num(e.p7)}` }, { label: "Stock (store + WH)", value: num(stock) }],
       });
+    }
+  }
+
+  /* ---------------- MARKETING: stock is available, so demand is the lever (one boost per product) */
+  const inw = new Map<string, { qty: number; last: string; wh: string[] }>();
+  for (const r of inwards) { const s = r.sku.toUpperCase(); const e = inw.get(s) ?? { qty: 0, last: r.last, wh: [] }; e.qty += r.qty; if (r.last > e.last) e.last = r.last; e.wh.push(r.wh); inw.set(s, e); }
+  const boostRec = "Boost visibility: homepage / collection placement, paid social and search ads, CRM (email · WhatsApp), marketplace sponsored listings, and store window / VM. Promotions only where business rules allow.";
+  for (const sku of new Set([...vel.keys(), ...inw.keys()])) {
+    const p = pm.get(sku);
+    if (!p?.category || !cats.has(p.category) || isGift(sku)) continue;
+    const e = vel.get(sku) ?? { l7: 0, p7: 0, l30: 0, p30: 0, rev30: 0, storeCount: 0, bySource: { stores: 0, online: 0, marketplace: 0 } };
+    const wu = whUnits(sku), su = p.invOffline ?? 0, stock = wu + su;
+    const asp = safeDiv(e.rev30, e.l30) ?? p.sellingPrice ?? p.mrp ?? 0;
+    const zone = wh.bySku.get(sku)?.byZone;
+    const base = { group: "marketing" as const, category: p.category, product: prodRef(p, sku), period: l30.range,
+      links: [{ label: "View product", href: `/products/${encodeURIComponent(sku)}` }] };
+    const stockEv = [{ label: "Warehouse", value: `${num(wu)}${zone ? ` (S ${num(zone.South)} · N ${num(zone.North)})` : ""}` }, { label: "Store stock", value: num(su) }];
+    const ni = inw.get(sku);
+    const ni7 = e.l7 / 7, niCover = ni7 > 0 ? stock / ni7 : null;
+    // a new inward that is already selling through quickly needs no push
+    if (ni && ni.qty >= RULES.boostInwardMinQty && wu >= RULES.distMinWarehouse && (niCover == null || niCover >= RULES.boostInwardMinCover)) {
+      const perDay = ni7, cover = niCover;
+      const value = Math.min(ni.qty, wu) * asp * 0.25;
+      actions.push({ ...base, key: `mkt-new:${sku}:${ni.last}`, type: "boost_new_inward", typeLabel: "New inward — launch push", priority: ni.qty >= 300 ? "high" : "medium",
+        title: `${p.name ?? sku}: ${num(ni.qty)} new units landed ${fmtDate(ni.last)}`, reason: `New inward in the last ${RULES.boostInwardDays} days; selling ${perDay.toFixed(1)}/day in the last 7 days${cover != null ? ` — ${Math.round(cover)} days of cover at that pace` : " — no sales yet"}.`,
+        recommendation: `Feature it as a new arrival. ${boostRec}`, impact: value, impactLabel: `≈${inr(value)} if a quarter of the inward sells through faster (estimate)`, confidence: "medium",
+        evidence: [{ label: "Inward qty", value: num(ni.qty) }, { label: "Last inward", value: fmtDate(ni.last) }, ...stockEv, { label: "L7 units", value: num(e.l7) }] });
+      continue;
+    }
+    if (e.p30 >= RULES.boostSlowMinPrev && e.l30 <= e.p30 * RULES.boostSlowRatio && stock >= e.p30) {
+      const lost = (e.p30 - e.l30) * asp;
+      actions.push({ ...base, key: `mkt-slow:${sku}`, type: "boost_paced_down", typeLabel: "Paced down, stock available", priority: lost >= 200_000 ? "high" : "medium",
+        title: `${p.name ?? sku}: ${num(e.l30)} sold in 30 days vs ${num(e.p30)} before, ${num(stock)} in stock`, reason: `Was selling ${(e.p30 / 30).toFixed(1)}/day, now ${(e.l30 / 30).toFixed(1)}/day (${sp(growth(e.l30, e.p30))}), with enough stock for ${Math.round(stock / Math.max(e.p30 / 30, 0.1))} days at the earlier pace — availability is not the constraint.`,
+        recommendation: `Re-boost a proven seller. ${boostRec}`, impact: lost, impactLabel: `${inr(lost)} / 30 days back if it returns to the earlier pace`, confidence: e.p30 >= 100 ? "high" : "medium",
+        evidence: [{ label: "L30 units", value: num(e.l30) }, { label: "Prior 30", value: num(e.p30) }, { label: "L7 / prior 7", value: `${num(e.l7)} / ${num(e.p7)}` }, ...stockEv] });
+      continue;
+    }
+    const onlineRev = e.bySource.online + e.bySource.marketplace;
+    const onlineUnits = asp > 0 ? onlineRev / asp : 0;
+    const whCover = onlineUnits > 0 ? wu / (onlineUnits / 30) : null;
+    if (onlineUnits >= RULES.boostOnlineMinL30 && wu >= RULES.boostOnlineMinWh && whCover != null && whCover >= RULES.boostOnlineCoverDays) {
+      const value = onlineRev * 0.3;
+      actions.push({ ...base, key: `mkt-online:${sku}`, type: "boost_online_stock", typeLabel: "Online inventory to push", priority: value >= 150_000 ? "high" : "medium",
+        title: `${p.name ?? sku}: ${num(wu)} units in the warehouse, ${Math.round(whCover)} days of online cover`, reason: `Sells online (${inr(onlineRev)} in L30 across Online + Marketplace) and the warehouse holds far more than online demand needs.`,
+        recommendation: `Scale online demand. ${boostRec}`, impact: value, impactLabel: `≈${inr(value)} / month at +30% online sales (estimate)`, confidence: "medium",
+        evidence: [{ label: "Online L30", value: inr(e.bySource.online) }, { label: "Marketplace L30", value: inr(e.bySource.marketplace) }, ...stockEv, { label: "Online cover", value: `${Math.round(whCover)} days` }] });
     }
   }
 
@@ -544,7 +595,13 @@ function applies(r: Remark, x: Action, cats: Set<string>): "hide" | "note" | nul
       // same action family on another day/month: snoozes and notes carry over, "not applicable" stays exact
       if (r.scope_id && baseKey(r.scope_id) === baseKey(x.key) && r.kind !== "not_applicable") return hides ? "hide" : "note";
       return null;
-    case "product": return x.product?.sku === r.scope_id ? (hides ? "hide" : "note") : null;
+    case "product": {
+      if (x.product?.sku !== r.scope_id) return null;
+      // tagged product remarks (e.g. "not to be sent to stores") hide only the action types they contradict
+      const tag = r.tag && r.tag in PRODUCT_TAGS ? PRODUCT_TAGS[r.tag as ProductTag] : null;
+      if (tag) return (tag.hides as readonly string[]).includes(x.type) ? "hide" : "note";
+      return hides ? "hide" : "note";
+    }
     case "store": return x.store?.code === r.scope_id ? (hides ? "hide" : "note") : null;
     case "store_category":
       if (x.store?.code !== r.scope_id) return null;
@@ -579,7 +636,7 @@ function applyRemarks(actions: Action[], remarks: Remark[], cats: Set<string>) {
   return { visible, hidden };
 }
 
-export const GROUP_LABEL: Record<ActionGroup, string> = { channel: "Channel", store: "Stores", sku: "SKU", merchandising: "Merchandising" };
+export const GROUP_LABEL: Record<ActionGroup, string> = { channel: "Channel", store: "Stores", sku: "SKU", merchandising: "Merchandising", marketing: "Marketing" };
 
 /** Status the team set on actions (open / done / dismissed). */
 export async function actionStatuses(): Promise<Map<string, string>> {

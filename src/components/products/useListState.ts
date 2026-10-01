@@ -38,4 +38,4 @@ export function useListState(o: { facets: string[]; defaultSort?: { key: string;
 }
 
 /** Page-local params that must not travel to a detail link. */
-export const LOCAL_PARAMS = ["q", "sort", "view"];
+export const LOCAL_PARAMS = ["q", "sort", "view", "f"];

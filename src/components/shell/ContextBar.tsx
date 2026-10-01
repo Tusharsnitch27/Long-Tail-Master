@@ -20,12 +20,13 @@ const PERIODS = [
 ];
 const CHANNELS = [{ key: "all", label: "Overall" }, { key: "stores", label: "Stores" }, { key: "online", label: "Online" }, { key: "marketplace", label: "Marketplace" }];
 
-function Seg({ items, value, onChange }: { items: { key: string; label: string }[]; value: string; onChange: (k: string) => void }) {
+function Seg({ items, value, onChange, label }: { items: { key: string; label: string }[]; value: string; onChange: (k: string) => void; label?: string }) {
   return (
-    <div className="flex h-8 items-center gap-0.5 rounded-lg border border-line bg-paper p-0.5">
+    <div className="flex h-9 items-center gap-0.5 rounded-xl border border-zinc-300 bg-white p-0.5 shadow-[0_1px_2px_rgba(60,40,20,.06)]">
+      {label && <span className="px-2 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-brand-600">{label}</span>}
       {items.map((i) => (
         <button key={i.key} onClick={() => onChange(i.key)}
-          className={cn("h-full whitespace-nowrap rounded-md px-2.5 text-[12.5px] transition-colors", value === i.key ? "bg-brand-900 font-medium text-canvas" : "text-zinc-600 hover:bg-brand-50 hover:text-ink")}>
+          className={cn("h-full whitespace-nowrap rounded-lg px-2.5 text-[12.5px] transition-colors", value === i.key ? "bg-brand-900 font-medium text-canvas shadow-sm" : "text-zinc-700 hover:bg-brand-50 hover:text-ink")}>
           {i.label}
         </button>
       ))}
@@ -45,8 +46,8 @@ function Dropdown({ label, value, items, onChange }: { label: string; value: str
   const cur = items.find((i) => i.key === value) ?? items[0];
   return (
     <div className="relative" ref={ref}>
-      <button onClick={() => setOpen((o) => !o)} className="flex h-8 items-center gap-2 rounded-lg border border-line bg-paper px-2.5 text-[12.5px] hover:border-zinc-300">
-        <span className="text-zinc-500">{label}</span>
+      <button onClick={() => setOpen((o) => !o)} className={cn("flex h-9 items-center gap-2 rounded-xl border px-3 text-[12.5px] shadow-[0_1px_2px_rgba(60,40,20,.06)] transition-colors", value !== items[0]?.key ? "border-brand-500 bg-brand-50 ring-2 ring-brand-500/15" : "border-zinc-300 bg-white hover:border-brand-400")}>
+        <span className="text-[9.5px] font-semibold uppercase tracking-[0.16em] text-brand-600">{label}</span>
         {cur?.color && <span className="size-2 rounded-full" style={{ background: cur.color }} />}
         <span className="font-medium">{cur?.label}</span>
         <ChevronDown className="size-3.5 text-zinc-400" />
@@ -77,7 +78,7 @@ export function ContextBar({ options }: { options: ContextOptions }) {
   const show = scope.category || scope.period || scope.channel;
 
   return (
-    <div className="sticky top-0 z-30 border-b border-line bg-canvas/85 backdrop-blur-md">
+    <div className="sticky top-0 z-30 border-b border-line bg-[#efe5d8]/90 shadow-[0_6px_18px_-14px_rgba(60,40,20,.45)] backdrop-blur-md">
       <div className={cn("h-px w-full bg-brand-500 transition-opacity", pending ? "animate-pulse opacity-100" : "opacity-0")} />
       <div className="flex flex-wrap items-center gap-2 px-6 py-2.5">
         {scope.category && (
@@ -86,9 +87,9 @@ export function ContextBar({ options }: { options: ContextOptions }) {
         )}
         {scope.period && (
           <>
-            <Seg items={[...PERIODS, { key: "custom", label: "Custom" }]} value={p} onChange={(k) => set(k === "custom" ? { p: "custom", from: sp.get("from") ?? options.asOf, to: sp.get("to") ?? options.asOf } : { p: k === "mtd" ? null : k, from: null, to: null })} />
+            <Seg label="Period" items={[...PERIODS, { key: "custom", label: "Custom" }]} value={p} onChange={(k) => set(k === "custom" ? { p: "custom", from: sp.get("from") ?? options.asOf, to: sp.get("to") ?? options.asOf } : { p: k === "mtd" ? null : k, from: null, to: null })} />
             {custom && (
-              <div className="flex h-8 items-center gap-1 rounded-lg border border-line bg-white px-2 text-[12.5px]">
+              <div className="flex h-9 items-center gap-1 rounded-xl border border-brand-500 bg-white px-2.5 text-[12.5px] ring-2 ring-brand-500/15">
                 <CalendarDays className="size-3.5 text-zinc-400" />
                 <input type="date" max={options.today} value={sp.get("from") ?? ""} onChange={(e) => set({ p: "custom", from: e.target.value })} className="bg-transparent outline-none" />
                 <span className="text-zinc-400">→</span>
@@ -99,9 +100,9 @@ export function ContextBar({ options }: { options: ContextOptions }) {
         )}
         {scope.channel && (
           <>
-            <Seg items={CHANNELS} value={ch} onChange={(k) => set({ ch: k === "all" ? null : k, mp: null })} />
+            <Seg label="Channel" items={CHANNELS} value={ch} onChange={(k) => set({ ch: k === "all" ? null : k, mp: null })} />
             {ch === "marketplace" && (options.marketplaces[cat] ?? []).length > 1 && (
-              <Seg items={[{ key: "", label: "All" }, ...(options.marketplaces[cat] ?? []).map((m) => ({ key: m, label: m[0] + m.slice(1).toLowerCase() }))]} value={mp} onChange={(k) => set({ mp: k || null })} />
+              <Seg label="Marketplace" items={[{ key: "", label: "All" }, ...(options.marketplaces[cat] ?? []).map((m) => ({ key: m, label: m[0] + m.slice(1).toLowerCase() }))]} value={mp} onChange={(k) => set({ mp: k || null })} />
             )}
           </>
         )}

@@ -29,6 +29,12 @@ async function identify(): Promise<string | null> {
   return session?.username.toLowerCase() ?? null;
 }
 
+/** When the signed-in session expires (epoch seconds); null in dev auth. */
+export async function sessionExpiry(): Promise<number | null> {
+  if (process.env.AUTH_MODE === "dev") return null;
+  return (await readSession((await cookies()).get(SESSION_COOKIE)?.value))?.exp ?? null;
+}
+
 /** Current user; re-checked every minute so disabling a user or changing a role takes effect without waiting for session expiry. */
 export async function getUser(): Promise<User | null> {
   const username = await identify();

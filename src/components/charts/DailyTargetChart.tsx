@@ -2,13 +2,14 @@
 import { Bar, CartesianGrid, Cell, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { inr, pct, num } from "@/lib/format";
 import { fmtDate, weekday } from "@/lib/dates";
+import { ChartDownload } from "./ChartDownload";
 
 export interface DailyRow { date: string; actual: number; target: number | null; units?: number; lw?: number | null }
 
 const color = (a: number | null, target: number | null) => (target == null || !target ? "#c08f60" : a == null ? "#b8a894" : a >= 0.95 ? "#15803d" : a >= 0.8 ? "#d97706" : "#dc2626");
 
 /** Daily actual vs target: bars coloured by achievement (green ≥95%, amber ≥80%, red below), target as a dashed line. */
-export function DailyTargetChart({ data, height = 260, showLw = true }: { data: DailyRow[]; height?: number; showLw?: boolean }) {
+export function DailyTargetChart({ data, height = 260, showLw = true, name = "daily-revenue-vs-target" }: { data: DailyRow[]; height?: number; showLw?: boolean; name?: string }) {
   const rows = data.map((d) => ({ ...d, ach: d.target ? d.actual / d.target : null }));
   const hasT = rows.some((r) => r.target != null);
   return (
@@ -21,6 +22,7 @@ export function DailyTargetChart({ data, height = 260, showLw = true }: { data: 
           <span className="flex items-center gap-1"><i className="h-0 w-3 border-t-2 border-dashed border-[#1b1712]" />Target</span>
         </>) : <span className="flex items-center gap-1"><i className="size-2 rounded-sm bg-[#c08f60]" />Revenue (no target set)</span>}
         {showLw && rows.some((r) => r.lw != null) && <span className="flex items-center gap-1"><i className="h-0 w-3 border-t-2 border-[#e2c9a6]" />Same day last week</span>}
+        <ChartDownload className="ml-auto" name={name} data={rows} columns={[{ key: "date", label: "Date" }, { key: "actual", label: "Revenue" }, { key: "target", label: "Target" }, { key: "ach", label: "Achievement" }, ...(rows.some((r) => r.units != null) ? [{ key: "units", label: "Units" }] : []), ...(showLw ? [{ key: "lw", label: "Same day last week" }] : [])]} />
       </div>
       <div style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">

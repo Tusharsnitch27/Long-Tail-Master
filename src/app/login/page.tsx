@@ -12,7 +12,7 @@ const ERRORS: Record<string, string> = {
   missing: "Enter your username and password.",
   locked: "Too many failed attempts. Try again in 15 minutes.",
   denied: "Your account has been disabled. Contact an admin.",
-  session: "Your session has expired. Sign in again.",
+  session: "Sessions last 8 hours. Sign in again to continue.",
   server: "Sign-in is temporarily unavailable. Try again.",
 };
 

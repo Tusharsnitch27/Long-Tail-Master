@@ -76,7 +76,7 @@ export function StoreTargetEditor({ month, cat, catLabel, cats, rows, categoryTa
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 px-4 py-2.5">
-        <span className="flex h-8 items-center gap-1.5 rounded-lg border border-line px-2"><Search className="size-3.5 text-zinc-400" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search store, city, state" className="w-48 text-[12.5px] outline-none" /></span>
+        <span className="flex h-8 items-center gap-1.5 rounded-lg border border-zinc-300 px-2"><Search className="size-3.5 text-zinc-400" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search store, city, state" className="w-48 text-[12.5px] outline-none" /></span>
         <span className="text-[11.5px] text-zinc-500">{rows.filter((r) => r.live).length} stores where {catLabel} is live · targets in ₹</span>
         <div className="ml-auto flex gap-1.5">
           <button onClick={() => downloadCsv(`store-targets-${cat}-${month.slice(0, 7)}.csv`, [["branch_code", "store", "state", "category", "month", "target"], ...rows.map((r) => [r.branch_code, r.store, r.state, catLabel, month.slice(0, 7), val(r) ?? (uploadedAny ? "" : Math.round(r.snowflake))])])} className="flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[12px] text-zinc-600 hover:border-brand-300"><Download className="size-3.5" />Template / export</button>
@@ -93,7 +93,7 @@ export function StoreTargetEditor({ month, cat, catLabel, cats, rows, categoryTa
               <td className="px-4 text-zinc-600">{r.state ?? "—"}</td>
               <td className="px-4">{r.live ? <span className="text-emerald-700">●</span> : <span className="text-zinc-300" title="No stock or sales of this category in the last 60 days">○</span>}</td>
               <td className="tabular px-4 text-right text-zinc-500">{r.snowflake ? inr(r.snowflake) : "—"}</td>
-              <td className="px-4 text-right">{readOnly ? inr(val(r)) : <input value={r.branch_code in edit ? edit[r.branch_code] : r.uploaded ?? ""} onChange={(e) => setEdit((s) => ({ ...s, [r.branch_code]: e.target.value }))} placeholder="—" inputMode="numeric" className={cn("tabular h-7 w-28 rounded-md border px-2 text-right outline-none focus:border-brand-500", r.branch_code in edit ? "border-brand-500 bg-brand-50" : "border-line")} />}</td>
+              <td className="px-4 text-right">{readOnly ? inr(val(r)) : <input value={r.branch_code in edit ? edit[r.branch_code] : r.uploaded ?? ""} onChange={(e) => setEdit((s) => ({ ...s, [r.branch_code]: e.target.value }))} placeholder="—" inputMode="numeric" className={cn("tabular h-7 w-28 rounded-md border px-2 text-right outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20", r.branch_code in edit ? "border-brand-500 bg-brand-50" : "border-zinc-300")} />}</td>
               <td className="tabular px-4 text-right">{inr(r.mtd)}</td>
             </tr>
           ))}</tbody>

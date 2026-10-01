@@ -664,12 +664,12 @@ const getTeamRemarks = def({
       if (r.scope === "date" && r.day && ((i.from && r.day < i.from) || (i.to && r.day > i.to))) return false;
       return true;
     }).map((r) => ({
-      key: String(r.id), kind: r.kind, scope: r.scope, label: r.text,
+      key: String(r.id), kind: r.kind, scope: r.scope, label: r.text, tag: r.tag,
       store: r.scope === "store" || r.scope === "store_category" ? b.byCode.get(r.scope_id ?? "")?.short_name ?? r.scope_id : null,
       branch_code: r.scope === "store" || r.scope === "store_category" ? r.scope_id : null,
       category: r.category ? catLabel(r.category) : null, sku: r.scope === "product" ? r.scope_id : null, action_key: r.action_key,
       day: r.day, snoozed_until: r.kind === "snooze" ? r.until : null, by: r.created_by, at: r.created_at,
-      effect: r.kind === "not_applicable" ? (r.scope === "store_category" ? "category treated as NOT live in this store; its store actions are hidden" : "matching actions hidden")
+      effect: r.tag ? `product tag "${r.tag}": hides the actions it contradicts for this SKU` : r.kind === "not_applicable" ? (r.scope === "store_category" ? "category treated as NOT live in this store; its store actions are hidden" : "matching actions hidden")
         : r.kind === "snooze" ? `matching actions hidden until ${r.until}` : r.scope === "date" ? "anomaly day: excluded from week-on-week baselines; mention it when comparing periods that include it" : "context note shown on matching actions",
     }));
     return { tool: "get_team_remarks", description: "Active team remarks", filters: { categories: i.categories, branch_codes: i.branch_codes, skus: i.skus, from: i.from, to: i.to }, as_of: b.today, source: "remarks (Action Centre, Postgres)",

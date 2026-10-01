@@ -84,7 +84,7 @@ export function SplitEditor({ month, days, states, saved, suggested, recommended
           {(["stores", "online", "marketplace"] as Ch[]).map((c) => <button key={c} onClick={() => { setCh(c); if (c !== "stores") setState("*"); }} className={cn("rounded-md px-2.5 py-1 text-[12.5px] capitalize", ch === c ? "bg-brand-900 font-medium text-white" : "text-zinc-600 hover:bg-brand-50")}>{c}</button>)}
         </div>
         {ch === "stores" && (
-          <select value={state} onChange={(e) => setState(e.target.value)} className="h-8 rounded-lg border border-line bg-white px-2 text-[12.5px]">
+          <select value={state} onChange={(e) => setState(e.target.value)} className="h-8 rounded-lg border border-zinc-300 bg-white px-2 text-[12.5px]">
             <option value="*">All India (default)</option>
             {states.map((s) => <option key={s} value={s.toUpperCase()}>{s}{saved[`stores|${s.toUpperCase()}`] ? " · custom" : ""}</option>)}
           </select>

@@ -7,7 +7,7 @@ import { ActionCard } from "@/components/ActionCard";
 
 type View = "open" | "closed" | "hidden";
 const GROUPS: { k: "all" | "urgent" | ActionGroup; label: string }[] = [
-  { k: "all", label: "All" }, { k: "urgent", label: "Urgent" }, { k: "channel", label: "Channel" }, { k: "store", label: "Stores" }, { k: "sku", label: "SKU" }, { k: "merchandising", label: "Merchandising" },
+  { k: "all", label: "All" }, { k: "urgent", label: "Urgent" }, { k: "channel", label: "Channel" }, { k: "store", label: "Stores" }, { k: "sku", label: "SKU" }, { k: "merchandising", label: "Merchandising" }, { k: "marketing", label: "Marketing" },
 ];
 const PAGE = 30;
 
@@ -44,7 +44,7 @@ export function ActionBoard({ actions, hidden, statuses, categories, initialGrou
   const reset = () => { setType(""); setCat(""); setPri(""); setQ(""); setLimit(PAGE); };
 
   const closedCount = actions.filter((a) => st(a) !== "open").length;
-  const sel = "h-8 rounded-lg border border-line bg-white px-2 text-[12.5px] text-zinc-700 outline-none focus:border-brand-500";
+  const sel = "h-8 rounded-lg border border-zinc-300 bg-white px-2 text-[12.5px] font-medium text-ink shadow-[0_1px_2px_rgba(60,40,20,.06)] outline-none hover:border-brand-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -70,7 +70,7 @@ export function ActionBoard({ actions, hidden, statuses, categories, initialGrou
         <SlidersHorizontal className="ml-1 size-3.5 text-zinc-400" />
         <label className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-2 size-4 text-zinc-400" />
-          <input value={q} onChange={(e) => { setQ(e.target.value); setLimit(PAGE); }} placeholder="Search store, product, SKU or note…" className="h-8 w-full rounded-lg border border-line bg-white pl-8 pr-2 text-[12.5px] outline-none focus:border-brand-500" />
+          <input value={q} onChange={(e) => { setQ(e.target.value); setLimit(PAGE); }} placeholder="Search store, product, SKU or note…" className="h-8 w-full rounded-lg border border-zinc-300 bg-white pl-8 pr-2 text-[12.5px] outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20" />
         </label>
         <select value={type} onChange={(e) => setType(e.target.value)} className={sel} aria-label="Type">
           <option value="">All types</option>

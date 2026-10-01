@@ -37,8 +37,8 @@ export default async function Actions({ searchParams }: { searchParams: Promise<
   const cats = sortCats(ctx.filters.cats).map((k) => ({ key: k, label: catByKey(k)?.label ?? k }));
   const stores = ctx.stores.filter((s) => s.last_seen && s.last_seen >= "2000").map((s) => ({ code: s.branch_code, name: s.short_name })).sort((a, b) => a.name.localeCompare(b.name));
 
-  // Keep the client payload bounded: all open (≤ 350 by priority/impact) + everything the team closed
-  const payload = [...open.slice(0, 350), ...actions.filter((a) => (statuses[a.key] ?? "open") !== "open")];
+  // Keep the client payload bounded: all open (≤ 500 by priority/impact) + everything the team closed
+  const payload = [...open.slice(0, 500), ...actions.filter((a) => (statuses[a.key] ?? "open") !== "open")];
 
   return (
     <>
@@ -57,7 +57,7 @@ export default async function Actions({ searchParams }: { searchParams: Promise<
             <Kpi label="₹ at stake (open)" value={inr(stake)} tip="Sum of each open action's estimated opportunity or risk. Estimates overlap across actions — use it to size, not to add to a plan."
               sub={<span>{inr(urgentStake)} in urgent + high</span>} />
             <Kpi label="By area" value={<span className="text-[15px]">{groupCount("store")} stores · {groupCount("sku")} SKU</span>}
-              sub={<span>{groupCount("merchandising")} merchandising · {groupCount("channel")} channel</span>} />
+              sub={<span>{groupCount("marketing")} marketing · {groupCount("merchandising")} merchandising · {groupCount("channel")} channel</span>} />
             <Kpi label="Done this week" value={doneWeek} tone={doneWeek ? "good" : "muted"} sub={<span>marked done in the last 7 days</span>} />
             <Kpi label="Team remarks" value={remarks.length} href={withQs(ctx, "/actions", { tab: "remarks" })}
               sub={<span>{suppressed.length} action{suppressed.length === 1 ? "" : "s"} hidden · {actions.filter((a) => a.notes?.length).length} annotated</span>} />

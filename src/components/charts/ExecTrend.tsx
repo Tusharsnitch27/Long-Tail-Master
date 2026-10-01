@@ -3,6 +3,7 @@ import { useState } from "react";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { inr, num, pct } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { ChartDownload } from "./ChartDownload";
 
 type Row = { day: string; revenue: number | null; units: number | null; prevRevenue: number | null; prevUnits: number | null; targetPace: number | null; targetBasis: number | null; achievement: number | null };
 
@@ -19,11 +20,11 @@ export function ExecTrend({ data, prevLabel, basisLabel }: { data: Row[]; prevLa
     : [{ k: "achievement", l: basisLabel ? `Achievement · ${basisLabel}` : "Achievement (cumulative)", c: "#a8703f" }];
   return (
     <div>
-      <div className="mb-2 flex gap-0.5 rounded-lg border border-line bg-white p-0.5 w-fit">
+      <div className="mb-2 flex items-center justify-between gap-2"><div className="flex gap-0.5 rounded-lg border border-line bg-white p-0.5 w-fit">
         {(["revenue", "units", ...(hasTarget ? ["achievement"] : [])] as const).map((k) => (
           <button key={k} onClick={() => setM(k as typeof m)} className={cn("rounded-md px-2.5 py-1 text-[12px] capitalize", m === k ? "bg-ink text-white" : "text-zinc-600 hover:bg-zinc-100")}>{k}</button>
         ))}
-      </div>
+      </div><ChartDownload name={`month-trend-${m}`} data={data} columns={[{ key: "day", label: "Day" }, ...series.map((s) => ({ key: s.k, label: s.l }))]} /></div>
       <div style={{ height: 250 }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 6, right: 12, left: 4, bottom: 0 }}>

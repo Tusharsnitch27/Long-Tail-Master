@@ -61,7 +61,7 @@ export default async function VmDetail({ params, searchParams }: { params: Promi
                 <span>Store <Delta v={perf.change} /></span><span>Peers <Delta v={perf.control} /></span><span>Lift <b><Delta v={perf.lift} /></b></span>
                 <span>Incremental <b className="tabular">{perf.incrementalPerDay == null ? "—" : inr(perf.incrementalPerDay * 30)}</b>/month</span>
               </div>
-              <TrendChart data={perf.series} height={240} series={[{ key: "store", label: "This store", color: "#6e4526" }, { key: "peer", label: "Avg peer store", color: "#e2c9a6", type: "line", dashed: true }]} />
+              <TrendChart name="vm-before-after" data={perf.series} height={240} series={[{ key: "store", label: "This store", color: "#6e4526" }, { key: "peer", label: "Avg peer store", color: "#e2c9a6", type: "line", dashed: true }]} />
             </>
           ) : <Empty title="No read-out yet">Performance tracking starts once the revamp has a live date. The chart then compares 28 days before vs after, against peer stores.</Empty>}
         </Section>

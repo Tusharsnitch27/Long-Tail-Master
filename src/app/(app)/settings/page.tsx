@@ -15,12 +15,13 @@ import { ruleBook, TABLES } from "@/server/rulesDoc";
 import { catColor, catLabel } from "@/server/views";
 import { CATEGORIES } from "@/lib/categories";
 import { addDays, addMonths, eachDay, endOfMonth, fmtDate, startOfMonth } from "@/lib/dates";
-import { PageHeader, Tabs, Empty, Notice, Section, DataPrompt, Pill } from "@/components/ui";
+import { PageHeader, Tabs, Empty, Notice, Section, DataPrompt, Pill, ProductCell } from "@/components/ui";
 import { SettingsForm, UsersForm } from "@/components/AdminForms";
 import { MonthTargetGrid } from "@/components/control/MonthTargetGrid";
 import { SplitEditor } from "@/components/control/SplitEditor";
 import { StoreTargetEditor, type StoreTargetRow } from "@/components/control/StoreTargetEditor";
 import { MetaUpload } from "@/components/control/MetaUpload";
+import { ProductEditor, type EditableProduct } from "@/components/control/ProductEditor";
 import { cn } from "@/lib/cn";
 
 export const metadata = { title: "Control Centre" };
@@ -169,9 +170,21 @@ export default async function ControlCentre({ searchParams }: { searchParams: Pr
       const xs = ps.filter((p) => p.category === c.key);
       return { c, n: xs.length, image: xs.filter((p) => p.image).length, l1: xs.filter((p) => p.l1).length, colour: xs.filter((p) => p.attrs.colour).length, attrs: xs.filter((p) => Object.keys(p.attrs).length >= 3).length };
     });
-    const missing = ps.map((p) => ({ sku: p.sku, name: p.name ?? p.sku, category: catLabel(p.category!), gaps: [!p.image && "image", !p.l1 && "type (L1)", !p.attrs.colour && "colour"].filter(Boolean) as string[] })).filter((m) => m.gaps.length);
+    const missing = ps.map((p) => ({ sku: p.sku, name: p.name ?? p.sku, image: p.image, category: catLabel(p.category!), gaps: [!p.image && "image", !p.l1 && "type (L1)", !p.attrs.colour && "colour"].filter(Boolean) as string[] })).filter((m) => m.gaps.length);
+    const all = (await getProducts()).filter((p) => p.category && cats.some((c) => c.key === p.category));
+    const overrides = dbConfigured() ? await q<{ sku_group: string; attrs: Record<string, string> }>("select sku_group, attrs from product_meta").catch(() => []) : [];
+    const editedBy = new Map(overrides.map((o) => [o.sku_group.toUpperCase(), Object.entries(o.attrs ?? {}).filter(([, v]) => v).map(([k]) => k)]));
+    const editable: EditableProduct[] = all.map((p) => ({
+      sku: p.sku, name: p.name, image: p.image, category: p.category!, catLabel: catLabel(p.category!), l1: p.l1, l2: p.l2, collection: p.collection,
+      attrs: { ...p.attrs, ...(p.colour && !p.attrs.colour ? { colour: p.colour } : {}), ...(p.material && !p.attrs.material ? { material: p.material } : {}) },
+      mrp: p.mrp, sellingPrice: p.sellingPrice, status: p.status, liveDate: p.liveDate, edited: editedBy.get(p.sku) ?? [], sold: (p.sales.all ?? 0) > 0 || (p.invOffline ?? 0) > 0,
+    }));
     body = (
       <>
+        <Section title="Product editor" tip="Name and image come from the Shopify catalogue first, then the Product Master and metafield sheets. Anything you set here wins over all of them and is logged in the Change log.">
+          <ProductEditor products={editable} categories={cats.map((c) => ({ key: c.key, label: c.label }))} />
+        </Section>
+        <div className="mt-3" />
         <Section title="Metafield coverage" tip="Products with sales or store stock" right={<MetaUpload missing={missing} />}>
           <table className="w-full text-[12.5px]">
             <thead><tr className="text-[11px] text-zinc-500">{["Category", "Products", "Image", "Type (L1)", "Colour", "≥3 attributes"].map((h, i) => <th key={h} className={`pb-1.5 font-medium ${i ? "text-right" : "text-left"}`}>{h}</th>)}</tr></thead>
@@ -183,12 +196,12 @@ export default async function ControlCentre({ searchParams }: { searchParams: Pr
               </tr>
             ))}</tbody>
           </table>
-          <p className="mt-2 text-[11.5px] text-zinc-500">Sources: GS_LONGTAIL_METAFIELD (L1 / L2, image), the Longtail Metafields workbook (shoe attributes; L1 / L2 not taken from it), and uploads here (win over both). Perfumes carry names only.</p>
+          <p className="mt-2 text-[11.5px] text-zinc-500">Sources: Shopify catalogue (name, image, MRP, live date, status), GS_LONGTAIL_METAFIELD (L1 / L2, image), the Longtail Metafields workbook (shoe attributes; L1 / L2 not taken from it), and uploads here (win over both). Perfumes carry names only.</p>
         </Section>
         {missing.length > 0 && (
           <div className="mt-3"><Section title={`Products with gaps · ${missing.length}`} pad={false}>
             <div className="max-h-[420px] overflow-y-auto scroll-thin"><table className="w-full text-[12.5px]"><tbody>{missing.slice(0, 300).map((m) => (
-              <tr key={m.sku} className="border-b border-brand-50"><td className="px-4 py-1.5"><Link href={`/products/${encodeURIComponent(m.sku)}`} className="font-medium hover:underline">{m.name}</Link> <span className="font-mono text-[10.5px] text-zinc-400">{m.sku}</span></td><td className="px-4 text-zinc-500">{m.category}</td><td className="px-4 text-right">{m.gaps.map((g) => <Pill key={g} tone="warn" className="ml-1">{g}</Pill>)}</td></tr>
+              <tr key={m.sku} className="border-b border-brand-50"><td className="px-4 py-1.5"><ProductCell name={m.name} sku={m.sku} image={m.image} href={`/products/${encodeURIComponent(m.sku)}`} /></td><td className="px-4 text-zinc-500">{m.category}</td><td className="px-4 text-right">{m.gaps.map((g) => <Pill key={g} tone="warn" className="ml-1">{g}</Pill>)}</td></tr>
             ))}</tbody></table></div>
           </Section></div>
         )}
@@ -248,7 +261,7 @@ export default async function ControlCentre({ searchParams }: { searchParams: Pr
     );
   }
   const tabs = [
-    { key: "targets", label: "Month targets" }, { key: "split", label: "Daily split" }, { key: "stores", label: "Store targets" }, { key: "attributes", label: "Product attributes" },
+    { key: "targets", label: "Month targets" }, { key: "split", label: "Daily split" }, { key: "stores", label: "Store targets" }, { key: "attributes", label: "Products" },
     { key: "users", label: "Users & access" }, { key: "rules", label: "Rules & data" }, { key: "log", label: "Change log" },
   ].map((t) => ({ ...t, href: withQs(ctx, "/settings", { tab: t.key === "targets" ? null : t.key, m: null, tc: null, fy: null }) }));
   return (
@@ -267,6 +280,10 @@ function describe(entity: string, d: unknown): string {
     const ch = x.changes as { channel: string; category: string; month: string; from: number | null; to: number | null }[];
     const l = (v: number | null) => (v == null ? "—" : `${(v / 1e5).toFixed(2).replace(/\.?0+$/, "")}L`);
     return ch.slice(0, 6).map((c) => `${c.channel} · ${catLabel(c.category)} · ${c.month.slice(0, 7)}: ${l(c.from)} → ${l(c.to)}`).join("; ") + (ch.length > 6 ? `; +${ch.length - 6} more` : "");
+  }
+  if (entity === "product_meta" && Array.isArray(x.changes)) {
+    const ch = x.changes as Record<string, string>[];
+    return ch.slice(0, 4).map(({ sku, ...f }) => `${sku}: ${Object.entries(f).map(([k, v]) => `${k} → ${v === "" ? "reset to source" : v}`).join(", ")}`).join("; ") + (ch.length > 4 ? `; +${ch.length - 4} more` : "");
   }
   if (entity === "day_splits") return `${x.channel} · ${x.state === "*" ? "All India" : x.state} · ${String(x.month).slice(0, 7)} · ${x.cleared ? "cleared (even phasing)" : `${x.days} days set`}`;
   if (entity === "store_month_targets") return `${x.rows} store targets · ${(x.categories as string[] | undefined)?.map(catLabel).join(", ")} · ${(x.months as string[] | undefined)?.map((m) => m.slice(0, 7)).join(", ")}`;

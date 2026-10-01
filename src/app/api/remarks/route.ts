@@ -5,6 +5,7 @@ import { dbConfigured } from "@/server/db";
 import { apiError } from "@/server/api";
 import { addRemark, deactivateRemark, getRemark, listRemarks, REMARK_KINDS, REMARK_SCOPES } from "@/server/data/remarks";
 import { CATEGORIES } from "@/lib/categories";
+import { PRODUCT_TAG_KEYS } from "@/lib/productTags";
 
 const Day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const Body = z.object({
@@ -16,11 +17,13 @@ const Body = z.object({
   day: Day.nullish(),
   text: z.string().trim().min(3, "Write a short remark").max(600),
   action_key: z.string().max(200).nullish(),
+  tag: z.enum(PRODUCT_TAG_KEYS as [string, ...string[]]).nullish(),
 }).superRefine((b, ctx) => {
   const need = (f: string, m: string) => ctx.addIssue({ code: "custom", path: [f], message: m });
   if (["action", "store", "product"].includes(b.scope) && !b.scope_id) need("scope_id", `A ${b.scope} is required for this scope`);
   if (b.scope === "store_category" && (!b.scope_id || !b.category)) need("scope_id", "Store and category are required");
   if (b.scope === "category" && !b.category && !b.scope_id) need("category", "Category is required");
+  if (b.tag && b.scope !== "product") need("tag", "Tags apply to a product");
   if (b.scope === "date" && !b.day) need("day", "Pick the date the remark is about");
   if (b.kind === "snooze" && !b.until) need("until", "Pick a date to snooze until");
   if (b.kind === "not_applicable" && (b.scope === "date" || b.scope === "general")) need("kind", "Not applicable needs an action, store, store × category, product or category");
@@ -43,7 +46,7 @@ export async function POST(req: Request) {
     if (!p.success) return NextResponse.json({ error: p.error.issues[0]?.message ?? "invalid", issues: p.error.issues }, { status: 400 });
     const b = p.data;
     const row = await addRemark({
-      scope: b.scope as never, kind: b.kind as never, text: b.text, action_key: b.action_key ?? null,
+      scope: b.scope as never, kind: b.kind as never, text: b.text, action_key: b.action_key ?? null, tag: b.scope === "product" ? b.tag ?? null : null,
       scope_id: b.scope === "category" ? (b.category ?? b.scope_id ?? null) : b.scope === "date" ? b.day ?? null : b.scope === "general" ? null : b.scope_id ?? null,
       category: b.scope === "category" ? (b.category ?? b.scope_id ?? null) : b.category ?? null,
       until: b.kind === "snooze" ? b.until ?? null : b.until ?? null,

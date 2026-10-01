@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { MobileNav } from "@/components/shell/MobileNav";
 import { ContextBar, type ContextOptions } from "@/components/shell/ContextBar";
-import { getUser, AuthError } from "@/server/auth";
+import { getUser, AuthError, sessionExpiry } from "@/server/auth";
+import { SessionTimer } from "@/components/shell/SessionTimer";
 import { getSettings } from "@/server/settings";
 import { getFreshness } from "@/server/data/freshness";
 import { getChannelDaily, channelFreshness } from "@/server/data/channels";
@@ -70,9 +71,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     loadError = e instanceof Error ? e.message : String(e);
   }
 
+  const exp = await sessionExpiry().catch(() => null);
   const nav = { role: user.role, name: user.name, username: user.username, actionCount: urgent };
   return (
     <div className="atelier flex h-dvh overflow-hidden">
+      {exp && <SessionTimer exp={exp} />}
       <aside className="hidden w-[236px] shrink-0 md:block">
         <Suspense><Sidebar {...nav} /></Suspense>
       </aside>

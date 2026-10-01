@@ -3,6 +3,8 @@ import { pageContext, withQs, type SP } from "@/server/context";
 import { loadScope } from "@/server/scope";
 import { productRows, rollup, DEF } from "@/server/productInsights";
 import { catLabel } from "@/server/views";
+import { listRemarks } from "@/server/data/remarks";
+import { productTagLabel } from "@/lib/productTags";
 import { PageHeader, Kpi, KpiGrid, DataPrompt } from "@/components/ui";
 import { ProductGrid, type GridRow } from "@/components/products/ProductGrid";
 import { DataTable, type Col } from "@/components/table/DataTable";
@@ -15,9 +17,12 @@ export const metadata = { title: "Product Master" };
 /** Product Master: every product in scope with image, identity, metafields, lifetime performance and live inventory. */
 export default async function ProductMaster({ searchParams }: { searchParams: Promise<SP> }) {
   const ctx = await pageContext(searchParams);
-  const view = ctx.sp.view === "table" ? "table" : "cards";
+  const view = ctx.sp.view === "cards" ? "cards" : "table";
   const sc = await loadScope(ctx);
-  const rows = await productRows(ctx, sc, { master: true, withPeriod: false });
+  const [base, remarks] = await Promise.all([productRows(ctx, sc, { master: true, withPeriod: false }), listRemarks()]);
+  const remarkBySku = new Map<string, string[]>();
+  for (const r of remarks) if (r.scope === "product" && r.scope_id) remarkBySku.set(r.scope_id, [...(remarkBySku.get(r.scope_id) ?? []), productTagLabel(r.tag) ?? r.text]);
+  const rows = base.map((r) => ({ ...r, remark: remarkBySku.get(r.sku)?.join(" · ") ?? null }));
   const multiCat = ctx.filters.cats.length > 1;
   const agg = rollup(rows);
   const noImage = rows.filter((r) => !r.image), noMeta = rows.filter((r) => !r.hasMeta);
@@ -26,7 +31,7 @@ export default async function ProductMaster({ searchParams }: { searchParams: Pr
   const catsNoMeta = [...new Set(noMeta.map((r) => r.catName))].sort();
   const facets = [
     ...(multiCat ? [{ key: "catName", label: "Category" }] : []),
-    { key: "l1", label: "Type" }, { key: "l2", label: "Sub-type" }, { key: "colour", label: "Colour" }, { key: "collection", label: "Collection" }, { key: "lifecycle", label: "Lifecycle" }, { key: "flag", label: "Flag" },
+    { key: "l1", label: "Type" }, { key: "l2", label: "Sub-type" }, { key: "colour", label: "Colour" }, { key: "collection", label: "Collection" }, { key: "lifecycle", label: "Lifecycle" }, { key: "flag", label: "Flag" }, { key: "remark", label: "Team remark" },
   ];
   const title = ctx.filters.cat ? catLabel(ctx.filters.cat) : "All categories";
   const pm = sc.pm;
@@ -47,7 +52,7 @@ export default async function ProductMaster({ searchParams }: { searchParams: Pr
     <>
       <PageHeader title="Product Master" subtitle={<>{title} · {num(rows.length)} products · lifetime performance and live inventory <span className="text-zinc-400">· sales to {fmtDate(ctx.asOf, true)}</span></>}
         right={<div className="flex rounded-lg border border-line bg-white p-0.5 text-[12px]">
-          {(["cards", "table"] as const).map((v) => <Link key={v} href={viewHref(v === "cards" ? null : v)} scroll={false} className={cn("rounded-md px-3 py-1", view === v ? "bg-brand-900 font-medium text-white" : "text-zinc-600 hover:bg-brand-50")}>{v === "cards" ? "Cards" : "Table"}</Link>)}
+          {(["table", "cards"] as const).map((v) => <Link key={v} href={viewHref(v === "table" ? null : v)} scroll={false} className={cn("rounded-md px-3 py-1", view === v ? "bg-brand-900 font-medium text-white" : "text-zinc-600 hover:bg-brand-50")}>{v === "cards" ? "Cards" : "Table"}</Link>)}
         </div>} />
       <KpiGrid cols={7}>
         <Kpi label="Products" value={num(agg.products)} sub={`${num(rows.filter((r) => r.l30Units > 0).length)} sold in L30`} />
@@ -95,6 +100,7 @@ function masterCols(multiCat: boolean): Col[] {
     { key: "whSouth", label: "WH South", type: "num", group: "Inventory", tip: DEF.wh }, { key: "whNorth", label: "WH North", type: "num", group: "Inventory", tip: DEF.wh },
     { key: "totalInv", label: "Total", type: "num", group: "Inventory" }, { key: "doi", label: "Cover (days)", type: "num", group: "Inventory", tip: DEF.doi },
     { key: "flag", label: "Flag", tip: "Free gift = recent ASP under ₹10; Low cover = ≥10 units L30 and under 21 days of cover; Slow = ≥30 units and over 180 days of cover" },
+    { key: "remark", label: "Team remark", width: 200, tip: "Product remarks from the product page (e.g. Not to be sent to stores)" },
     { key: "liveDate", label: "Live", type: "date", hidden: true }, { key: "lastInward", label: "Last inward", type: "date", hidden: true },
   ];
 }

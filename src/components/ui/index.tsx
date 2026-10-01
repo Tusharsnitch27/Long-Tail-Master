@@ -184,3 +184,6 @@ export function Stat({ label, value, sub }: { label: string; value: React.ReactN
     </div>
   );
 }
+
+
+export { MixBar, type MixPart } from "./MixBar";

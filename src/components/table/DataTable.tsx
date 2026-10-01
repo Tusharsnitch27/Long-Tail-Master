@@ -1,6 +1,8 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { X, Plus, ListFilter, ArrowUpDown } from "lucide-react";
+import { MixBar } from "@/components/ui/MixBar";
+import { NUM_OPS, TEXT_OPS, needsValue, passRule, encodeRules, decodeRules, type Rule, type Op } from "./rules";
 import { facetOptions, matchTerms, normText, passFacets, queryTerms, type FacetDef } from "@/components/products/search";
 import { useListState, LOCAL_PARAMS } from "@/components/products/useListState";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -53,7 +55,7 @@ function fmt(v: unknown, t: ColType = "text"): string {
 
 export function DataTable({
   rows, columns, rowHref, searchKeys, defaultSort, csvName = "export", height = 620, totals, title, toolbar, dense = true, emptyText = "No rows match the current filters.",
-  searchText, facets, urlState = false, searchPlaceholder = "Search",
+  searchText, facets, urlState = false, searchPlaceholder = "Search", rules: allowRules = true,
 }: {
   rows: Row[];
   columns: Col[];
@@ -75,6 +77,8 @@ export function DataTable({
   /** mirror search / filters / sort to page-local URL params (q, facet keys, sort) */
   urlState?: boolean;
   searchPlaceholder?: string;
+  /** show the "Add filter" rule builder (column · operator · value) */
+  rules?: boolean;
 }) {
   const router = useRouter();
   const sp = useSearchParams();
@@ -83,9 +87,34 @@ export function DataTable({
   const [hidden, setHidden] = useState<Set<string>>(() => new Set(columns.filter((c) => c.hidden).map((c) => c.key)));
   const [colMenu, setColMenu] = useState(false);
   const cols = columns.filter((c) => !hidden.has(c.key));
+  // rule filters (column · operator · value), mirrored to ?f= when urlState
+  const [rules, setRules] = useState<Rule[]>(() => (urlState ? decodeRules(sp.get("f")) : []));
+  useEffect(() => {
+    if (!urlState) return;
+    const p = new URLSearchParams(window.location.search);
+    const enc = encodeRules(rules);
+    if (enc) p.set("f", enc); else p.delete("f");
+    const s = p.toString();
+    window.history.replaceState(null, "", s ? `${window.location.pathname}?${s}` : window.location.pathname);
+  }, [rules, urlState]);
+  const ruleCols = columns.filter((c) => c.type !== "image" && c.type !== "split");
+  const isNum = (c?: Col) => !!c && RIGHT.includes(c.type ?? "text");
+  const isRatio = (c?: Col) => !!c && ["pct", "ach", "delta"].includes(c.type ?? "");
+  const colLabel = (c: Col) => (c.group ? `${c.group} · ${c.label}` : c.label);
+  const addRule = () => { const c = ruleCols.find((x) => isNum(x)) ?? ruleCols[0]; if (c) setRules((r) => [...r, { key: c.key, op: isNum(c) ? "gt" : "contains", value: "" }]); };
+  const setRule = (i: number, patch: Partial<Rule>) => setRules((rs) => rs.map((r, j) => {
+    if (j !== i) return r;
+    const n = { ...r, ...patch };
+    if (patch.key && patch.key !== r.key) { const c = columns.find((x) => x.key === patch.key); n.op = isNum(c) ? "gt" : "contains"; n.value = ""; }
+    return n;
+  }));
 
   const data = useMemo(() => {
     let out = fs.length ? rows.filter((r) => passFacets(r, fs, sel)) : rows;
+    if (rules.length) {
+      const rc = rules.map((r) => { const c = columns.find((x) => x.key === r.key); return { r, num: isNum(c), ratio: isRatio(c) }; });
+      out = out.filter((row) => rc.every(({ r, num, ratio }) => passRule(row[r.key], r, num, ratio)));
+    }
     const s = q.trim().toLowerCase();
     if (s && searchText) {
       const terms = queryTerms(s);
@@ -106,9 +135,10 @@ export function DataTable({
       });
     }
     return out;
-  }, [rows, q, sort, searchKeys, columns, searchText, fs, sel]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, q, sort, searchKeys, columns, searchText, fs, sel, rules]);
   const opts = useMemo(() => (fs.length ? facetOptions(rows, fs, sel) : {}), [rows, fs, sel]);
-  const active = !!q.trim() || Object.keys(sel).length > 0;
+  const active = !!q.trim() || Object.keys(sel).length > 0 || rules.length > 0;
 
   const maxes = useMemo(() => {
     const m: Record<string, number> = {};
@@ -117,7 +147,7 @@ export function DataTable({
   }, [rows, columns]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const maxImg = Math.max(0, ...columns.filter((c) => c.image && !hidden.has(c.key)).map((c) => c.imageSize ?? 32));
+  const maxImg = Math.max(0, ...columns.filter((c) => c.image && !hidden.has(c.key)).map((c) => c.imageSize ?? 44));
   const rowH = Math.max(dense ? 34 : 46, maxImg + 10);
   const virt = useVirtualizer({ count: data.length, getScrollElement: () => scrollRef.current, estimateSize: () => rowH, overscan: 12 });
   const items = virt.getVirtualItems();
@@ -165,26 +195,43 @@ export function DataTable({
   const onSort = (k: string) => setSort((s: { key: string; desc: boolean } | null) => (s?.key === k ? (s.desc ? { key: k, desc: false } : null) : { key: k, desc: true }));
 
   return (
-    <div className="rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(17,17,20,.03)]">
-      <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-        {title && <div className="mr-2 text-[12.5px] font-semibold text-zinc-800">{title}</div>}
-        <div className="flex h-7 items-center gap-1.5 rounded-md border border-line px-2 focus-within:border-zinc-400">
-          <Search className="size-3.5 text-zinc-400" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={searchPlaceholder} className={cn("text-[12.5px] outline-none", searchText ? "w-56" : "w-40")} />
+    <div className="rounded-[16px] border border-line bg-white shadow-[0_1px_2px_rgba(60,40,20,.04)]">
+      <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2.5">
+        {title && <div className="mr-2 font-serif text-[15px] text-ink">{title}</div>}
+        <div className="flex h-8 items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-2.5 shadow-[inset_0_1px_1px_rgba(60,40,20,.05)] focus-within:border-brand-500 focus-within:ring-4 focus-within:ring-brand-500/15">
+          <Search className="size-3.5 text-zinc-500" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={searchPlaceholder} className={cn("bg-transparent text-[12.5px] outline-none placeholder:text-zinc-400", searchText ? "w-56" : "w-40")} />
+          {q && <button onClick={() => setQ("")} aria-label="Clear search" className="text-zinc-400 hover:text-ink"><X className="size-3" /></button>}
         </div>
         {fs.map((f) => (opts[f.key]?.length || sel[f.key]) ? (
-          <select key={f.key} value={sel[f.key] ?? ""} onChange={(e) => setFacet(f.key, e.target.value)} aria-label={f.label}
-            className={cn("h-7 max-w-40 rounded-md border px-1.5 text-[12px] outline-none", sel[f.key] ? "border-brand-500 bg-brand-50 text-brand-800" : "border-line text-zinc-600")}>
-            <option value="">{f.label}: all</option>
-            {(opts[f.key] ?? []).map((o) => <option key={o.v} value={o.v}>{o.v} ({o.n})</option>)}
-            {sel[f.key] && !(opts[f.key] ?? []).some((o) => o.v === sel[f.key]) && <option value={sel[f.key]}>{sel[f.key]} (0)</option>}
-          </select>
+          <label key={f.key} className={cn("flex h-8 items-center gap-1 rounded-lg border pl-2.5 pr-1 text-[12px] transition-colors", sel[f.key] ? "border-brand-900 bg-brand-900 text-canvas" : "border-zinc-300 bg-white text-zinc-600 hover:border-brand-400")}>
+            <span className={cn("text-[10px] font-semibold uppercase tracking-[0.12em]", sel[f.key] ? "text-brand-300" : "text-zinc-400")}>{f.label}</span>
+            <select value={sel[f.key] ?? ""} onChange={(e) => setFacet(f.key, e.target.value)} aria-label={f.label}
+              className={cn("h-7 max-w-40 cursor-pointer bg-transparent pr-1 text-[12px] font-medium outline-none", sel[f.key] ? "text-canvas" : "text-ink")}>
+              <option value="" className="text-ink">All</option>
+              {(opts[f.key] ?? []).map((o) => <option key={o.v} value={o.v} className="text-ink">{o.v} ({o.n})</option>)}
+              {sel[f.key] && !(opts[f.key] ?? []).some((o) => o.v === sel[f.key]) && <option value={sel[f.key]} className="text-ink">{sel[f.key]} (0)</option>}
+            </select>
+          </label>
         ) : null)}
-        {active && (fs.length > 0 || urlState) && <button onClick={clear} className="flex h-7 items-center gap-0.5 rounded-md px-1.5 text-[11.5px] text-zinc-500 hover:bg-zinc-100 hover:text-ink"><X className="size-3" />Clear</button>}
-        <span className="text-[11.5px] text-zinc-400">{data.length.toLocaleString("en-IN")} rows</span>
+        {allowRules && ruleCols.length > 0 && (
+          <button onClick={addRule} className="flex h-8 items-center gap-1 rounded-lg border border-dashed border-brand-500 bg-brand-50 px-2.5 text-[12px] font-medium text-brand-800 transition-colors hover:bg-brand-100">
+            <Plus className="size-3.5" />Add filter
+          </button>
+        )}
+        <label className="flex h-8 items-center gap-1 rounded-lg border border-zinc-300 bg-white pl-2.5 pr-1 text-[12px] text-zinc-600 hover:border-brand-400">
+          <ArrowUpDown className="size-3.5 text-zinc-400" />
+          <select value={sort?.key ?? ""} onChange={(e) => setSort(e.target.value ? { key: e.target.value, desc: sort?.key === e.target.value ? sort.desc : true } : null)} aria-label="Sort by" className="h-7 max-w-44 cursor-pointer bg-transparent text-[12px] font-medium text-ink outline-none">
+            <option value="">Sort: none</option>
+            {ruleCols.map((c) => <option key={c.key} value={c.key}>Sort: {colLabel(c)}</option>)}
+          </select>
+          {sort && <button onClick={() => setSort({ key: sort.key, desc: !sort.desc })} title={sort.desc ? "Highest first — click for lowest first" : "Lowest first — click for highest first"} className="rounded px-1 text-zinc-500 hover:bg-zinc-100 hover:text-ink">{sort.desc ? <ArrowDown className="size-3.5" /> : <ArrowUp className="size-3.5" />}</button>}
+        </label>
+        {active && (fs.length > 0 || urlState || rules.length > 0) && <button onClick={() => { clear(); setRules([]); }} className="flex h-8 items-center gap-0.5 rounded-lg px-2 text-[12px] font-medium text-rose-700 hover:bg-rose-50"><X className="size-3.5" />Clear all</button>}
+        <span className="text-[11.5px] text-zinc-500"><b className="tabular font-semibold text-ink">{data.length.toLocaleString("en-IN")}</b>{data.length !== rows.length ? ` of ${rows.length.toLocaleString("en-IN")}` : ""} rows</span>
         {toolbar}
         <div className="relative ml-auto">
-          <button onClick={() => setColMenu((v) => !v)} className="flex h-7 items-center gap-1 rounded-md px-2 text-[12px] text-zinc-600 hover:bg-zinc-100">
+          <button onClick={() => setColMenu((v) => !v)} className="flex h-8 items-center gap-1 rounded-lg px-2 text-[12px] text-zinc-600 hover:bg-zinc-100">
             <Columns3 className="size-3.5" /> Columns
           </button>
           {colMenu && (
@@ -198,10 +245,37 @@ export function DataTable({
             </div>
           )}
         </div>
-        <button onClick={exportCsv} className="flex h-7 items-center gap-1 rounded-md border border-line px-2 text-[12px] text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50">
+        <button onClick={exportCsv} className="flex h-8 items-center gap-1 rounded-lg border border-line px-2 text-[12px] text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50">
           <Download className="size-3.5" /> CSV
         </button>
       </div>
+      {rules.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-line bg-brand-50/60 px-3 py-2">
+          <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-700"><ListFilter className="size-3.5" />Show rows where</span>
+          {rules.map((r, i) => {
+            const c = columns.find((x) => x.key === r.key);
+            const ops: { op: Op; label: string }[] = isNum(c) ? NUM_OPS : TEXT_OPS;
+            return (
+              <span key={i} className="flex items-center gap-1 rounded-lg border border-brand-300 bg-white p-0.5 pl-1 shadow-sm">
+                {i > 0 && <span className="px-1 text-[10.5px] font-semibold text-brand-700">AND</span>}
+                <select value={r.key} onChange={(e) => setRule(i, { key: e.target.value })} aria-label="Column" className="h-7 max-w-48 rounded-md bg-brand-50 px-1.5 text-[12px] font-medium text-ink outline-none">
+                  {ruleCols.map((x) => <option key={x.key} value={x.key}>{colLabel(x)}</option>)}
+                </select>
+                <select value={r.op} onChange={(e) => setRule(i, { op: e.target.value as Op })} aria-label="Operator" className="h-7 rounded-md px-1 text-[12px] font-semibold text-brand-800 outline-none">
+                  {ops.map((o) => <option key={o.op} value={o.op}>{o.label}</option>)}
+                </select>
+                {needsValue(r.op) && (
+                  <input value={r.value} onChange={(e) => setRule(i, { value: e.target.value })} autoFocus={!r.value}
+                    placeholder={isNum(c) ? (r.op === "between" ? (isRatio(c) ? "10 - 40 (%)" : "e.g. 10 - 50") : isRatio(c) ? "e.g. 20 (%)" : c?.type === "inr" || c?.type === "inrFull" ? "e.g. 50k, 1.5L" : "e.g. 100") : "text"}
+                    className="h-7 w-28 rounded-md border border-zinc-300 bg-white px-2 text-[12px] outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20" />
+                )}
+                <button onClick={() => setRules((rs) => rs.filter((_, j) => j !== i))} aria-label="Remove filter" className="rounded-md p-1 text-zinc-400 hover:bg-rose-50 hover:text-rose-700"><X className="size-3.5" /></button>
+              </span>
+            );
+          })}
+          <button onClick={addRule} className="flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-brand-800 hover:bg-white"><Plus className="size-3.5" />And</button>
+        </div>
+      )}
       <div ref={scrollRef} className="overflow-auto scroll-thin" style={{ maxHeight: height }}>
         <table className="w-full border-separate border-spacing-0 text-[12.5px]">
           <thead className="sticky top-0 z-20 bg-white">
@@ -271,11 +345,10 @@ function Cell({ c, r, first, max }: { c: Col; r: Row; first: boolean; max?: numb
   if (t === "split") {
     // [stores, online, marketplace] shares → compact stacked bar
     const parts = (Array.isArray(v) ? v : []) as (number | null)[];
-    const colors = ["#a8703f", "#c08f60", "#e2c9a6"], names = ["Stores", "Online", "Marketplace"];
-    const tip = parts.map((x, i) => `${names[i]} ${x == null ? "—" : Math.round(x * 100) + "%"}`).join(" · ");
+    const colors = ["#6e4526", "#c08f60", "#e2c9a6"], names = ["Stores", "Online", "Marketplace"];
     return (
-      <td className={base} title={tip}>
-        {parts.some((x) => x) ? <span className="flex h-1.5 w-24 overflow-hidden rounded-full bg-zinc-100">{parts.map((x, i) => <span key={i} style={{ width: `${(x ?? 0) * 100}%`, background: colors[i] }} />)}</span> : <span className="text-zinc-400">—</span>}
+      <td className={base}>
+        {parts.some((x) => x) ? <MixBar className="w-24" barClass="h-2" title="Lifetime channel mix" format="none" parts={parts.map((x, i) => ({ label: names[i], value: (x ?? 0) * 100, color: colors[i] }))} /> : <span className="text-zinc-400">—</span>}
       </td>
     );
   }
@@ -310,7 +383,7 @@ function Cell({ c, r, first, max }: { c: Col; r: Row; first: boolean; max?: numb
     return (
       <td className={base}>
         <span className="flex max-w-[280px] items-center gap-2.5">
-          {img ? <span className="thumb inline-block shrink-0" style={{ width: c.imageSize ?? 32, height: c.imageSize ?? 32 }}><img src={img} alt="" loading="lazy" className="size-full rounded-md border border-line bg-white object-cover" /><img src={img} alt="" loading="lazy" className="preview" /></span> : <span className="shrink-0 rounded-md bg-zinc-100" style={{ width: c.imageSize ?? 32, height: c.imageSize ?? 32 }} />}
+          {img ? <span className="thumb inline-block shrink-0" style={{ width: c.imageSize ?? 44, height: c.imageSize ?? 44 }}><img src={img} alt="" loading="lazy" className="size-full rounded-md border border-line bg-white object-cover" /><img src={img} alt="" loading="lazy" className="preview" /></span> : <span className="shrink-0 rounded-md bg-zinc-100" style={{ width: c.imageSize ?? 44, height: c.imageSize ?? 44 }} />}
           <span className="min-w-0 leading-tight"><span className="block truncate">{fmt(v, t)}</span>{sub != null && sub !== "" && <span className="block font-mono text-[10.5px] font-normal text-zinc-400">{String(sub)}</span>}</span>
         </span>
       </td>

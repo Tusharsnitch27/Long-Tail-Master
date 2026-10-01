@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { checkLogin } from "@/server/auth";
 import { dbConfigured, q } from "@/server/db";
-import { safeNext, secureCookies, SESSION_COOKIE, SESSION_DAYS, signSession } from "@/lib/session";
+import { safeNext, secureCookies, SESSION_COOKIE, SESSION_SECONDS, signSession } from "@/lib/session";
 
 // Relative Location: behind a reverse proxy req.url carries the internal host (e.g. 0.0.0.0:3000).
 const redirectTo = (path: string) => new NextResponse(null, { status: 303, headers: { Location: path } });
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   fails.delete(`u:${username}`);
   const res = redirectTo(next);
   res.cookies.set(SESSION_COOKIE, await signSession({ username: user.username, name: user.name }), {
-    httpOnly: true, secure: secureCookies(), sameSite: "lax", path: "/", maxAge: SESSION_DAYS * 86400,
+    httpOnly: true, secure: secureCookies(), sameSite: "lax", path: "/", maxAge: SESSION_SECONDS,
   });
   if (dbConfigured()) await q("insert into audit_log(actor, action, entity) values ($1,'login','session')", [user.username]).catch(() => {});
   return res;

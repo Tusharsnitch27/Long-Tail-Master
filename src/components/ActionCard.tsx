@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Store, TrendingDown, Boxes, Truck, Target, MessageSquareText, EyeOff, CalendarDays, Sparkles } from "lucide-react";
+import { Store, TrendingDown, Boxes, Truck, Megaphone, Target, MessageSquareText, EyeOff, CalendarDays, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { catByKey } from "@/lib/categories";
 import type { Action } from "@/server/actions";
@@ -13,7 +13,7 @@ const PRI = {
   medium: "bg-zinc-100 text-zinc-600 ring-zinc-200",
 } as const;
 const STRIPE = { urgent: "bg-rose-500", high: "bg-amber-400", medium: "bg-brand-200" } as const;
-const GROUP_ICON = { channel: TrendingDown, store: Store, sku: Boxes, merchandising: Truck } as const;
+const GROUP_ICON = { channel: TrendingDown, store: Store, sku: Boxes, merchandising: Truck, marketing: Megaphone } as const;
 const CONF = { high: "●●●", medium: "●●○", low: "●○○" } as const;
 
 const fmt = (d: string) => new Date(`${d.slice(0, 10)}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" });

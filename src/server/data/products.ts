@@ -3,6 +3,7 @@ import { catForProduct, catBySalesName } from "@/lib/categories";
 import { cached } from "@/lib/cache";
 import { sfCached } from "../snowflake";
 import { getMetafields, type Meta } from "./metafields";
+import { getShopifyProducts, type ShopifyProduct } from "./shopify";
 import { getStoreInventory } from "./inventory";
 import { productCode } from "./warehouse";
 
@@ -64,9 +65,10 @@ export interface Product {
 }
 
 const S = "SNITCH_DB.MAPLEMONK";
+const tidyName = (name: string) => name.trim().replace(/\s+/g, " ").replace(/\b\w+/g, (w) => (w.length > 2 && w === w.toUpperCase() ? w[0] + w.slice(1).toLowerCase() : w));
 
 export function getProducts(): Promise<Product[]> {
-  return cached("products:merged:v3", 600, buildProducts);
+  return cached("products:merged:v4", 600, buildProducts);
 }
 
 async function buildProducts(): Promise<Product[]> {
@@ -98,7 +100,7 @@ async function buildProducts(): Promise<Product[]> {
   );
   const n = (v: unknown) => (v == null || v === "" ? null : Number(v));
   const pct = (r: number | null, s: number | null) => (r != null && s && s > 0 ? r / s : null);
-  const [meta, inv] = await Promise.all([getMetafields().catch(() => new Map<string, Meta>()), getStoreInventory([]).catch(() => [])]);
+  const [meta, inv, shop] = await Promise.all([getMetafields().catch(() => new Map<string, Meta>()), getStoreInventory([]).catch(() => []), getShopifyProducts().catch((e) => { console.error("[products] shopify catalogue unavailable", e); return new Map<string, ShopifyProduct>(); })]);
   const base = rows.map((r) => {
     const sku = String(r.sku).toUpperCase();
     const cat = catForProduct(r.category as string | null, sku) ?? catBySalesName(String(r.category ?? ""));
@@ -145,9 +147,19 @@ async function buildProducts(): Promise<Product[]> {
   }
   for (const p of base) {
     const m = meta.get(p.sku);
+    // identity precedence: Control Centre edit > Shopify catalogue > Product Master / inventory master > metafield sheet
+    const s = shop.get(p.sku);
+    if (s) {
+      if (s.name) p.name = tidyName(s.name);
+      if (s.image) p.image = s.image;
+      p.mrp = s.mrp ?? p.mrp; p.sellingPrice = s.sellingPrice ?? p.sellingPrice;
+      p.liveDate ??= s.liveDate; p.status = s.status ?? p.status;
+      if (p.daysSinceLive == null && p.liveDate) p.daysSinceLive = Math.max(0, Math.round((Date.now() - new Date(p.liveDate).getTime()) / 86400_000));
+    }
     if (m) {
       p.l1 = m.l1; p.l2 = m.l2; p.attrs = { ...m.attrs }; p.collection = m.collection;
       if (m.imageOverride) p.image = m.image; else p.image ??= m.image;
+      if (m.nameOverride && m.name) p.name = m.name; else if (!p.name && m.name) p.name = tidyName(m.name);
       p.category ??= m.category;
     }
     if (p.colour && !p.attrs.colour) p.attrs.colour = p.colour;

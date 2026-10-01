@@ -27,6 +27,8 @@ export type Remark = {
   day: string | null;
   text: string;
   action_key: string | null;
+  /** product tag (see lib/productTags) */
+  tag: string | null;
   active: boolean;
   created_by: string;
   created_at: string;
@@ -41,9 +43,10 @@ export interface NewRemark {
   day?: string | null;
   text: string;
   action_key?: string | null;
+  tag?: string | null;
 }
 
-const COLS = `id::int as id, scope, scope_id, category, kind, to_char(until,'YYYY-MM-DD') as "until", to_char(day,'YYYY-MM-DD') as "day", text, action_key, active, created_by, created_at::text as created_at`;
+const COLS = `id::int as id, scope, scope_id, category, kind, to_char(until,'YYYY-MM-DD') as "until", to_char(day,'YYYY-MM-DD') as "day", text, action_key, tag, active, created_by, created_at::text as created_at`;
 
 /** All active remarks (newest first). Snoozes past their date are still returned; use `effectiveRemarks` to drop them. */
 export function listRemarks(): Promise<Remark[]> {
@@ -67,13 +70,13 @@ export function listInactiveRemarks(limit = 30): Promise<Remark[]> {
 
 export async function addRemark(r: NewRemark, actor: string): Promise<Remark> {
   const rows = await q<Remark>(
-    `insert into remarks(scope, scope_id, category, kind, until, day, text, action_key, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning ${COLS}`,
-    [r.scope, r.scope_id ?? null, r.category ?? null, r.kind, r.until ?? null, r.day ?? null, r.text.trim(), r.action_key ?? null, actor],
+    `insert into remarks(scope, scope_id, category, kind, until, day, text, action_key, tag, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning ${COLS}`,
+    [r.scope, r.scope_id ?? null, r.category ?? null, r.kind, r.until ?? null, r.day ?? null, r.text.trim(), r.action_key ?? null, r.tag ?? null, actor],
   );
   const row = rows[0];
   await q("insert into audit_log(actor, action, entity, entity_id, detail) values ($1,$2,$3,$4,$5)",
-    [actor, "add", "remarks", String(row.id), JSON.stringify({ scope: row.scope, scope_id: row.scope_id, category: row.category, kind: row.kind, until: row.until, day: row.day, text: row.text, action_key: row.action_key })]).catch(() => {});
+    [actor, "add", "remarks", String(row.id), JSON.stringify({ scope: row.scope, scope_id: row.scope_id, category: row.category, kind: row.kind, until: row.until, day: row.day, text: row.text, action_key: row.action_key, tag: row.tag })]).catch(() => {});
   bust();
   return row;
 }

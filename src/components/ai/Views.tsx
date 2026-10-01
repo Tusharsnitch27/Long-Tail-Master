@@ -1,5 +1,6 @@
 "use client";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { ChartDownload } from "@/components/charts/ChartDownload";
 import { TrendChart } from "@/components/charts/TrendChart";
 import { DataTable, type Col, type ColType } from "@/components/table/DataTable";
 import { inr, num, pct, signedPct } from "@/lib/format";
@@ -117,6 +118,8 @@ function Body({ v }: { v: ViewData }) {
       // ranking: horizontal bars read better with long store/product names
       const data = v.rows.slice(0, 25).map((r) => ({ ...r, __label: String(r[v.x!]).replace(/^(COCO|COFO|FOCO)\s*-\s*/, "") }));
       return (
+        <div>
+        <div className="mb-1 flex justify-end"><ChartDownload name={v.title} data={v.rows} columns={[v.x, ...v.y].map((k) => ({ key: k, label: v.labels[k] ?? k }))} /></div>
         <div style={{ height: Math.max(160, data.length * 26 + 40) }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
@@ -129,10 +132,11 @@ function Body({ v }: { v: ViewData }) {
             </BarChart>
           </ResponsiveContainer>
         </div>
+        </div>
       );
     }
     return (
-      <TrendChart data={v.rows} xKey={v.x} xIsDate={dateX && v.rows.every((r) => String(r[v.x!]).length === 10)} yFormat={yFmt} height={240}
+      <TrendChart name={v.title} data={v.rows} xKey={v.x} xIsDate={dateX && v.rows.every((r) => String(r[v.x!]).length === 10)} yFormat={yFmt} height={240}
         series={v.y.map((k, i) => ({ key: k, label: v.labels[k] ?? k, color: COLORS[i % COLORS.length], type: v.type === "bar" ? "bar" as const : "line" as const }))} />
     );
   }

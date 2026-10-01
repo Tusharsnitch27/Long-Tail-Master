@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Download, Upload, Save, RotateCcw } from "lucide-react";
 import { parseCsv, downloadCsv, parseMonth } from "@/lib/csv";
@@ -17,7 +17,7 @@ const fmtL = (v: number | null | undefined) => (v == null ? "" : Number((v / L).
  * Month × category targets per channel, in ₹ lakhs (as in the business plan). Past months show the actual and
  * achievement; empty future cells are flagged as pending. Save writes only changed cells; every change is logged.
  */
-export function MonthTargetGrid({ months, cats, values, actuals, current, readOnly }: {
+export function MonthTargetGrid({ months, cats, values: serverValues, actuals, current, readOnly }: {
   months: string[]; cats: { key: string; label: string; color: string }[]; values: Record<string, number | null>; actuals: Record<string, number>; current: string; readOnly: boolean;
 }) {
   const router = useRouter();
@@ -25,6 +25,10 @@ export function MonthTargetGrid({ months, cats, values, actuals, current, readOn
   const [edit, setEdit] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  // values confirmed by the database after a save (shown until the page data refreshes)
+  const [confirmed, setConfirmed] = useState<Record<string, number | null>>({});
+  const values = useMemo(() => ({ ...serverValues, ...confirmed }), [serverValues, confirmed]);
+  useEffect(() => setConfirmed({}), [serverValues]);
   const file = useRef<HTMLInputElement>(null);
   type Row = { channel: Ch; category: string; month: string; target: number | null };
   const [pendingRows, setPendingRows] = useState<{ rows: Row[]; source: "manual" | "upload"; changes: Change[] } | null>(null);
@@ -56,7 +60,8 @@ export function MonthTargetGrid({ months, cats, values, actuals, current, readOn
     setBusy(false);
     setPendingRows(null);
     if (!res.ok) return setMsg({ ok: false, text: j.error ?? "Save failed" });
-    setMsg({ ok: true, text: `${j.changed} target${j.changed === 1 ? "" : "s"} updated and logged.` });
+    if (j.saved) setConfirmed((c) => ({ ...c, ...j.saved }));
+    setMsg(j.mismatched ? { ok: false, text: `${j.mismatched} target(s) did not save as entered — please check and retry.` } : { ok: true, text: `${j.changed} target${j.changed === 1 ? "" : "s"} saved, logged and verified against the database.` });
     setEdit({}); router.refresh();
   }
   const save = () => ask(dirty.map(([k, v]) => { const [c, category, month] = k.split("|"); return { channel: c as Ch, category, month, target: v.trim() === "" ? null : Math.round(Number(v) * L) }; }), "manual");
@@ -84,7 +89,7 @@ export function MonthTargetGrid({ months, cats, values, actuals, current, readOn
         <div className="flex gap-0.5 rounded-lg border border-line p-0.5">
           {CH.map((c) => <button key={c.key} onClick={() => setCh(c.key)} className={cn("rounded-md px-2.5 py-1 text-[12.5px]", ch === c.key ? "bg-brand-900 font-medium text-white" : "text-zinc-600 hover:bg-brand-50")}>{c.label}</button>)}
         </div>
-        <span className="text-[11.5px] text-zinc-500">₹ lakhs · {ch === "overall" ? "sum of the three channels (read-only)" : "click a cell to edit"}</span>
+        <span className={cn("rounded-md px-2 py-0.5 text-[11.5px]", ch === "overall" ? "text-zinc-500" : "bg-brand-50 font-medium text-brand-800 ring-1 ring-brand-200")}>₹ lakhs · {ch === "overall" ? "sum of the three channels (read-only) — pick a channel to edit" : "white cells are editable · bronze = unsaved change"}</span>
         {pending > 0 && <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11.5px] font-medium text-amber-800 ring-1 ring-amber-200">{pending} upcoming category-months missing a channel target</span>}
         <div className="ml-auto flex items-center gap-1.5">
           <button onClick={template} className="flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[12px] text-zinc-600 hover:border-brand-300"><Download className="size-3.5" />Template / export</button>
@@ -112,7 +117,7 @@ export function MonthTargetGrid({ months, cats, values, actuals, current, readOn
                     <td key={m} className={cn("px-1 py-1 text-right align-top", m === current && "bg-brand-50/40")}>
                       {k && !readOnly ? (
                         <input value={k in edit ? edit[k] : fmtL(v)} onChange={(e) => setEdit((s) => ({ ...s, [k]: e.target.value }))} inputMode="decimal" placeholder={m >= current ? "pending" : "—"}
-                          className={cn("tabular h-7 w-16 rounded-md border px-1.5 text-right outline-none focus:border-brand-500", isDirty ? "border-brand-500 bg-brand-50" : v == null && m >= current ? "border-dashed border-amber-300 bg-amber-50/50 placeholder:text-amber-600/70" : "border-transparent hover:border-line")} />
+                          className={cn("tabular h-7 w-16 rounded-md border px-1.5 text-right shadow-[inset_0_1px_1px_rgba(60,40,20,.06)] outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20", isDirty ? "border-brand-600 bg-brand-100 font-semibold text-brand-900" : v == null && m >= current ? "border-dashed border-amber-400 bg-amber-50 placeholder:text-amber-600/80" : "border-zinc-300 bg-white hover:border-brand-400")} />
                       ) : <span className={cn("tabular inline-block h-7 w-16 px-1.5 leading-7", v == null && "text-zinc-300")}>{v == null ? "—" : fmtL(v)}</span>}
                       {past && v != null && <span className={cn("block pr-1.5 text-[10px] tabular", ach == null ? "text-zinc-400" : ach >= 0.95 ? "text-emerald-700" : ach >= 0.8 ? "text-amber-700" : "text-rose-600")}>{fmtL(a)} · {ach != null ? `${Math.round(ach * 100)}%` : "—"}</span>}
                     </td>

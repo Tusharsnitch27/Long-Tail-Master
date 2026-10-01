@@ -89,7 +89,7 @@ export default async function DailyOverview({ searchParams }: { searchParams: Pr
       </KpiGrid>
       <div className="mt-3">
         <Section title="Revenue vs target by day" tip="Bars coloured by achievement of the day's target; line = same weekday last week">
-          <DailyTargetChart data={chartRows} height={240} />
+          <DailyTargetChart name="daily-overview-revenue-vs-target" data={chartRows} height={240} />
         </Section>
       </div>
       <div className="mt-3">

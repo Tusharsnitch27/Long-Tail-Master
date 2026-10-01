@@ -10,6 +10,8 @@ import { getStoreInventory, getProductStoreHistory } from "@/server/data/invento
 import { getInwards } from "@/server/data/metafields";
 import { listRemarks } from "@/server/data/remarks";
 import { ProductRemarks } from "@/components/products/ProductRemarks";
+import { gitOrEmpty } from "@/server/scope";
+import { InvMix } from "@/components/InvMix";
 import { productTagLabel } from "@/lib/productTags";
 import { buildActions, actionStatuses } from "@/server/actions";
 import { ucChannel, CH_LABEL, type ChKey } from "@/server/channelData";
@@ -54,18 +56,21 @@ export default async function ProductDetail({ params, searchParams }: { params: 
     getProductWarehouseHistory(sku, hist.from, hist.to).catch(() => []),
     buildActions(cctx).catch(() => ({ actions: [] as Awaited<ReturnType<typeof buildActions>>["actions"] })), actionStatuses(),
   ]);
+  const git = await gitOrEmpty(new Set(pm.keys()));
+  const g = git.bySku.get(sku);
   const remarks = (await listRemarks()).filter((r) => r.scope === "product" && r.scope_id === sku);
   const tagLabels = remarks.map((r) => productTagLabel(r.tag)).filter((x): x is string => !!x);
   const w = wh.bySku.get(sku);
   const rl = roll.map.get(sku);
-  const storeInv = p.invOffline ?? 0, whInv = w?.units ?? 0, totalInv = storeInv + whInv;
+  const gitInv = g?.units ?? 0;
+  const storeInv = p.invOffline ?? 0, whInv = w?.units ?? 0, totalInv = storeInv + gitInv + whInv;
   const allL30u = rl?.all.l30u ?? 0;
   const gift = isFreeGift(rl?.all.l30, allL30u, p.sales.all, p.qty.all);
   const row = {
     l7: rl?.all.l7 ?? 0, p7: rl?.all.p7 ?? 0, l7Units: rl?.all.l7u ?? 0, l30: rl?.all.l30 ?? 0, p30: rl?.all.p30 ?? 0, l30Units: allL30u, p30Units: rl?.all.p30u ?? 0,
     wow: growth(rl?.all.l7, rl?.all.p7), mom: growth(rl?.all.l30, rl?.all.p30), doi: allL30u > 0 ? totalInv / (allL30u / 30) : null,
     str30: allL30u + totalInv > 0 ? allL30u / (allL30u + totalInv) : null, ltStr: safeDiv(p.qty.all, p.inwardTotal),
-    storeInv, whInv, whNorth: w?.byZone.North ?? 0, whSouth: w?.byZone.South ?? 0, totalInv,
+    storeInv, git: gitInv, whInv, whNorth: w?.byZone.North ?? 0, whSouth: w?.byZone.South ?? 0, totalInv,
   };
 
   // store distribution: period + L30 sales lines, merged with live store stock
@@ -84,8 +89,9 @@ export default async function ProductDetail({ params, searchParams }: { params: 
   for (const f of stPeriod) if (f.sku === sku) { const e = line(storeB(f.ch), f.ch); e.revenue += f.rs; e.units += f.rq; e.l7u += f.l7q; if (f.last && (!e.last || f.last > e.last)) e.last = f.last; }
   for (const f of roll.st) if (f.sku === sku) { const e = line(storeB(f.ch), f.ch); e.l30 += f.rs; e.l30u += f.rq; }
   for (const r of inv) if (r.sku === sku) { const e = line(r.b, r.store); e.stock += r.units; e.s30 += r.s30; }
-  const stores = [...lines.values()].filter((s) => s.revenue > 0 || s.l30u > 0 || s.stock > 0)
-    .map((s) => ({ ...s, doi: s.l30u > 0 ? s.stock / (s.l30u / 30) : null }))
+  for (const l of git.lines) if (l.sku === sku) { const e = line(l.b, l.store); e.git = (e.git ?? 0) + l.qty; }
+  const stores = [...lines.values()].filter((s) => s.revenue > 0 || s.l30u > 0 || s.stock > 0 || (s.git ?? 0) > 0)
+    .map((s) => ({ ...s, doi: s.l30u > 0 ? (s.stock + (s.git ?? 0)) / (s.l30u / 30) : null }))
     .sort((a, b) => b.revenue - a.revenue || b.l30 - a.l30 || b.stock - a.stock);
 
   // category benchmarks
@@ -193,7 +199,7 @@ export default async function ProductDetail({ params, searchParams }: { params: 
         <Kpi label="L30 sales" value={inr(row.l30)} delta={row.mom} deltaLabel="vs P30" sub={`${num(row.l30Units)} units`} tip={`${DEF.l30.replace(", selected channel", ", all channels")}; ${DEF.mom}`} />
         <Kpi label="L7 sales" value={inr(row.l7)} delta={row.wow} deltaLabel="vs P7" sub={`${num(row.l7Units)} units`} tip={`${DEF.l7.replace(", selected channel", ", all channels")}; ${DEF.wow}`} />
         <Kpi label="Return %" value={pct(p.returnPct.all, 1)} sub={facts.catReturn != null ? `category ${pct(facts.catReturn, 1)}` : "lifetime"} tone={p.returnPct.all != null && facts.catReturn != null && p.returnPct.all > facts.catReturn + 0.05 ? "warn" : undefined} tip="Lifetime returned ₹ ÷ sold ₹, all channels" />
-        <Kpi label="Store stock" value={num(storeInv)} sub={`${num(p.storesStocked)} stores · ${num(selling)} selling`} tip={DEF.storeInv} />
+        <Kpi label="Store stock" value={num(storeInv)} sub={<>{num(p.storesStocked)} stores · {num(selling)} selling{gitInv ? <> · <b className="font-semibold text-brand-700">{num(gitInv)}</b> in transit</> : null}</>} tip={`${DEF.storeInv}. ${DEF.git}`} />
         <Kpi label="Warehouse" value={num(whInv)} sub={`S ${num(row.whSouth)} · N ${num(row.whNorth)}`} tip={DEF.wh} />
         <Kpi label="Days of cover" value={row.doi != null ? num(row.doi) : totalInv > 0 ? "No sales" : "—"} sub={`STR L30 ${pct(row.str30, 0)}`} tone={row.doi == null ? (totalInv > 0 ? "warn" : undefined) : row.doi < 21 ? "bad" : row.doi > 180 ? "warn" : "good"} tip={`${DEF.doi}. ${DEF.str30}`} />
       </KpiGrid>
@@ -260,18 +266,19 @@ export default async function ProductDetail({ params, searchParams }: { params: 
       </div>
 
       <div className="mt-3 grid gap-3 xl:grid-cols-[1.25fr_1fr]">
-        <Section title={`Store distribution · ${num(stores.length)} stores`} pad={false} tip={`Sorted by revenue in ${fmtRange(range)}. Stock = latest store report. Cover = store stock ÷ that store's L30 daily units.`}
+        <Section title={`Store distribution · ${num(stores.length)} stores`} pad={false} tip={`Sorted by revenue in ${fmtRange(range)}. Stock = latest store report; in transit = on its way to that store. Cover = (store stock + in transit) ÷ that store's L30 daily units.`}
           right={<span className="text-[11.5px] text-zinc-500">{num(selling)} selling L30{stockedNoSale ? <> · <span className="text-amber-700">{num(stockedNoSale)} stocked, no L30 sale</span></> : null}</span>}>
           {stores.length ? (
             <div className="max-h-[440px] overflow-auto scroll-thin">
               <table className="w-full whitespace-nowrap text-[12.5px]">
-                <thead className="sticky top-0 bg-white"><tr className="border-b border-line text-[11px] text-zinc-500">{["Store", "Revenue", "Units", "L7", "L30", "Stock", "Cover"].map((h, i) => <th key={h} className={cn("px-3 py-2 font-medium", i ? "text-right" : "text-left")}>{h}</th>)}</tr></thead>
+                <thead className="sticky top-0 bg-white"><tr className="border-b border-line text-[11px] text-zinc-500">{["Store", "Revenue", "Units", "L7", "L30", "Stock", "In transit", "Cover"].map((h, i) => <th key={h} className={cn("px-3 py-2 font-medium", i ? "text-right" : "text-left")}>{h}</th>)}</tr></thead>
                 <tbody>{stores.map((s) => (
                   <tr key={keyOf(s.b, s.name)} className="border-b border-zinc-100 hover:bg-zinc-50">
                     <td className="px-3 py-1.5">{s.b ? <Link href={withQs(ctx, `/stores/${s.b}`)} className="font-medium hover:underline">{s.name}</Link> : <span className="font-medium">{s.name}</span>}{(s.city || s.region) && <span className="ml-1.5 text-[11px] text-zinc-400">{[s.city, s.region].filter(Boolean).join(" · ")}</span>}</td>
                     <td className="tabular px-3 text-right font-medium">{s.revenue ? inr(s.revenue) : <span className="text-zinc-300">—</span>}</td><td className="tabular px-3 text-right">{num(s.units)}</td>
                     <td className="tabular px-3 text-right">{num(s.l7u)}</td><td className="tabular px-3 text-right">{num(s.l30u)}</td>
                     <td className={cn("tabular px-3 text-right", s.stock === 0 && s.l30u > 0 && "font-semibold text-rose-600")}>{num(s.stock)}</td>
+                    <td className="tabular px-3 text-right text-brand-700">{s.git ? num(s.git) : <span className="text-zinc-300">—</span>}</td>
                     <td className="px-3 text-right">{s.doi != null ? <span className={cn("tabular", s.doi < 14 ? "font-semibold text-rose-600" : s.doi > 120 ? "text-amber-700" : "")}>{num(s.doi)} d</span> : s.stock > 0 ? <Pill tone="warn">no sale</Pill> : <span className="text-zinc-300">—</span>}</td>
                   </tr>
                 ))}</tbody>
@@ -279,17 +286,15 @@ export default async function ProductDetail({ params, searchParams }: { params: 
             </div>
           ) : <div className="px-4 py-6 text-center text-[12.5px] text-zinc-500">No store sales or store stock for this product.</div>}
         </Section>
-        <Section title="Inventory now" tip={`${DEF.storeInv}. ${DEF.wh}`}>
-          <div className="grid grid-cols-4 gap-3">
-            {[["Stores", storeInv, `${num(p.storesStocked)} stores`], ["WH South", row.whSouth, "WH1 + WH2"], ["WH North", row.whNorth, "Tauru"], ["Total", totalInv, row.doi != null ? `${num(row.doi)} days` : "—"]].map(([l, v, s]) => (
+        <Section title="Inventory now" tip={`Three phases. ${DEF.storeInv}. ${DEF.git}. ${DEF.wh}`} right={gitInv ? <Link href={withQs(ctx, "/stores", { tab: "git", q: sku })} className="text-[11.5px] font-medium text-brand-700 hover:underline">In-transit detail →</Link> : undefined}>
+          <div className="grid grid-cols-5 gap-3">
+            {[["Stores", storeInv, `${num(p.storesStocked)} stores`], ["In transit", gitInv, gitInv ? `to ${num(g?.stores ?? 0)} stores` : "none"], ["WH South", row.whSouth, "WH1 + WH2"], ["WH North", row.whNorth, "Tauru"], ["Total", totalInv, row.doi != null ? `${num(row.doi)} days` : "—"]].map(([l, v, s]) => (
               <div key={String(l)} className="min-w-0"><div className="text-[11px] text-zinc-500">{l}</div><div className="tabular text-[16px] font-semibold">{num(Number(v))}</div><div className="text-[11px] text-zinc-400">{s}</div></div>
             ))}
           </div>
-          <div className="mt-3 flex h-3 overflow-hidden rounded bg-zinc-100" title="Stores · WH South · WH North">
-            {totalInv > 0 && [[storeInv, CH_COLORS.stores], [row.whSouth, "#c08f60"], [row.whNorth, "#2e6f73"]].map(([v, c], i) => <span key={i} style={{ width: `${(Number(v) / totalInv) * 100}%`, background: String(c) }} />)}
-          </div>
+          <div className="mt-3"><InvMix className="w-full" store={storeInv} git={gitInv} wh={whInv} title={`${p.name ?? sku} · inventory`} /></div>
           <div className="mt-3 space-y-1.5">{facs.map((f) => (
-            <div key={f.f} className="grid grid-cols-[140px_1fr_52px] items-center gap-2 text-[12px]"><span className="text-zinc-600">{f.f} <span className="text-[10.5px] text-zinc-400">{f.zone}</span></span><Meter value={safeDiv(f.u, whInv)} color={f.zone === "North" ? "#d97706" : "#c08f60"} /><span className="tabular text-right font-medium">{num(f.u)}</span></div>
+            <div key={f.f} className="grid grid-cols-[140px_1fr_52px] items-center gap-2 text-[12px]"><span className="text-zinc-600">{f.f} <span className="text-[10.5px] text-zinc-400">{f.zone}</span></span><Meter value={safeDiv(f.u, whInv)} color={f.zone === "North" ? "#2e6f73" : "#c08f60"} /><span className="tabular text-right font-medium">{num(f.u)}</span></div>
           ))}</div>
           <div className="mt-4">
             <div className="mb-1.5 flex items-center gap-1 text-[11px] font-medium text-zinc-500">Warehouse by size <Tip text="Live warehouse units per size (all three warehouses). Red = size out of stock at the warehouse." /></div>

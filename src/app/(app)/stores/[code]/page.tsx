@@ -6,6 +6,7 @@ import { buildStoreModel, modelRanges, LIVE_LOOKBACK } from "@/server/storeInsig
 import { trendByCategory, catColor, catLabel } from "@/server/views";
 import { getSkuFacts } from "@/server/data/sku";
 import { getProductMap } from "@/server/data/products";
+import { gitOrEmpty } from "@/server/scope";
 import { getStoreInventory, catKey } from "@/server/data/inventory";
 import { buildActions, actionStatuses } from "@/server/actions";
 import { PageHeader, Kpi, KpiGrid, Section, Delta, Pill, achTone, DataPrompt, ProductCell, StatusBadge } from "@/components/ui";
@@ -66,24 +67,28 @@ export default async function StoreDetail({ params, searchParams }: { params: Pr
     return {
       c, x, st, tone: tone as "muted" | "bad" | "good" | "warn", sales: x?.w.r.s ?? 0, prev: x?.w.c.s ?? 0, qty: x?.w.r.q ?? 0, share: safeDiv(x?.w.r.s ?? 0, s?.sales ?? 0),
       target: x?.w.r.ht ? x.w.r.t : null, ach: x?.w.r.ht ? safeDiv(x.w.r.s, x.w.r.t) : null, projAch: safeDiv(proj, mt), monthTarget: mt,
-      unitsDay: (x?.w.r.q ?? 0) / model.days, peerUnits, pen: x?.pen ?? null, peerPen: model.peerPen(c, s?.lt ?? null), inv: x?.inv ?? 0, s30: x?.s30 ?? 0, cover: x?.cover ?? null, last: x?.lastSale ?? null,
+      unitsDay: (x?.w.r.q ?? 0) / model.days, peerUnits, pen: x?.pen ?? null, peerPen: model.peerPen(c, s?.lt ?? null), inv: x?.inv ?? 0, git: x?.git ?? 0, s30: x?.s30 ?? 0, cover: x?.cover ?? null, last: x?.lastSale ?? null,
     };
   });
 
   // products: sales at this store ∪ stock at this store
   const inv = (await getStoreInventory([...pm.keys()])).filter((r) => r.b === code && cats.includes(catKey(r.cat) ?? ""));
+  const gitAll = await gitOrEmpty(new Set(pm.keys()));
+  const gitHere = new Map<string, number>();
+  for (const l of gitAll.lines) if (l.b === code && cats.includes(pm.get(l.sku)?.category ?? "")) gitHere.set(l.sku, (gitHere.get(l.sku) ?? 0) + l.qty);
+  const storeGit = gitAll.byStore.get(code);
   const stock = new Map<string, { units: number; s30: number }>();
   for (const r of inv) { const v = stock.get(r.sku) ?? { units: 0, s30: 0 }; v.units += r.units; v.s30 += r.s30; stock.set(r.sku, v); }
   const catSet = new Set(cats);
   const sales = skus.filter((f) => f.ch.toUpperCase() === storeName && catSet.has(f.c));
   const seen = new Set<string>();
   const prodRows = [...sales.map((f) => { seen.add(f.sku); return { sku: f.sku, c: f.c, rs: f.rs, rq: f.rq, ps: f.ps, l7: f.l7q, l30: f.l30q, last: f.last }; }),
-    ...[...stock.keys()].filter((k) => !seen.has(k)).map((k) => ({ sku: k, c: pm.get(k)?.category ?? catKey(inv.find((r) => r.sku === k)?.cat ?? "") ?? "", rs: 0, rq: 0, ps: 0, l7: 0, l30: 0, last: null as string | null }))]
+    ...[...new Set([...stock.keys(), ...gitHere.keys()])].filter((k) => !seen.has(k)).map((k) => ({ sku: k, c: pm.get(k)?.category ?? catKey(inv.find((r) => r.sku === k)?.cat ?? "") ?? "", rs: 0, rq: 0, ps: 0, l7: 0, l30: 0, last: null as string | null }))]
     .map((f) => {
       const p = pm.get(f.sku), st = stock.get(f.sku);
       const l30 = Math.max(f.l30, st?.s30 ?? 0);
       return { sku: f.sku, name: p?.name ?? f.sku, image: p?.image ?? null, category: catLabel(f.c), c: f.c, revenue: f.rs, units: f.rq, growth: growth(f.rs, f.ps), l7: f.l7, l30,
-        stock: s?.inFeed ? st?.units ?? 0 : null, cover: s?.inFeed && l30 > 0 ? (st?.units ?? 0) / (l30 / 30) : null, last: f.last, daysSince: f.last ? diffDays(f.last, ctx.asOf) : null };
+        stock: s?.inFeed ? st?.units ?? 0 : null, git: gitHere.get(f.sku) ?? 0, cover: s?.inFeed && l30 > 0 ? ((st?.units ?? 0) + (gitHere.get(f.sku) ?? 0)) / (l30 / 30) : null, last: f.last, daysSince: f.last ? diffDays(f.last, ctx.asOf) : null };
     });
   const top = prodRows.filter((r) => r.units > 0).sort((a, b) => b.revenue - a.revenue).slice(0, 8);
   const lowStock = prodRows.filter((r) => r.l30 >= 3 && r.stock != null && (r.stock === 0 || (r.cover != null && r.cover < 14))).sort((a, b) => b.l30 - a.l30).slice(0, 8);
@@ -101,7 +106,7 @@ export default async function StoreDetail({ params, searchParams }: { params: Pr
     { key: "name", label: "Product", image: "image", sub: "sku", width: 250 }, { key: "category", label: "Category" },
     { key: "revenue", label: "Revenue", type: "inr", bar: true }, { key: "units", label: "Units", type: "num" }, { key: "growth", label: "Growth", type: "delta" },
     { key: "l7", label: "L7 units", type: "num" }, { key: "l30", label: "L30 units", type: "num" },
-    { key: "stock", label: "Store stock", type: "num", tip: "Latest store report" }, { key: "cover", label: "Store cover (days)", type: "num", tip: "Store stock ÷ L30 daily units" },
+    { key: "stock", label: "Store stock", type: "num", tip: "Latest store report" }, { key: "git", label: "In transit", type: "num", tip: "On its way to this store, not yet in its stock" }, { key: "cover", label: "Store cover (days)", type: "num", tip: "(Store stock + in transit) ÷ L30 daily units" },
     { key: "last", label: "Last sale", type: "date" }, { key: "daysSince", label: "Days since sale", type: "num", hidden: true },
   ];
   const meta = [s?.city ?? store?.city, s?.state ?? store?.state, ltLabel(s?.lt ?? null), ctLabel(s?.ct ?? null), store?.store_status, store?.operating_model].filter((v) => v && v !== "—").join(" · ");
@@ -128,7 +133,7 @@ export default async function StoreDetail({ params, searchParams }: { params: Pr
           <Kpi label="Sales / day" value={inr(s.perDay)} sub={<>peer median {inr(peerPerDay)}</>} tip={`Median of other ${ltLabel(s.lt).toLowerCase()} stores with a live long-tail category`} />
           <Kpi label="ATV · UPT" value={s.atv == null ? "—" : inr(s.atv, { compact: false })} sub={<>UPT {num(s.upt, 2)} · peers {inr(peerAtv, { compact: false })} / {num(peerUpt, 2)}</>} tip="Perfumes + Shoes bills only" />
           <Kpi label="LT penetration" value={pct(s.pen, 1)} sub={<>peer median {pct(peerPen, 1)}</>} tone={s.pen != null && peerPen != null ? (s.pen >= peerPen ? "good" : s.pen < peerPen * 0.6 ? "bad" : "warn") : undefined} tip="In-scope category L30 units ÷ store's total L30 units across all categories (store report) — proxy for bill penetration" />
-          <Kpi label="Store stock" value={s.inFeed ? num(s.inv) : "—"} sub={s.inFeed ? <>cover {days(s.cover)} · {s.liveCats.length}/{cats.length} categories live</> : "not in the store report"} />
+          <Kpi label="Store stock" value={s.inFeed ? num(s.inv) : "—"} sub={s.inFeed ? <>cover {days(s.cover)} · {s.liveCats.length}/{cats.length} categories live{s.git ? <> · <Link href={withQs(base, "/stores", { tab: "git", store: code })} className="font-semibold text-brand-700 hover:underline">{num(s.git)} in transit</Link>{storeGit && storeGit.maxAging >= 7 ? <span className="text-amber-700"> (oldest {storeGit.maxAging}d)</span> : null}</> : null}</> : "not in the store report"} />
         </KpiGrid>
 
         <div className="mt-3 grid gap-3 xl:grid-cols-[1.6fr_1fr]">
@@ -147,7 +152,7 @@ export default async function StoreDetail({ params, searchParams }: { params: Pr
             <div className="overflow-x-auto scroll-thin">
               <table className="w-full whitespace-nowrap text-[12.5px]">
                 <thead><tr className="border-b border-line text-[11px] text-zinc-500">
-                  {["Category", "Status", "Revenue", "Share", "Growth", "Target", "Ach.", "Proj. month", "Units / day", "Peer units / day", "Penetration", "Peer pen.", "Store stock", "L30 units", "Cover", "Last sale"].map((h, i) => <th key={h} className={cn("px-3 py-2 font-medium", i > 1 ? "text-right" : "text-left")}>{h}</th>)}
+                  {["Category", "Status", "Revenue", "Share", "Growth", "Target", "Ach.", "Proj. month", "Units / day", "Peer units / day", "Penetration", "Peer pen.", "Store stock", "In transit", "L30 units", "Cover", "Last sale"].map((h, i) => <th key={h} className={cn("px-3 py-2 font-medium", i > 1 ? "text-right" : "text-left")}>{h}</th>)}
                 </tr></thead>
                 <tbody>{catRows.map((r) => (
                   <tr key={r.c} className={cn("border-b border-brand-50 last:border-0", r.st === "Not live" && "text-zinc-400")}>
@@ -164,6 +169,7 @@ export default async function StoreDetail({ params, searchParams }: { params: Pr
                     <td className={cn("tabular px-3 text-right", r.pen != null && r.peerPen != null && r.pen < r.peerPen * 0.5 && "text-rose-600")}>{pct(r.pen, 1)}</td>
                     <td className="tabular px-3 text-right text-zinc-500">{pct(r.peerPen, 1)}</td>
                     <td className="tabular px-3 text-right">{s.inFeed ? num(r.inv) : "—"}</td>
+                    <td className="tabular px-3 text-right text-brand-700">{r.git ? num(r.git) : <span className="text-zinc-300">—</span>}</td>
                     <td className="tabular px-3 text-right">{s.inFeed ? num(r.s30) : "—"}</td>
                     <td className="px-3 text-right">{r.cover == null ? "—" : <Pill tone={coverTone(r.cover)}>{days(r.cover)}</Pill>}</td>
                     <td className="tabular px-3 text-right text-zinc-500">{r.last ? fmtDate(r.last) : "—"}</td>
@@ -182,10 +188,10 @@ export default async function StoreDetail({ params, searchParams }: { params: Pr
 
         <div className="mt-3 grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
           <Section title="Top sellers" tip="By revenue in the selected period">
-            <ProdList rows={top} empty="No sales in this period." note={(r) => <><b className="font-semibold">{inr(r.revenue)}</b><span className="block text-[11px] text-zinc-500">{num(r.units)} units · stock {r.stock ?? "—"}</span></>} />
+            <ProdList rows={top} empty="No sales in this period." note={(r) => <><b className="font-semibold">{inr(r.revenue)}</b><span className="block text-[11px] text-zinc-500">{num(r.units)} units · stock {r.stock ?? "—"}{r.git ? <span className="text-brand-700"> · +{num(r.git)} GIT</span> : null}</span></>} />
           </Section>
-          <Section title="Selling, low stock" tip="≥3 units sold in 30 days with 0 stock or under 14 days of store cover — replenish">
-            <ProdList rows={lowStock} empty="No top seller is short in this store." note={(r) => <><Pill tone={r.stock === 0 ? "bad" : "warn"}>{r.stock === 0 ? "0 stock" : days(r.cover)}</Pill><span className="block text-[11px] text-zinc-500">{num(r.l30)} sold L30</span></>} />
+          <Section title="Selling, low stock" tip="≥3 units sold in 30 days with 0 stock or under 14 days of store cover. Items already in transit are marked — no need to send again.">
+            <ProdList rows={lowStock} empty="No top seller is short in this store." note={(r) => <><Pill tone={r.git ? "info" : r.stock === 0 ? "bad" : "warn"}>{r.git ? `${num(r.git)} in transit` : r.stock === 0 ? "0 stock" : days(r.cover)}</Pill><span className="block text-[11px] text-zinc-500">{num(r.l30)} sold L30 · {num(r.stock ?? 0)} in store</span></>} />
           </Section>
           <Section title="Stocked, not selling" tip="≥3 units in store and no sale in 30 days — move or re-merchandise">
             <ProdList rows={idle} empty="Every stocked product sold in the last 30 days." note={(r) => <><b className="font-semibold">{num(r.stock)}</b><span className="block text-[11px] text-zinc-500">{r.last ? `last sale ${fmtDate(r.last)}` : "no sale in 90 days"}</span></>} />

@@ -22,11 +22,11 @@ export async function StoreProductsTab({ ctx }: { ctx: Ctx }) {
     { key: "revenue", label: "Revenue", type: "inr", bar: true, group: "Period", tip: fmtRange(ctx.period.range) }, { key: "units", label: "Units", type: "num", group: "Period" },
     { key: "share", label: "Share of store", type: "pct", group: "Period", tip: "This product's share of the store's revenue in its category" },
     { key: "l7Units", label: "L7 units", type: "num", group: "Rolling" }, { key: "l30Units", label: "L30 units", type: "num", group: "Rolling" },
-    { key: "stock", label: "Store stock", type: "num", group: "Inventory", tip: "Latest store report" }, { key: "cover", label: "Cover (days)", type: "num", group: "Inventory", tip: "Store stock ÷ L30 daily units in this store" },
+    { key: "stock", label: "Store stock", type: "num", group: "Inventory", tip: "Latest store report" }, { key: "git", label: "In transit", type: "num", group: "Inventory", tip: "On its way to this store (allocated, not yet in store stock)" }, { key: "cover", label: "Cover (days)", type: "num", group: "Inventory", tip: "(Store stock + in transit) ÷ L30 daily units in this store" },
     { key: "last", label: "Last sale", type: "date", hidden: true },
   ];
   const tableRows = rows.map((r) => ({ ...r, format: LT_LABEL[fmtLt(r.format) ?? ""] ?? fmtLt(r.format) }));
-  const rev = rows.reduce((a, r) => a + r.revenue, 0), stock = rows.reduce((a, r) => a + r.stock, 0);
+  const rev = rows.reduce((a, r) => a + r.revenue, 0), stock = rows.reduce((a, r) => a + r.stock, 0), inTransit = rows.reduce((a, r) => a + r.git, 0);
   const selling = rows.filter((r) => r.units > 0).length, idle = rows.filter((r) => r.stock >= 3 && r.l30Units === 0).length;
   const facets = [{ key: "store", label: "Store" }, ...(multiCat ? [{ key: "catName", label: "Category" }] : []), { key: "l1", label: "Type" }, { key: "l2", label: "Sub-type" }, { key: "colour", label: "Colour" }, { key: "state", label: "State" }, { key: "format", label: "Format" }];
   return (
@@ -35,7 +35,7 @@ export async function StoreProductsTab({ ctx }: { ctx: Ctx }) {
         <Kpi label="Store × product lines" value={num(rows.length)} sub={`${num(new Set(rows.map((r) => r.b)).size)} stores · ${num(new Set(rows.map((r) => r.sku)).size)} products`} />
         <Kpi label="Revenue · period" value={inr(rev)} sub="store sales lines (gross)" />
         <Kpi label="Selling lines" value={num(selling)} sub={`${num(rows.length - selling)} with stock, no sale in period`} />
-        <Kpi label="Store stock" value={compactNum(stock)} sub={`${num(idle)} lines idle 30 days (≥3 units)`} tone={idle ? "warn" : undefined} />
+        <Kpi label="Store stock" value={compactNum(stock)} sub={<>{num(idle)} lines idle 30 days{inTransit ? <> · <b className="font-semibold text-brand-700">{compactNum(inTransit)}</b> in transit</> : null}</>} tone={idle ? "warn" : undefined} />
       </KpiGrid>
       <div className="mt-3">
         <Section title="Which metafields sell in which store" pad={false} tip="Pick an attribute (type, colour, occasion …) and a metric; cells are heat-mapped across stores">

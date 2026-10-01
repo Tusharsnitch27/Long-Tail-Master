@@ -54,7 +54,7 @@ export async function buildLab(ctx: Ctx) {
   const allRows = perfAll.rows.filter((r) => !gift(r.p, r));
   const products = sc.products.filter((p) => !gift(p, allBy.get(p.sku)));
   const cats = ctx.filters.cats;
-  const stockOf = (p: Product) => Math.max(0, p.invOffline ?? 0) + Math.max(0, whUnits(p.sku));
+  const stockOf = (p: Product) => Math.max(0, p.invOffline ?? 0) + Math.max(0, sc.git.bySku.get(p.sku)?.units ?? 0) + Math.max(0, whUnits(p.sku)); // stores + in transit + warehouse
   const th = ctx.settings.thresholds;
 
   /* 1 · category health scorecard */

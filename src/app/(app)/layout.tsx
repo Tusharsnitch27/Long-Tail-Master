@@ -12,6 +12,7 @@ import { getWarehouseStock } from "@/server/data/warehouse";
 import { storeInventoryDate } from "@/server/data/inventory";
 import { APP_NAME } from "@/lib/nav";
 import { getProductMap } from "@/server/data/products";
+import { gitOrEmpty } from "@/server/scope";
 import { ucChannel } from "@/server/channelData";
 import { buildActions } from "@/server/actions";
 import { pageContext } from "@/server/context";
@@ -44,6 +45,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   try {
     const [settings, fresh] = await Promise.all([getSettings(), getFreshness()]);
     const [uc, ucTs, pm, invDate] = await Promise.all([getChannelDaily({ from: addDays(fresh.asOf, -29), to: fresh.today }), channelFreshness(), getProductMap(), storeInventoryDate().catch(() => null)]);
+    const gitTs = (await gitOrEmpty(new Set(pm.keys()))).updated;
     const wh = await getWarehouseStock(new Set(pm.keys()));
     // options come from the data: categories with sales in the last 30 days; marketplaces with sales
     const withData = new Set(uc.filter((r) => r.items > 0).map((r) => r.c));
@@ -61,7 +63,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       freshness: [
         { label: "Store sales", value: `to ${fmtDate(fresh.asOf)}`, tip: `DSR refreshed ${time(fresh.tables.LONG_TAIL_DSR_PERFUMES ?? null)}`, stale: fresh.asOf < addDays(fresh.today, -2) },
         { label: "Online", value: time(ucTs), tip: "Online & Marketplace — latest order item (Unicommerce)" },
-        { label: "Inventory", value: time(wh.updated), tip: `Warehouse live ${time(wh.updated)} · store stock ${invDate ? fmtDate(invDate) : "—"} (latest store report)`, stale: !invDate || invDate < addDays(fresh.today, -1) },
+        { label: "Inventory", value: time(wh.updated), tip: `Warehouse live ${time(wh.updated)} · store stock ${invDate ? fmtDate(invDate) : "—"} (latest store report) · goods in transit ${gitTs ? time(gitTs) : "—"}`, stale: !invDate || invDate < addDays(fresh.today, -1) },
       ],
     };
     const ctx = await pageContext(Promise.resolve({}));

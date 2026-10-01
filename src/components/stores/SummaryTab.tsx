@@ -35,7 +35,7 @@ export async function SummaryTab({ ctx, facts, model }: { ctx: Ctx; facts: Fact[
 
   // network totals (all stores in scope)
   const tot = S.reduce((a, s) => ({ sales: a.sales + s.sales, prev: a.prev + s.prev, qty: a.qty + s.qty, mrp: a.mrp + s.mrp, bills: a.bills + (s.bills ?? 0), bS: a.bS + s.billSales, bQ: a.bQ + s.billQty,
-    inv: a.inv + s.inv, s30: a.s30 + s.s30, su: a.su + (s.liveCats.length ? s.storeUnits30 : 0) }), { sales: 0, prev: 0, qty: 0, mrp: 0, bills: 0, bS: 0, bQ: 0, inv: 0, s30: 0, su: 0 });
+    inv: a.inv + s.inv, git: a.git + s.git, s30: a.s30 + s.s30, su: a.su + (s.liveCats.length ? s.storeUnits30 : 0) }), { sales: 0, prev: 0, qty: 0, mrp: 0, bills: 0, bS: 0, bQ: 0, inv: 0, git: 0, s30: 0, su: 0 });
   const prevQty = facts.reduce((a, f) => (f.d >= compare.from && f.d <= compare.to ? a + f.q : a), 0);
   const billStores = S.filter((s) => s.billLive).length;
   const stockOutCells = S.reduce((a, s) => a + s.stockOuts.length, 0), stockOutStores = S.filter((s) => s.stockOuts.length).length;
@@ -129,7 +129,7 @@ export async function SummaryTab({ ctx, facts, model }: { ctx: Ctx; facts: Fact[
         <Kpi label={`UPT · ${billCats}`} value={num(safeDiv(tot.bQ, tot.bills), 2)} sub="units per bill" />
         <Kpi label="Bills / store / day" value={num(safeDiv(tot.bills, billStores * model.days), 1)} sub={`${billStores} stores · ${billCats}`} />
         <Kpi label="Long-tail penetration" value={pct(safeDiv(tot.s30, tot.su), 1)} sub="of store units · L30" tip="In-scope category L30 units ÷ total L30 units of the same (live) stores across ALL categories, from the store report. Proxy for bill penetration." />
-        <Kpi label="Store inventory" value={compactNum(tot.inv)} sub={<>cover <b className="font-semibold text-zinc-800">{days(tot.s30 > 0 ? tot.inv / (tot.s30 / 30) : null)}</b> at L30 rate</>} tip={`Latest store report${model.invDate ? ` (${model.invDate})` : ""} — ${model.feedStores} stores in the feed`} />
+        <Kpi label="Store inventory" value={compactNum(tot.inv)} sub={<>cover <b className="font-semibold text-zinc-800">{days(tot.s30 > 0 ? (tot.inv + tot.git) / (tot.s30 / 30) : null)}</b> incl. transit{tot.git ? <> · <Link href={withQs(ctx, "/stores", { tab: "git" })} className="font-semibold text-brand-700 hover:underline">{compactNum(tot.git)} in transit</Link></> : null}</>} tip={`Latest store report${model.invDate ? ` (${model.invDate})` : ""} — ${model.feedStores} stores in the feed`} />
         <Kpi label="Stock-outs" value={num(stockOutCells)} tone={stockOutCells ? "bad" : "good"} sub={`${stockOutStores} stores · live category at 0 stock`} href={withQs(ctx, "/stores", { tab: "dsr" })} />
       </KpiGrid></div>
       <div className="mt-3"><DataPrompt compact title="True bill penetration needs total store bills">
@@ -158,7 +158,7 @@ export async function SummaryTab({ ctx, facts, model }: { ctx: Ctx; facts: Fact[
           <div className="mt-3 border-t border-line pt-3">
             <div className="mb-1.5 text-[11px] font-medium text-zinc-500">Category scorecard · live stores</div>
             <table className="w-full whitespace-nowrap text-[12px]">
-              <thead><tr className="text-[10.5px] text-zinc-400">{["Category", "Live", "Sales / store / day", "Ach.", "Proj.", "Cover", "Stock-outs"].map((h, i) => <th key={h} className={cn("py-1 font-medium", i ? "text-right" : "text-left")}>{h}</th>)}</tr></thead>
+              <thead><tr className="text-[10.5px] text-zinc-400">{["Category", "Live", "Sales / store / day", "Ach.", "Proj.", "In transit", "Cover", "Stock-outs"].map((h, i) => <th key={h} className={cn("py-1 font-medium", i ? "text-right" : "text-left")}>{h}</th>)}</tr></thead>
               <tbody>{model.cats.map((c) => (
                 <tr key={c.c} className="border-t border-brand-50">
                   <td className="py-1.5"><span className="flex items-center gap-1.5"><span className="size-2 rounded-full" style={{ background: catColor(c.c) }} />{catLabel(c.c)}</span></td>
@@ -166,6 +166,7 @@ export async function SummaryTab({ ctx, facts, model }: { ctx: Ctx; facts: Fact[
                   <td className="tabular text-right">{inr(c.perLiveStoreDay)}</td>
                   <td className="text-right">{c.ach == null ? <span className="text-zinc-400">—</span> : <Pill tone={achTone(c.ach, th)}>{pct(c.ach, 0)}</Pill>}</td>
                   <td className="tabular text-right">{pct(c.projAch, 0)}</td>
+                  <td className="tabular text-right text-brand-700">{c.git ? compactNum(c.git) : <span className="text-zinc-300">—</span>}</td>
                   <td className="text-right">{c.cover == null ? "—" : <Pill tone={coverTone(c.cover)}>{days(c.cover)}</Pill>}</td>
                   <td className={cn("tabular text-right", c.stockOuts ? "text-rose-600" : "text-zinc-400")}>{c.stockOuts}</td>
                 </tr>

@@ -6,8 +6,8 @@ import { cn } from "@/lib/cn";
 import { compactNum, inr, num, pct } from "@/lib/format";
 import { ChartDownload } from "@/components/charts/ChartDownload";
 
-type Cells = Record<string, Record<string, Record<string, [number, number, number]>>>;
-const METRICS = [{ k: 0, label: "Revenue" }, { k: 1, label: "Units" }, { k: 2, label: "Stock now" }, { k: 3, label: "Share of store" }] as const;
+type Cells = Record<string, Record<string, Record<string, [number, number, number, number]>>>;
+const METRICS = [{ k: 0, label: "Revenue" }, { k: 1, label: "Units" }, { k: 2, label: "Stock now" }, { k: 4, label: "In transit" }, { k: 3, label: "Share of store" }] as const;
 const MAXCOLS = 12;
 
 /** Store × metafield heat map: which types / colours / attributes sell (or sit) in which store. */
@@ -16,7 +16,7 @@ export function MetaPivot({ attrs, stores, cells, qs }: { attrs: { key: string; 
   const [metric, setMetric] = useState<(typeof METRICS)[number]["k"]>(0);
   const [q, setQ] = useState("");
   const data = cells[attr] ?? {};
-  const base = metric === 3 ? 0 : metric; // share uses revenue
+  const base = metric === 3 ? 0 : metric === 4 ? 3 : metric; // share uses revenue; in transit = slot 3
   const { values, rows, colTot } = useMemo(() => {
     const vt = new Map<string, number>();
     for (const s of Object.values(data)) for (const [v, x] of Object.entries(s)) vt.set(v, (vt.get(v) ?? 0) + x[base]);
@@ -46,7 +46,7 @@ export function MetaPivot({ attrs, stores, cells, qs }: { attrs: { key: string; 
           <div className="flex h-8 items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-2.5 focus-within:border-brand-500 focus-within:ring-4 focus-within:ring-brand-500/15">
             <Search className="size-3.5 text-zinc-500" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a store" className="w-32 bg-transparent text-[12.5px] outline-none" />
           </div>
-          <ChartDownload name={`stores-by-${label}-${METRICS[metric].label}`} data={rows.map((r) => ({ store: r.store, city: r.city, ...Object.fromEntries(values.map((v, i) => [v, r.v[i]])), total: metric === 3 ? 1 : r.tot }))}
+          <ChartDownload name={`stores-by-${label}-${(METRICS.find((m) => m.k === metric) ?? METRICS[0]).label}`} data={rows.map((r) => ({ store: r.store, city: r.city, ...Object.fromEntries(values.map((v, i) => [v, r.v[i]])), total: metric === 3 ? 1 : r.tot }))}
             columns={[{ key: "store", label: "Store" }, { key: "city", label: "City" }, ...values.map((v) => ({ key: v, label: v })), { key: "total", label: "Total" }]} />
         </div>
       </div>
@@ -73,7 +73,7 @@ export function MetaPivot({ attrs, stores, cells, qs }: { attrs: { key: string; 
           </table>
         </div>
       )}
-      <div className="px-3 py-2 text-[11px] text-zinc-500">Top {MAXCOLS} {label.toLowerCase()} values by network {METRICS[base].label.toLowerCase()}. Revenue / units = store sales lines in the selected period; stock = latest store report. Darker = more.</div>
+      <div className="px-3 py-2 text-[11px] text-zinc-500">Top {MAXCOLS} {label.toLowerCase()} values by network {(METRICS.find((m) => m.k === metric) ?? METRICS[0]).label.toLowerCase()}. Revenue / units = store sales lines in the selected period; stock = latest store report; in transit = allocated to the store, not yet in its stock. Darker = more.</div>
     </div>
   );
 }

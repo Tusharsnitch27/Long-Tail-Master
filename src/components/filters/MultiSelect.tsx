@@ -5,10 +5,13 @@ import { cn } from "@/lib/cn";
 
 export interface Option { value: string; label: string; hint?: string }
 
-export function MultiSelect({ label, options, value, onChange, width = 260 }: {
+export function MultiSelect({ label, options, value, onChange, width = 260, pill = false }: {
   label: string; options: Option[]; value: string[]; onChange: (v: string[]) => void; width?: number;
+  /** labelled filter-pill style (espresso when active) */ pill?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // open towards whichever side has room, so the panel never runs off-screen
+  const [alignRight, setAlignRight] = useState(false);
   const [q, setQ] = useState("");
   const [draft, setDraft] = useState<string[]>(value);
   const ref = useRef<HTMLDivElement>(null);
@@ -35,18 +38,31 @@ export function MultiSelect({ label, options, value, onChange, width = 260 }: {
     <div className="relative" ref={ref}>
       <button
         type="button"
-        onClick={() => (open ? commit() : setOpen(true))}
-        className={cn(
+        onClick={() => {
+          if (open) return commit();
+          const r = ref.current?.getBoundingClientRect();
+          setAlignRight(!!r && r.left + width > window.innerWidth - 12);
+          setOpen(true);
+        }}
+        className={pill ? cn(
+          "flex h-8 items-center gap-1.5 rounded-lg border pl-2.5 pr-2 text-[12px] shadow-[0_1px_2px_rgba(60,40,20,.06)] transition-colors",
+          value.length ? "border-brand-900 bg-brand-900 text-canvas" : "border-zinc-300 bg-white text-ink hover:border-brand-400",
+        ) : cn(
           "flex h-8 items-center gap-1.5 rounded-md border bg-white px-2.5 text-[13px] hover:border-zinc-400",
           value.length ? "border-brand-500 text-brand-700" : "border-zinc-300 text-zinc-700",
         )}
       >
-        {label}
-        {value.length > 0 && <span className="rounded bg-brand-500 px-1.5 text-[11px] font-semibold text-white">{value.length}</span>}
+        {pill ? <>
+          <span className={cn("text-[10px] font-semibold uppercase tracking-[0.12em]", value.length ? "text-brand-300" : "text-zinc-400")}>{label}</span>
+          <span className="max-w-36 truncate font-medium">{value.length === 0 ? "All" : value.length === 1 ? options.find((o) => o.value === value[0])?.label ?? value[0] : `${value.length} selected`}</span>
+        </> : <>
+          {label}
+          {value.length > 0 && <span className="rounded bg-brand-500 px-1.5 text-[11px] font-semibold text-white">{value.length}</span>}
+        </>}
         <ChevronDown className="size-3.5 opacity-60" />
       </button>
       {open && (
-        <div className="absolute left-0 top-9 z-50 rounded-lg border border-zinc-200 bg-white shadow-lg" style={{ width }}>
+        <div className={cn("absolute top-10 z-50 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_18px_40px_-16px_rgba(60,40,20,.45)]", alignRight ? "right-0" : "left-0")} style={{ width: Math.min(width, typeof window === "undefined" ? width : window.innerWidth - 24) }}>
           <div className="flex items-center gap-2 border-b border-zinc-100 px-2.5 py-2">
             <Search className="size-3.5 text-zinc-400" />
             <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${label.toLowerCase()}…`}
@@ -72,7 +88,7 @@ export function MultiSelect({ label, options, value, onChange, width = 260 }: {
             ))}
           </div>
           <div className="flex justify-end border-t border-zinc-100 p-2">
-            <button onClick={commit} className="rounded-md bg-zinc-900 px-3 py-1 text-[12px] font-medium text-white">Apply</button>
+            <button onClick={commit} className="rounded-md bg-brand-900 px-3 py-1 text-[12px] font-medium text-canvas">Apply</button>
           </div>
         </div>
       )}

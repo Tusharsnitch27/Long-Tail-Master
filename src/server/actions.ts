@@ -11,6 +11,7 @@ import { getProductMap, type Product } from "./data/products";
 import { getWarehouseStock } from "./data/warehouse";
 import { getStoreInventory, getStoreInventoryCoverage, catKey } from "./data/inventory";
 import { getRecentInwards } from "./data/metafields";
+import { getGoodsInTransit, type GitData } from "./data/git";
 import { PRODUCT_TAGS, type ProductTag } from "@/lib/productTags";
 import { getTargetBook } from "./data/targetBook";
 import { effectiveRemarks, remarksSig, type Remark, type RemarkKind, type RemarkScope } from "./data/remarks";
@@ -63,6 +64,7 @@ export const RULES = {
   distTopQuantile: 0.75, distMaxPenetration: 0.3, distMinWarehouse: 30,
   declineL30: -0.25, declineL7: -0.15, declineMinPrevUnits: 30,
   allocMinL7: 3, allocCoverDays: 21, allocMinWarehouse: 10,
+  gitStuckDays: 10, gitStuckMinUnits: 5,
   idleSellThroughRatio: 0.3, idleMinUnits: 15,
   catGapRatio: 0.4,
   liveDays: 60, expansionMinLiveShare: 0.2, expansionPerCategory: 6, expansionMinWarehouse: 30,
@@ -86,7 +88,7 @@ export interface ActionsResult {
 
 export async function buildActions(ctx: Ctx): Promise<ActionsResult> {
   const remarks = await effectiveRemarks(ctx.today).catch(() => [] as Remark[]);
-  const key = `actions:v12:${ctx.asOf}:${ctx.filters.cats.join(",")}:${remarksSig(remarks)}`;
+  const key = `actions:v13:${ctx.asOf}:${ctx.filters.cats.join(",")}:${remarksSig(remarks)}`;
   return cached(key, 600, () => compute(ctx, remarks));
 }
 
@@ -115,7 +117,11 @@ async function compute(ctx: Ctx, remarks: Remark[]): Promise<ActionsResult> {
   // store × SKU sales keyed to branch codes (CHANNEL = store name)
   const storeSku = storeSkuRaw.map((f) => { const st = ctx.byName.get(f.ch.toUpperCase()); return { ...f, b: st?.branch_code ?? null, store: st?.short_name ?? f.ch.replace(/^SNITCH\s*-\s*/i, "") }; });
   const known = new Set(pm.keys());
-  const [wh, storeInv] = await Promise.all([getWarehouseStock(known), getStoreInventory([...known])]);
+  const [wh, storeInv, git] = await Promise.all([getWarehouseStock(known), getStoreInventory([...known]),
+    getGoodsInTransit(known).catch((e): GitData => { console.error("[actions] goods in transit unavailable", e); return { lines: [], bySku: new Map(), byStoreSku: new Map(), byStore: new Map(), updated: null }; })]);
+  /** goods already on their way to stores (allocated, not yet in store stock) */
+  const gitUnits = (sku: string) => git.bySku.get(sku)?.units ?? 0;
+  const gitAt = (b: string, sku: string) => git.byStoreSku.get(`${b}|${sku}`)?.units ?? 0;
   const inCat = (sku: string) => { const c = pm.get(sku)?.category; return !!c && cats.has(c); };
   const actions: Action[] = [];
   const whUnits = (sku: string) => wh.bySku.get(sku)?.units ?? 0;
@@ -260,18 +266,18 @@ async function compute(ctx: Ctx, remarks: Remark[]): Promise<ActionsResult> {
   for (const [sku, e] of vel) {
     const p = pm.get(sku);
     if (isGift(sku)) continue; // free gifts (< ₹10 / unit or no paid units) are never flagged
-    const stock = (p?.invOffline ?? 0) + whUnits(sku);
-    const perDay = e.l30 / 30; // DOI = (store + warehouse units) ÷ (L30 units ÷ 30)
+    const stock = (p?.invOffline ?? 0) + gitUnits(sku) + whUnits(sku);
+    const perDay = e.l30 / 30; // DOI = (store + in transit + warehouse units) ÷ (L30 units ÷ 30)
     const asp = safeDiv(e.rev30, e.l30) ?? p?.mrp ?? 0;
     const doi = perDay > 0 ? stock / perDay : Infinity;
     const base = { category: p?.category ?? null, product: prodRef(p, sku), links: [{ label: "View product", href: `/products/${encodeURIComponent(sku)}` }] };
     const zone = wh.bySku.get(sku)?.byZone;
-    const zoneEv = zone && (zone.North || zone.South) ? [{ label: "WH North / South", value: `${num(zone.North)} / ${num(zone.South)}` }] : [];
+    const zoneEv = [...(gitUnits(sku) > 0 ? [{ label: "In transit to stores", value: num(gitUnits(sku)) }] : []), ...(zone && (zone.North || zone.South) ? [{ label: "WH North / South", value: `${num(zone.North)} / ${num(zone.South)}` }] : [])];
     if (perDay >= RULES.fastMinPerDay && doi < RULES.fastDoiDays) {
       const short = Math.max(0, (RULES.fastDoiDays - doi) * perDay * asp);
       actions.push({
         ...base, key: `fast:${sku}`, group: "sku", type: "fast_low_doi", typeLabel: "Fast mover, low cover", priority: doi < RULES.urgentDoiDays ? "urgent" : "high",
-        title: `${p?.name ?? sku}: ${doi.toFixed(0)} days of inventory left`, reason: `Selling ${perDay.toFixed(1)}/day (L30 average, all channels; ${(e.l7 / 7).toFixed(1)}/day in the last 7) against ${num(stock)} units in stores + warehouse.`,
+        title: `${p?.name ?? sku}: ${doi.toFixed(0)} days of inventory left`, reason: `Selling ${perDay.toFixed(1)}/day (L30 average, all channels; ${(e.l7 / 7).toFixed(1)}/day in the last 7) against ${num(stock)} units in stores, in transit and the warehouse.`,
         recommendation: whUnits(sku) > 0 ? "Plan replenishment now and push warehouse stock to the fastest stores." : "Raise a reorder — warehouse is empty.",
         impact: short, impactLabel: `${inr(short)} at risk in ${RULES.fastDoiDays} days`, confidence: e.l30 >= 60 ? "high" : "medium", period: l30.range,
         evidence: [{ label: "L30 units", value: num(e.l30) }, { label: "L7 units", value: num(e.l7) }, { label: "Store inventory", value: num(p?.invOffline ?? 0) }, { label: "Warehouse", value: num(whUnits(sku)) }, ...zoneEv, { label: "Days of inventory", value: doi.toFixed(0) }],
@@ -319,12 +325,12 @@ async function compute(ctx: Ctx, remarks: Remark[]): Promise<ActionsResult> {
     const p = pm.get(sku);
     if (!p?.category || !cats.has(p.category) || isGift(sku)) continue;
     const e = vel.get(sku) ?? { l7: 0, p7: 0, l30: 0, p30: 0, rev30: 0, storeCount: 0, bySource: { stores: 0, online: 0, marketplace: 0 } };
-    const wu = whUnits(sku), su = p.invOffline ?? 0, stock = wu + su;
+    const wu = whUnits(sku), su = p.invOffline ?? 0, stock = wu + su + gitUnits(sku);
     const asp = safeDiv(e.rev30, e.l30) ?? p.sellingPrice ?? p.mrp ?? 0;
     const zone = wh.bySku.get(sku)?.byZone;
     const base = { group: "marketing" as const, category: p.category, product: prodRef(p, sku), period: l30.range,
       links: [{ label: "View product", href: `/products/${encodeURIComponent(sku)}` }] };
-    const stockEv = [{ label: "Warehouse", value: `${num(wu)}${zone ? ` (S ${num(zone.South)} · N ${num(zone.North)})` : ""}` }, { label: "Store stock", value: num(su) }];
+    const stockEv = [{ label: "Warehouse", value: `${num(wu)}${zone ? ` (S ${num(zone.South)} · N ${num(zone.North)})` : ""}` }, { label: "Store stock", value: num(su) }, ...(gitUnits(sku) ? [{ label: "In transit", value: num(gitUnits(sku)) }] : [])];
     const ni = inw.get(sku);
     const ni7 = e.l7 / 7, niCover = ni7 > 0 ? stock / ni7 : null;
     // a new inward that is already selling through quickly needs no push
@@ -527,11 +533,13 @@ async function compute(ctx: Ctx, remarks: Remark[]): Promise<ActionsResult> {
   for (const f of alloc) {
     if (isGift(f.sku) || (f.l30q > 0 && f.l30s / f.l30q < 10)) continue;
     const stock = stockAt.get(`${f.b}|${f.sku}`) ?? 0;
+    const inTransit = gitAt(f.b!, f.sku); // double-check: stock already on its way to this store
     const perDay = f.l7q / 7;
-    if (stock > perDay * 7) continue; // more than a week of cover
+    if (stock + inTransit > perDay * 7) continue; // more than a week of cover once transit lands
     const avail = whLeft.get(f.sku) ?? 0;
     if (avail < RULES.allocMinWarehouse) continue;
-    const need = Math.ceil(perDay * RULES.allocCoverDays - stock);
+    const need = Math.ceil(perDay * RULES.allocCoverDays - stock - inTransit);
+    if (need <= 0) continue;
     const qty = Math.max(1, Math.min(need, Math.floor(avail * 0.25)));
     whLeft.set(f.sku, avail - qty);
     const p = pm.get(f.sku), st = ctx.byCode.get(f.b!);
@@ -542,11 +550,11 @@ async function compute(ctx: Ctx, remarks: Remark[]): Promise<ActionsResult> {
     actions.push({
       key: `alloc:${f.b}:${f.sku}`, group: "merchandising", type: "allocation", typeLabel: "Allocation opportunity",
       priority: stock <= 1 && f.l7q >= 5 ? "urgent" : "high",
-      title: `${p?.name ?? f.sku} → ${st?.short_name ?? f.store}`, reason: `Sold ${f.l7q} in 7 days with ${stock} in store — ${stock === 0 ? "out of stock" : `${(stock / perDay).toFixed(0)} days of cover`}; warehouse has ${num(avail)}.`,
-      recommendation: `Review allocation of ~${qty} units (${RULES.allocCoverDays} days of cover at the current rate)${fromZone ? `, ideally from the ${fromZone} warehouse` : ""}.`,
+      title: `${p?.name ?? f.sku} → ${st?.short_name ?? f.store}`, reason: `Sold ${f.l7q} in 7 days with ${stock} in store${inTransit ? ` and ${inTransit} already in transit` : ""} — ${stock + inTransit === 0 ? "out of stock, nothing on the way" : `${((stock + inTransit) / perDay).toFixed(0)} days of cover${inTransit ? " once the transit lands" : ""}`}; warehouse has ${num(avail)}.`,
+      recommendation: `Review allocation of ~${qty} more units (${RULES.allocCoverDays} days of cover at the current rate${inTransit ? `, net of the ${inTransit} in transit` : ""})${fromZone ? `, ideally from the ${fromZone} warehouse` : ""}.`,
       impact: qty * asp, impactLabel: `≈${inr(qty * asp)} sales enabled`, confidence: f.l7q >= 5 ? "high" : "medium", category: p?.category ?? null,
       product: prodRef(p, f.sku), store: { code: f.b!, name: st?.short_name ?? f.store }, period: l7,
-      evidence: [{ label: "L7 sales", value: num(f.l7q) }, { label: "Store stock", value: num(stock) }, { label: "Warehouse", value: num(avail) }, ...(zone ? [{ label: "WH North / South", value: `${num(zone.North)} / ${num(zone.South)}` }] : []), { label: "Suggested qty", value: num(qty) }],
+      evidence: [{ label: "L7 sales", value: num(f.l7q) }, { label: "Store stock", value: num(stock) }, { label: "In transit to store", value: inTransit ? num(inTransit) : "none" }, { label: "Warehouse", value: num(avail) }, ...(zone ? [{ label: "WH North / South", value: `${num(zone.North)} / ${num(zone.South)}` }] : []), { label: "Suggested qty", value: num(qty) }],
       links: [{ label: "View product", href: `/products/${encodeURIComponent(f.sku)}` }, { label: "View store", href: `/stores/${f.b}` }],
     });
   }
@@ -555,7 +563,9 @@ async function compute(ctx: Ctx, remarks: Remark[]): Promise<ActionsResult> {
     const top = [...vel.entries()].filter(([s]) => pm.get(s)?.category === ck && !isGift(s)).sort((x, y) => y[1].bySource.stores - x[1].bySource.stores).slice(0, 5).map(([s]) => s);
     const strongStores = [...perDayBy.entries()].filter(([k, x]) => k.endsWith(`|${ck}`) && feed.has(k.split("|")[0]) && x >= (catMedian.get(ck) ?? Infinity)).map(([k]) => k.split("|")[0]);
     for (const sku of top) {
-      const missing = strongStores.filter((b) => (stockAt.get(`${b}|${sku}`) ?? 0) === 0);
+      const absent = strongStores.filter((b) => (stockAt.get(`${b}|${sku}`) ?? 0) === 0);
+      const onTheWay = absent.filter((b) => gitAt(b, sku) > 0); // already being sent
+      const missing = absent.filter((b) => gitAt(b, sku) === 0);
       if (missing.length < 2 || whUnits(sku) < RULES.distMinWarehouse) continue;
       const p = pm.get(sku); const e = vel.get(sku)!;
       const perStore = e.storeCount ? e.bySource.stores / e.storeCount : 0;
@@ -564,13 +574,35 @@ async function compute(ctx: Ctx, remarks: Remark[]): Promise<ActionsResult> {
       actions.push({
         key: `miss:${ck}:${sku}`, group: "merchandising", type: "missed_distribution", typeLabel: "Missed distribution",
         priority: reach >= 4 && perStore * reach >= 100_000 ? "urgent" : "high",
-        title: `${p?.name ?? sku}: not stocked in ${missing.length} strong ${catLabel(ck).toLowerCase()} stores`, reason: `A top-5 ${catLabel(ck).toLowerCase()} seller with no stock on the latest store report in above-median ${catLabel(ck).toLowerCase()} stores.`,
+        title: `${p?.name ?? sku}: not stocked in ${missing.length} strong ${catLabel(ck).toLowerCase()} stores`, reason: `A top-5 ${catLabel(ck).toLowerCase()} seller with no stock on the latest store report and nothing in transit in above-median ${catLabel(ck).toLowerCase()} stores${onTheWay.length ? ` (${onTheWay.length} more stores already have it on the way and are excluded)` : ""}.`,
         recommendation: `Allocate to ${missing.map(storeName).slice(0, 4).join(", ")}${missing.length > 4 ? "…" : ""} from ${num(whUnits(sku))} warehouse units${reach < missing.length ? ` (enough for ~${reach} stores at 3 units each)` : ""}.`,
         impact: perStore * reach, impactLabel: `≈${inr(perStore * reach)}/month potential`, confidence: "medium", category: ck, product: prodRef(p, sku), period: l30.range,
-        evidence: [{ label: "Stores missing it", value: num(missing.length) }, { label: "Sales / store (L30)", value: inr(perStore) }, { label: "Warehouse", value: num(whUnits(sku)) }],
+        evidence: [{ label: "Stores missing it", value: num(missing.length) }, { label: "Already in transit to", value: `${num(onTheWay.length)} stores` }, { label: "Sales / store (L30)", value: inr(perStore) }, { label: "Warehouse", value: num(whUnits(sku)) }],
         links: [{ label: "View product", href: `/products/${encodeURIComponent(sku)}` }],
       });
     }
+  }
+
+  /* ---------------- MERCHANDISING: goods stuck in transit (per store) */
+  const stuckBy = new Map<string, { units: number; value: number; skus: Set<string>; maxAge: number; c: Map<string, number> }>();
+  for (const l of git.lines) {
+    if (l.aging < RULES.gitStuckDays) continue;
+    const p = pm.get(l.sku); if (!p?.category || !cats.has(p.category)) continue;
+    const e = stuckBy.get(l.b) ?? { units: 0, value: 0, skus: new Set<string>(), maxAge: 0, c: new Map<string, number>() };
+    e.units += l.qty; e.value += l.qty * (p.sellingPrice ?? p.mrp ?? 0); e.skus.add(l.sku); e.maxAge = Math.max(e.maxAge, l.aging); e.c.set(p.category, (e.c.get(p.category) ?? 0) + l.qty);
+    stuckBy.set(l.b, e);
+  }
+  for (const [b, e] of stuckBy) {
+    if (e.units < RULES.gitStuckMinUnits) continue;
+    const mainCat = [...e.c.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] ?? null;
+    actions.push({
+      key: `git-stuck:${b}`, group: "merchandising", type: "git_stuck", typeLabel: "Stuck in transit", priority: e.maxAge >= 21 || e.value >= 200_000 ? "high" : "medium",
+      title: `${storeName(b)}: ${num(e.units)} units in transit for ${RULES.gitStuckDays}+ days`, reason: `${num(e.skus.size)} products allocated to this store have not reached its stock; the oldest has been pending ${e.maxAge} days.`,
+      recommendation: "Chase dispatch / delivery / store inward with logistics and the store so the stock can sell.", impact: e.value, impactLabel: `≈${inr(e.value)} of stock not sellable yet (selling price)`, confidence: "high",
+      category: e.c.size === 1 ? mainCat : null, store: { code: b, name: storeName(b) }, period: null,
+      evidence: [{ label: "Units stuck", value: num(e.units) }, { label: "Products", value: num(e.skus.size) }, { label: "Oldest", value: `${e.maxAge} days` }],
+      links: [{ label: "Goods in transit", href: `/stores?tab=git&store=${b}` }, { label: "View store", href: `/stores/${b}` }],
+    });
   }
 
   /* ---------------- apply team remarks */

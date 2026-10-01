@@ -41,7 +41,7 @@ export default async function ProductMaster({ searchParams }: { searchParams: Pr
     return {
       sku: r.sku, name: r.name, image: r.image, catName: r.catName, l1: r.l1, l2: r.l2, colour: r.colour, collection: r.collection, lifecycle: r.lifecycle, mrp: r.mrp, search: r.search, attrs,
       ltSales: r.ltSales, ltUnits: r.ltUnits, inward: r.inward, ltStr: r.ltStr, returnPct: r.returnPct, split: r.split, l30: r.l30, mom: r.mom, l30Units: r.l30Units, str30: r.str30,
-      storeInv: r.storeInv, storesStocked: r.storesStocked, whInv: r.whInv, whSouth: r.whSouth, whNorth: r.whNorth, doi: r.doi, daysLive: r.daysLive, flag: r.flag,
+      storeInv: r.storeInv, storesStocked: r.storesStocked, git: r.git, whInv: r.whInv, whSouth: r.whSouth, whNorth: r.whNorth, doi: r.doi, daysLive: r.daysLive, flag: r.flag,
     };
   });
   const viewHref = (v: string | null) => withQs(ctx, "/products", { view: v });
@@ -59,7 +59,7 @@ export default async function ProductMaster({ searchParams }: { searchParams: Pr
         <Kpi label="Lifetime sales" value={inr(agg.ltSales)} sub="all channels" tip="Product Master (LONG_TAIL_MASTER_BIBLE), to date" />
         <Kpi label="L30 sales" value={inr(agg.l30)} delta={agg.p30 ? agg.l30 / agg.p30 - 1 : null} deltaLabel="vs prior 30" tip={`${DEF.l30}`} />
         <Kpi label="Lifetime STR" value={pct(agg.ltStr, 0)} sub={`L30 STR ${pct(agg.str30, 0)}`} tip={`${DEF.ltStr}. ${DEF.str30}`} />
-        <Kpi label="Store stock" value={compactNum(agg.storeInv)} tip={DEF.storeInv} />
+        <Kpi label="Store stock" value={compactNum(agg.storeInv)} sub={agg.git ? <><b className="font-semibold text-brand-700">{compactNum(agg.git)}</b> more in transit</> : undefined} tip={`${DEF.storeInv}. ${DEF.git}`} />
         <Kpi label="Warehouse stock" value={compactNum(agg.whInv)} sub={`South ${compactNum(agg.whSouth)} · North ${compactNum(agg.whNorth)}`} tip={DEF.wh} />
         <Kpi label="Days of cover" value={agg.doi != null ? num(agg.doi) : "—"} sub={`${num(agg.lowCover)} products < 21 days`} tone={agg.doi == null ? undefined : agg.doi < 30 ? "bad" : agg.doi > 180 ? "warn" : "good"} tip={DEF.doi} />
       </KpiGrid>
@@ -97,6 +97,7 @@ function masterCols(multiCat: boolean): Col[] {
     { key: "l30", label: "Sales", type: "inr", group: "Last 30 days", tip: DEF.l30 }, { key: "mom", label: "vs P30", type: "delta", group: "Last 30 days", tip: DEF.mom },
     { key: "l30Units", label: "Units", type: "num", group: "Last 30 days" }, { key: "str30", label: "STR", type: "pct", group: "Last 30 days", tip: DEF.str30 },
     { key: "storeInv", label: "Stores", type: "num", group: "Inventory", tip: DEF.storeInv }, { key: "storesStocked", label: "# stores", type: "num", group: "Inventory" },
+    { key: "git", label: "In transit", type: "num", group: "Inventory", tip: DEF.git }, { key: "gitStores", label: "→ stores", type: "num", group: "Inventory", tip: "Stores the in-transit units are going to", hidden: true },
     { key: "whSouth", label: "WH South", type: "num", group: "Inventory", tip: DEF.wh }, { key: "whNorth", label: "WH North", type: "num", group: "Inventory", tip: DEF.wh },
     { key: "totalInv", label: "Total", type: "num", group: "Inventory" }, { key: "doi", label: "Cover (days)", type: "num", group: "Inventory", tip: DEF.doi },
     { key: "flag", label: "Flag", tip: "Free gift = recent ASP under ₹10; Low cover = ≥10 units L30 and under 21 days of cover; Slow = ≥30 units and over 180 days of cover" },

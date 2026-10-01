@@ -77,7 +77,7 @@ export function GroupTable({ rows, th, first = "Group", showCoverage = true, tot
     ["Sales / store / day", "Revenue ÷ (live stores × days)"], ["Units / store / day"], ["Bills / store / day", "Perfumes + Shoes bills (only DSR categories carry bills) ÷ stores where either is live"],
     ["ATV", "Bill value: Perfumes + Shoes sales ÷ their bills"], ["UPT", "Units per bill (Perfumes + Shoes)"], ["Discount"],
     ["Achievement", "Live store × category cells only"], ["Proj. month"], ["Ahead · Behind", `Stores ≥${pct(th.onTrack, 0)} · <${pct(th.atRisk, 0)} of target`],
-    ["LT penetration", "In-scope category L30 units ÷ the stores' total L30 units across all categories (store report)"], ["Store stock"], ["Cover", "Store stock ÷ L30 daily units (store report)"],
+    ["LT penetration", "In-scope category L30 units ÷ the stores' total L30 units across all categories (store report)"], ["Store stock"], ["In transit", "Goods allocated to these stores and not yet in their stock"], ["Cover", "Store stock ÷ L30 daily units (store report)"],
     ...(showCoverage ? [["Range coverage", "Share of store × category cells that are live"] as [string, string]] : []),
   ];
   return (
@@ -104,6 +104,7 @@ export function GroupTable({ rows, th, first = "Group", showCoverage = true, tot
             <td className="tabular px-3 text-right"><span className="text-emerald-700">{r.ahead}</span><span className="text-zinc-300"> · </span><span className="text-rose-600">{r.behind}</span><span className="text-zinc-400"> / {r.withTarget}</span></td>
             <td className="tabular px-3 text-right">{pct(r.pen, 1)}</td>
             <td className="tabular px-3 text-right">{num(r.inv)}</td>
+            <td className="tabular px-3 text-right text-brand-700">{r.git ? num(r.git) : <span className="text-zinc-300">—</span>}</td>
             <td className="px-3 text-right">{r.cover == null ? "—" : <Pill tone={coverTone(r.cover)}>{days(r.cover)}</Pill>}</td>
             {showCoverage && <td className="tabular px-3 text-right">{pct(r.coverage, 0)}</td>}
           </tr>

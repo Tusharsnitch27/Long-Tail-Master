@@ -47,13 +47,13 @@ export default async function Merchandising({ searchParams }: { searchParams: Pr
     return { sku: r.sku, name: r.name, image: r.image, category: catLabel(r.category!), stores: sold.size, comparable: strong.size, gap: Math.max(strong.size - strongSelling, 0), perStore: r.salesPerStore, wh: r.whInv };
   }).filter((r) => r.gap > 0 && r.wh > 0).sort((a, b) => (b.perStore ?? 0) * b.gap - (a.perStore ?? 0) * a.gap).slice(0, 15);
 
-  const posRows = perf.rows.filter((r) => (r.storeInv ?? 0) + r.whInv > 0 || r.l30Units > 0).map((r) => ({
-    sku: r.sku, name: r.name, image: r.image, category: catLabel(r.category ?? ""), storeInv: r.storeInv, whInv: r.whInv, total: (r.storeInv ?? 0) + r.whInv,
+  const posRows = perf.rows.filter((r) => (r.storeInv ?? 0) + r.git + r.whInv > 0 || r.l30Units > 0).map((r) => ({
+    sku: r.sku, name: r.name, image: r.image, category: catLabel(r.category ?? ""), storeInv: r.storeInv, git: r.git, whInv: r.whInv, total: (r.storeInv ?? 0) + r.git + r.whInv,
     l7: r.l7Units, l30: r.l30Units, cover: r.doi, stocked: r.p?.storesStocked ?? null, selling: r.storesSelling,
   }));
   const posCols: Col[] = [
     { key: "name", label: "Product", image: "image", sub: "sku", width: 250 }, { key: "category", label: "Category" },
-    { key: "storeInv", label: "Store inv", type: "num" }, { key: "whInv", label: "Warehouse", type: "num" }, { key: "total", label: "Total", type: "num", bar: true },
+    { key: "storeInv", label: "Store inv", type: "num" }, { key: "git", label: "In transit", type: "num", tip: "Allocated to stores, not yet in store stock" }, { key: "whInv", label: "Warehouse", type: "num" }, { key: "total", label: "Total", type: "num", bar: true },
     { key: "l7", label: "L7 units", type: "num" }, { key: "l30", label: "L30 units", type: "num" }, { key: "cover", label: "Cover (days)", type: "num", tip: "Total inventory ÷ L30 daily units (all channels)" },
     { key: "stocked", label: "Stores stocked", type: "num" }, { key: "selling", label: "Stores selling", type: "num", tip: "Stores with ≥1 sale in the last 30 days" },
   ];
@@ -68,6 +68,7 @@ export default async function Merchandising({ searchParams }: { searchParams: Pr
       <PageHeader title="Merchandising Overview" subtitle={<>Is the right inventory in the right place? · velocity to {ctx.asOf} · inventory latest (warehouse live)</>} />
       <KpiGrid cols={6}>
         <Kpi label="Store inventory" value={compactNum(sc.inventory.store)} sub="units · all stores" />
+        <Kpi label="In transit" value={compactNum(sc.inventory.git)} sub="warehouse → stores" href={withQs(base, "/stores", { tab: "git" })} />
         <Kpi label="Warehouse inventory" value={compactNum(sc.inventory.warehouse)} sub="units · live" />
         <Kpi label="Active selling products" value={num(perf.rows.filter((r) => r.l30Units > 0).length)} sub="≥1 sale in 30 days" />
         <Kpi label="Fast sellers at risk" value={num(fast.length)} sub="< 14 days of cover" href={withQs(base, "/actions", { group: "sku", type: "Fast mover, low cover" })} />

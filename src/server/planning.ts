@@ -31,14 +31,16 @@ export const targetDoi = (p: PlanParams) => Math.round((p.lo + p.hi) / 2);
 
 export interface SkuDemand {
   sku: string; name: string; image: string | null; category: string; l1: string | null; p: Product;
-  storeInv: number; whInv: number; stock: number; l7U: number; l30U: number; l30Rev: number;
+  storeInv: number; git: number; whInv: number; stock: number; l7U: number; l30U: number; l30Rev: number;
   base: number; trend: number | null; adj: number; rate: number; asp: number | null;
   f30: number; f60: number; f90: number; doi: number | null; onOrder: number; reorder: number;
   band: "no_sales" | "stockout" | "below" | "in" | "above" | "excess";
 }
 
 export function demandFor(p: Product, perf: ProductPerf | undefined, whInv: number, onOrder: number, pp: PlanParams): Omit<SkuDemand, "category"> & { category: string } {
-  const storeInv = Math.max(0, p.invOffline ?? 0), stock = storeInv + Math.max(0, whInv);
+  // stock = stores + in transit + warehouse (in-transit stock already left the warehouse but is still ours to sell)
+  const git = Math.max(0, perf?.git ?? 0);
+  const storeInv = Math.max(0, p.invOffline ?? 0), stock = storeInv + git + Math.max(0, whInv);
   const l7U = perf?.l7Units ?? 0, l30U = perf?.l30Units ?? 0, l30Rev = perf?.l30 ?? 0;
   const r7 = l7U / 7, r30 = l30U / 30;
   const base = pp.w * r7 + (1 - pp.w) * r30;
@@ -51,7 +53,7 @@ export function demandFor(p: Product, perf: ProductPerf | undefined, whInv: numb
   const band = doi == null ? "no_sales" : doi! < Math.min(14, pp.lo) ? "stockout" : doi! < pp.lo ? "below" : doi! <= pp.hi ? "in" : doi! <= pp.hi * 2 ? "above" : "excess";
   return {
     sku: p.sku, name: p.name ?? p.sku, image: p.image, category: p.category!, l1: productL1(p), p,
-    storeInv, whInv: Math.max(0, whInv), stock, l7U, l30U, l30Rev, base, trend, adj, rate, asp: safeDiv(l30Rev, l30U) ?? p.mrp,
+    storeInv, git, whInv: Math.max(0, whInv), stock, l7U, l30U, l30Rev, base, trend, adj, rate, asp: safeDiv(l30Rev, l30U) ?? p.mrp,
     f30: rate * 30, f60: rate * 60, f90: rate * 90, doi, onOrder, reorder, band,
   };
 }

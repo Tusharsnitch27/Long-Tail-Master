@@ -8,6 +8,8 @@ import type { Fact } from "./data/facts";
 import type { Store } from "./data/stores";
 import { catKey, getStoreCategoryMix, getStoreInventoryCoverage } from "./data/inventory";
 import { prevMonthSameDays } from "./plan";
+import { getProductMap } from "./data/products";
+import { gitOrEmpty } from "./scope";
 
 /**
  * Store Overview engine. One pass over store × category × day facts builds a store × category "cell" with every
@@ -41,6 +43,8 @@ export interface Cell {
   lastSale: string | null;
   /** live store report */
   inv: number; s30: number; inFeed: boolean;
+  /** goods in transit to this store (allocated, not yet in its stock) */
+  git: number;
   live: boolean;
   cover: number | null;
   /** category units ÷ store's total L30 units (all categories) */
@@ -77,7 +81,7 @@ export interface StoreInsight {
   // DSR windows (all cells)
   y: number; yTarget: number | null; lw: number; l7: number; p7: number; wtd: number; pwtd: number; lm: number;
   // inventory (store report)
-  inFeed: boolean; inv: number; s30: number; cover: number | null; storeUnits30: number; pen: number | null;
+  inFeed: boolean; inv: number; git: number; s30: number; cover: number | null; storeUnits30: number; pen: number | null;
   stockOuts: string[]; dead: string[]; lowCover: string[];
   todos: Todo[];
 }
@@ -86,7 +90,7 @@ export interface CatInsight {
   c: string; liveStores: number; notLive: number; sales: number; qty: number; prev: number; growth: number | null;
   target: number | null; ach: number | null; nonLiveTarget: number; nonLiveTargetStores: number;
   perLiveStoreDay: number | null; unitsPerLiveStoreDay: number | null; asp: number | null;
-  inv: number; s30: number; cover: number | null; pen: number | null; medianPen: number | null;
+  inv: number; git: number; s30: number; cover: number | null; pen: number | null; medianPen: number | null;
   stockOuts: number; dead: number; lowCover: number;
   mtd: number; mtdTarget: number | null; monthTarget: number | null; projected: number; projAch: number | null;
 }
@@ -141,7 +145,10 @@ export function windowsFor(ctx: Ctx): Record<Win, Range> {
 export const modelRanges = (ctx: Ctx): Range[] => { const w = windowsFor(ctx); return [w.l60, w.lm, w.pwtd, w.p7]; };
 
 export async function buildStoreModel(ctx: Ctx, facts: Fact[]): Promise<StoreModel> {
-  const [mix, cov, attrs] = await Promise.all([getStoreCategoryMix(), getStoreInventoryCoverage(), getStoreAttrs()]);
+  const [mix, cov, attrs, pm] = await Promise.all([getStoreCategoryMix(), getStoreInventoryCoverage(), getStoreAttrs(), getProductMap()]);
+  const git = await gitOrEmpty(new Set(pm.keys()));
+  const gitCell = new Map<string, number>();
+  for (const l of git.lines) { const c = pm.get(l.sku)?.category; if (c) gitCell.set(`${l.b}|${c}`, (gitCell.get(`${l.b}|${c}`) ?? 0) + l.qty); }
   const W = windowsFor(ctx);
   const cats = ctx.filters.cats;
   const catSet = new Set(cats);
@@ -170,7 +177,7 @@ export async function buildStoreModel(ctx: Ctx, facts: Fact[]): Promise<StoreMod
     const key = `${b}|${c}`;
     let x = cells.get(key);
     if (!x) {
-      x = { b, c, w: Object.fromEntries(WINS.map((k) => [k, acc()])) as Record<Win, Acc>, lastSale: null, inv: 0, s30: 0, inFeed: false, live: false, cover: null, pen: null, stockOut: false, dead: false, lowCover: false };
+      x = { b, c, w: Object.fromEntries(WINS.map((k) => [k, acc()])) as Record<Win, Acc>, lastSale: null, inv: 0, s30: 0, git: 0, inFeed: false, live: false, cover: null, pen: null, stockOut: false, dead: false, lowCover: false };
       cells.set(key, x);
     }
     return x;
@@ -190,20 +197,22 @@ export async function buildStoreModel(ctx: Ctx, facts: Fact[]): Promise<StoreMod
   }
   // cells that only exist in the store report
   for (const [key] of invCell) { const [b, c] = key.split("|"); if (!storeFilter || storeFilter.has(b)) cell(b, c); }
+  for (const [key] of gitCell) { const [b, c] = key.split("|"); if (catSet.has(c) && (!storeFilter || storeFilter.has(b))) cell(b, c); }
 
   // --- finalise cells
   for (const x of cells.values()) {
     const iv = invCell.get(`${x.b}|${x.c}`);
     x.inFeed = feed.has(x.b);
-    x.inv = iv?.inv ?? 0; x.s30 = iv?.s30 ?? 0;
+    x.inv = iv?.inv ?? 0; x.s30 = iv?.s30 ?? 0; x.git = gitCell.get(`${x.b}|${x.c}`) ?? 0;
     const soldL60 = x.w.l60.s > 0 || x.w.l60.q > 0 || x.s30 > 0;
-    x.live = x.inv > 0 || soldL60;
+    x.live = x.inv > 0 || x.git > 0 || soldL60; // stock on its way also makes the category live
     x.cover = x.inFeed && x.s30 > 0 ? x.inv / (x.s30 / 30) : null;
     const su = storeUnits.get(x.b) ?? 0;
     x.pen = x.inFeed && su > 0 ? x.s30 / su : null;
     x.stockOut = x.inFeed && x.live && x.inv <= 0 && soldL60;
     x.dead = x.inFeed && x.inv >= RULE.deadMinUnits && x.s30 === 0;
-    x.lowCover = x.inFeed && x.inv > 0 && x.s30 >= RULE.lowCoverMinS30 && x.cover != null && x.cover < RULE.lowCoverDays;
+    // low cover counts goods already in transit to the store (no "replenish" for stock that is on its way)
+    x.lowCover = x.inFeed && x.inv > 0 && x.s30 >= RULE.lowCoverMinS30 && x.cover != null && (x.inv + x.git) / (x.s30 / 30) < RULE.lowCoverDays;
   }
 
   // --- peer penetration medians (live cells in stores big enough to be meaningful)
@@ -244,7 +253,7 @@ export async function buildStoreModel(ctx: Ctx, facts: Fact[]): Promise<StoreMod
     const mtdTarget = hM ? sum(live, "mtd", "t") : null, monthTarget = hM ? sum(live, "mon", "t") : null;
     const projected = monthTarget && mtdTarget && mtdTarget > 0 ? (mtd / mtdTarget) * monthTarget : (mtd / elapsed) * daysInMonth;
     const nonLive = cs.filter((x) => !x.live && (x.w.mon.t > 0 || x.w.r.t > 0));
-    const inv = cs.reduce((a, x) => a + x.inv, 0), s30 = cs.reduce((a, x) => a + x.s30, 0);
+    const inv = cs.reduce((a, x) => a + x.inv, 0), s30 = cs.reduce((a, x) => a + x.s30, 0), gitU = cs.reduce((a, x) => a + x.git, 0);
     const su = storeUnits.get(b) ?? 0;
     const lt = fmtLt(st?.location_type), ct = fmtCt(st?.city_type);
     const allY = sum(cs, "y", "s");
@@ -264,7 +273,7 @@ export async function buildStoreModel(ctx: Ctx, facts: Fact[]): Promise<StoreMod
       nonLiveTarget: nonLive.reduce((a, x) => a + (x.w.mon.t || x.w.r.t), 0), nonLiveTargetCats: sortCats(nonLive.map((x) => x.c)),
       y: allY, yTarget: has(live, "y", "ht") ? sum(live, "y", "t") : null, lw: sum(cs, "lw", "s"), l7: sum(cs, "l7", "s"), p7: sum(cs, "p7", "s"),
       wtd: sum(cs, "wtd", "s"), pwtd: sum(cs, "pwtd", "s"), lm: sum(cs, "lm", "s"),
-      inFeed: feed.has(b), inv, s30, cover: feed.has(b) && s30 > 0 ? inv / (s30 / 30) : null, storeUnits30: su, pen: su > 0 ? s30 / su : null,
+      inFeed: feed.has(b), inv, git: gitU, s30, cover: feed.has(b) && s30 > 0 ? inv / (s30 / 30) : null, storeUnits30: su, pen: su > 0 ? s30 / su : null,
       stockOuts: sortCats(cs.filter((x) => x.stockOut).map((x) => x.c)), dead: sortCats(cs.filter((x) => x.dead).map((x) => x.c)), lowCover: sortCats(cs.filter((x) => x.lowCover).map((x) => x.c)),
       todos: [],
     };
@@ -281,7 +290,7 @@ export async function buildStoreModel(ctx: Ctx, facts: Fact[]): Promise<StoreMod
     const hT = live.some((x) => x.w.r.ht), target = hT ? live.reduce((a, x) => a + x.w.r.t, 0) : null;
     const sales = cs.reduce((a, x) => a + x.w.r.s, 0), qty = cs.reduce((a, x) => a + x.w.r.q, 0), prev = cs.reduce((a, x) => a + x.w.c.s, 0);
     const nl = cs.filter((x) => !x.live && (x.w.mon.t > 0 || x.w.r.t > 0));
-    const inv = cs.reduce((a, x) => a + x.inv, 0), s30 = cs.reduce((a, x) => a + x.s30, 0);
+    const inv = cs.reduce((a, x) => a + x.inv, 0), s30 = cs.reduce((a, x) => a + x.s30, 0), gitU = cs.reduce((a, x) => a + x.git, 0);
     const su = live.reduce((a, x) => a + (storeUnits.get(x.b) ?? 0), 0);
     const mtd = live.reduce((a, x) => a + x.w.mtd.s, 0), hM = live.some((x) => x.w.mon.ht);
     const mtdTarget = hM ? live.reduce((a, x) => a + x.w.mtd.t, 0) : null, monthTarget = hM ? live.reduce((a, x) => a + x.w.mon.t, 0) : null;
@@ -290,7 +299,7 @@ export async function buildStoreModel(ctx: Ctx, facts: Fact[]): Promise<StoreMod
       c, liveStores: live.length, notLive: stores.length - live.length, sales, qty, prev, growth: growth(sales, prev),
       target, ach: safeDiv(liveSales, target), nonLiveTarget: nl.reduce((a, x) => a + (x.w.mon.t || x.w.r.t), 0), nonLiveTargetStores: nl.length,
       perLiveStoreDay: safeDiv(sales, live.length * days), unitsPerLiveStoreDay: safeDiv(qty, live.length * days), asp: safeDiv(sales, qty),
-      inv, s30, cover: s30 > 0 ? inv / (s30 / 30) : null, pen: safeDiv(s30, su), medianPen: peerPen(c, null),
+      inv, git: cs.reduce((a, x) => a + x.git, 0), s30, cover: s30 > 0 ? inv / (s30 / 30) : null, pen: safeDiv(s30, su), medianPen: peerPen(c, null),
       stockOuts: cs.filter((x) => x.stockOut).length, dead: cs.filter((x) => x.dead).length, lowCover: cs.filter((x) => x.lowCover).length,
       mtd, mtdTarget, monthTarget, projected, projAch: safeDiv(projected, monthTarget),
     };
@@ -311,8 +320,9 @@ function todosFor(s: StoreInsight, peerPen: StoreModel["peerPen"], asp: Map<stri
   const out: Todo[] = [];
   for (const x of Object.values(s.cells)) {
     const perDayRev = (x.s30 / 30) * (asp.get(x.c) ?? 0);
-    if (x.stockOut) out.push({ kind: "stockout", tone: "bad", c: x.c, weight: 100 + perDayRev, text: `Restock ${L(x.c)} — ${x.s30 > 0 ? `sold ${r0(x.s30)} units in 30 days` : `sold in the last ${LIVE_LOOKBACK} days`}, 0 units in store` });
-    else if (x.lowCover) out.push({ kind: "lowcover", tone: "warn", c: x.c, weight: 80 + perDayRev, text: `Replenish ${L(x.c)} — ${r0(x.cover!)} days of cover (${r0(x.inv)} units, ${r0(x.s30)} sold L30)` });
+    if (x.stockOut && x.git > 0) out.push({ kind: "stockout", tone: "warn", c: x.c, weight: 60 + perDayRev, text: `${L(x.c)} is out of stock — ${r0(x.git)} units already in transit; make sure they are received and displayed` });
+    else if (x.stockOut) out.push({ kind: "stockout", tone: "bad", c: x.c, weight: 100 + perDayRev, text: `Restock ${L(x.c)} — ${x.s30 > 0 ? `sold ${r0(x.s30)} units in 30 days` : `sold in the last ${LIVE_LOOKBACK} days`}, 0 units in store, nothing in transit` });
+    else if (x.lowCover) out.push({ kind: "lowcover", tone: "warn", c: x.c, weight: 80 + perDayRev, text: `Replenish ${L(x.c)} — ${r0((x.inv + x.git) / (x.s30 / 30))} days of cover (${r0(x.inv)} units${x.git ? ` + ${r0(x.git)} in transit` : ""}, ${r0(x.s30)} sold L30)` });
     if (x.dead) out.push({ kind: "dead", tone: "warn", c: x.c, weight: 40 + x.inv / 10, text: `Move or re-merchandise ${L(x.c)} — ${r0(x.inv)} units in store, no sale in 30 days` });
     if (!x.live && (x.w.mon.t > 0 || x.w.r.t > 0)) out.push({ kind: "nonlive", tone: "info", c: x.c, weight: 30, text: `${L(x.c)} has a ${inrS(x.w.mon.t || x.w.r.t)} target but is not live (no stock, no sale in ${LIVE_LOOKBACK} days) — launch it or reallocate the target` });
     if (x.live && x.inv > 0 && x.pen != null && s.storeUnits30 >= RULE.minStoreUnits30) {
@@ -338,7 +348,7 @@ export interface GroupAgg {
   sales: number; prev: number; growth: number | null; qty: number; share: number | null;
   perStoreDay: number | null; unitsPerStoreDay: number | null; billsPerStoreDay: number | null; atv: number | null; upt: number | null; asp: number | null; disc: number | null;
   target: number | null; ach: number | null; projAch: number | null; ahead: number; behind: number; withTarget: number;
-  inv: number; cover: number | null; pen: number | null; stockOuts: number; coverage: number | null;
+  inv: number; git: number; cover: number | null; pen: number | null; stockOuts: number; coverage: number | null;
 }
 
 export function groupStores(m: StoreModel, keyOf: (s: StoreInsight) => string | null, labelOf: (k: string) => string = (k) => k, th: Thresholds): GroupAgg[] {
@@ -365,7 +375,7 @@ export function groupStores(m: StoreModel, keyOf: (s: StoreInsight) => string | 
       target, ach: safeDiv(liveSalesT, target),
       projAch: mT.length ? safeDiv(mT.reduce((a, s) => a + s.projected, 0), mT.reduce((a, s) => a + s.monthTarget!, 0)) : null,
       ahead: tS.filter((s) => (s.ach ?? 0) >= th.onTrack).length, behind: tS.filter((s) => (s.ach ?? 0) < th.atRisk).length, withTarget: tS.length,
-      inv, cover: s30 > 0 ? inv / (s30 / 30) : null, pen: safeDiv(s30, su), stockOuts: ss.reduce((a, s) => a + s.stockOuts.length, 0),
+      inv, git: ss.reduce((a, s) => a + s.git, 0), cover: s30 > 0 ? inv / (s30 / 30) : null, pen: safeDiv(s30, su), stockOuts: ss.reduce((a, s) => a + s.stockOuts.length, 0),
       coverage: safeDiv(liveCells, ss.length * nCats),
     };
   }).sort((a, b) => b.sales - a.sales);

@@ -29,9 +29,10 @@ export const DEF = {
   wow: "L7 vs the 7 days before it",
   l30: "Last 30 days to the data date (₹, selected channel)",
   mom: "L30 vs the 30 days before it",
-  str30: "Sell-through (L30) = L30 units ÷ (L30 units + current store + warehouse stock), all channels",
+  str30: "Sell-through (L30) = L30 units ÷ (L30 units + current store + in-transit + warehouse stock), all channels",
   ltStr: "Lifetime sell-through = lifetime units sold ÷ lifetime inward qty (Product Master)",
-  doi: "Days of cover = (store + warehouse units) ÷ L30 average daily units, all channels",
+  doi: "Days of cover = (store + in transit + warehouse units) ÷ L30 average daily units, all channels",
+  git: "Goods in transit to stores (JIT_OFFLINE_GOODS): allocated to a store and not yet in its stock — from dispatch pending at the warehouse to delivered, inward pending",
   ret: "Lifetime returned ₹ ÷ sold ₹ (Product Master), selected channel",
   storeInv: "Live store inventory (latest store report, all stores)",
   wh: "Live warehouse inventory (Unicommerce): South = SAPL-WH1 + SAPL-WH2, North = SAPL-NORTH-TAURU",
@@ -98,7 +99,7 @@ export interface ProductRow {
   l30: number; p30: number; mom: number | null; l30Units: number; p30Units: number; allL30Units: number;
   str30: number | null; ltSales: number | null; ltUnits: number | null; inward: number | null; ltStr: number | null;
   returnPct: number | null; split: [number, number, number] | null; stShare: number | null; onShare: number | null; mpShare: number | null;
-  storeInv: number; storesStocked: number | null; whInv: number; wh1: number; wh2: number; whSouth: number; whNorth: number; totalInv: number;
+  storeInv: number; storesStocked: number | null; git: number; gitStores: number; gitAging: number; whInv: number; wh1: number; wh2: number; whSouth: number; whNorth: number; totalInv: number;
   doi: number | null; storesSelling: number; lastInward: string | null; hasMeta: boolean;
   gift: boolean; flag: string | null;
 }
@@ -137,7 +138,8 @@ export async function productRows(ctx: Ctx, sc: Scope, o: { master?: boolean; wi
     const b = pickBucket(rl, ch, mp);
     const allL30u = rl?.all.l30u ?? 0;
     const w = sc.wh.bySku.get(sku);
-    const storeInv = p?.invOffline ?? 0, whInv = w?.units ?? 0, totalInv = storeInv + whInv;
+    const g = sc.git.bySku.get(sku);
+    const storeInv = p?.invOffline ?? 0, whInv = w?.units ?? 0, git = g?.units ?? 0, totalInv = storeInv + git + whInv;
     const lt = p ? (p.sales.stores ?? 0) + (p.sales.online ?? 0) + (p.sales.marketplace ?? 0) : 0;
     const row: ProductRow = {
       sku, name: p?.name ?? pr?.name ?? sku, image: p?.image ?? null, category: p?.category ?? pr?.category ?? null, catName: catLabel(p?.category ?? pr?.category ?? ""),
@@ -152,7 +154,7 @@ export async function productRows(ctx: Ctx, sc: Scope, o: { master?: boolean; wi
       returnPct: retFor(p, ch),
       split: lt > 0 ? [(p!.sales.stores ?? 0) / lt, (p!.sales.online ?? 0) / lt, (p!.sales.marketplace ?? 0) / lt] : null,
       stShare: lt > 0 ? (p!.sales.stores ?? 0) / lt : null, onShare: lt > 0 ? (p!.sales.online ?? 0) / lt : null, mpShare: lt > 0 ? (p!.sales.marketplace ?? 0) / lt : null,
-      storeInv, storesStocked: p?.storesStocked ?? null, whInv, wh1: w?.byFacility["SAPL-WH1"] ?? 0, wh2: w?.byFacility["SAPL-WH2"] ?? 0,
+      storeInv, storesStocked: p?.storesStocked ?? null, git, gitStores: g?.stores ?? 0, gitAging: g?.maxAging ?? 0, whInv, wh1: w?.byFacility["SAPL-WH1"] ?? 0, wh2: w?.byFacility["SAPL-WH2"] ?? 0,
       whSouth: w?.byZone.South ?? 0, whNorth: w?.byZone.North ?? 0, totalInv,
       doi: allL30u > 0 ? totalInv / (allL30u / 30) : null, storesSelling: rl?.storesL30 ?? 0, lastInward: p?.lastInward ?? null,
       hasMeta: !!p && (!!p.l1 || Object.keys(p.attrs).length > 0),
@@ -180,7 +182,7 @@ export function rollup(rows: ProductRow[]) {
     chRev: [s((r) => r.chRev[0]), s((r) => r.chRev[1]), s((r) => r.chRev[2])] as [number, number, number],
     top10: safeDiv(byRev.slice(0, 10).reduce((a, r) => a + r.revenue, 0), rev), n80,
     l7: s((r) => r.l7), p7: s((r) => r.p7), l30: s((r) => r.l30), p30: s((r) => r.p30), l30Units: l30u,
-    storeInv: s((r) => r.storeInv), whInv: s((r) => r.whInv), wh1: s((r) => r.wh1), wh2: s((r) => r.wh2), whSouth: s((r) => r.whSouth), whNorth: s((r) => r.whNorth), totalInv: stock,
+    storeInv: s((r) => r.storeInv), git: s((r) => r.git), whInv: s((r) => r.whInv), wh1: s((r) => r.wh1), wh2: s((r) => r.wh2), whSouth: s((r) => r.whSouth), whNorth: s((r) => r.whNorth), totalInv: stock,
     str30: l30u + stock > 0 ? l30u / (l30u + stock) : null, doi: l30u > 0 ? stock / (l30u / 30) : null,
     ltSales, ltStr: safeDiv(ltUnits, inward), returnPct: safeDiv(retV, ltSales),
     lowCover: rows.filter((r) => !r.gift && r.doi != null && r.doi < 21 && r.allL30Units >= 10).length,
@@ -222,10 +224,10 @@ export const attrList = (p: Product) => Object.entries(p.attrs).filter(([, v]) =
 
 export interface Opp { tone: "bad" | "warn" | "good" | "info"; title: string; detail: string }
 
-export interface StoreLine { b: string | null; name: string; region: string | null; city: string | null; revenue: number; units: number; l30: number; l30u: number; l7u: number; stock: number; s30: number; last: string | null; doi: number | null }
+export interface StoreLine { b: string | null; name: string; region: string | null; city: string | null; revenue: number; units: number; l30: number; l30u: number; l7u: number; stock: number; git?: number; s30: number; last: string | null; doi: number | null }
 
 export interface DetailFacts {
-  p: Product; row: Pick<ProductRow, "l7" | "p7" | "l30" | "p30" | "l30Units" | "p30Units" | "l7Units" | "wow" | "mom" | "doi" | "str30" | "ltStr" | "storeInv" | "whInv" | "whNorth" | "whSouth" | "totalInv">;
+  p: Product; row: Pick<ProductRow, "l7" | "p7" | "l30" | "p30" | "l30Units" | "p30Units" | "l7Units" | "wow" | "mom" | "doi" | "str30" | "ltStr" | "storeInv" | "git" | "whInv" | "whNorth" | "whSouth" | "totalInv">;
   roll: Roll | undefined; stores: StoreLine[]; sizes: [string, number][]; catReturn: number | null; catStorePerStore: number | null; activeStores: number;
   inwards: { d: string; wh: string; qty: number; done: number; lines: number }[]; soldSinceInward: number | null; asOf: string;
 }
@@ -268,18 +270,20 @@ export function productOpportunities(f: DetailFacts): Opp[] {
   // 1. cover
   if (row.doi != null && row.doi < 21 && allL30u >= 5) {
     const need = Math.max(0, Math.ceil(daily * 45 - stock));
-    out.push({ tone: "bad", title: `Only ${num(row.doi)} days of cover`, detail: `Selling ${daily.toFixed(1)}/day (L30, all channels) against ${num(stock)} units. ${row.whInv > 0 ? `Replenish stores from the ${num(row.whInv)} warehouse units and` : "Warehouse is empty —"} raise a reorder of ≈${num(need)} units to reach 45 days.` });
+    out.push({ tone: "bad", title: `Only ${num(row.doi)} days of cover`, detail: `Selling ${daily.toFixed(1)}/day (L30, all channels) against ${num(stock)} units${row.git ? ` (incl. ${num(row.git)} already in transit to stores)` : ""}. ${row.whInv > 0 ? `Replenish stores from the ${num(row.whInv)} warehouse units and` : "Warehouse is empty —"} raise a reorder of ≈${num(need)} units to reach 45 days.` });
   }
   // 2. store cover vs warehouse
   const stL30u = roll?.ch.stores.l30u ?? 0;
-  const stDoi = stL30u > 0 ? row.storeInv / (stL30u / 30) : null;
-  if (stDoi != null && stDoi < 21 && row.whInv >= 10 && stL30u >= 5) out.push({ tone: "warn", title: `Stores have ${num(stDoi)} days of cover while the warehouse holds ${num(row.whInv)}`, detail: `Store sales run ${(stL30u / 30).toFixed(1)}/day. Push warehouse stock to the top-selling stores (${f.stores.filter((s) => s.revenue > 0).slice(0, 3).map((s) => s.name).join(", ") || "see store distribution"}).` });
+  // in-transit stock counts as store-bound: don't ask to push what is already on its way
+  const stDoi = stL30u > 0 ? (row.storeInv + row.git) / (stL30u / 30) : null;
+  if (stDoi != null && stDoi < 21 && row.whInv >= 10 && stL30u >= 5) out.push({ tone: "warn", title: `Stores have ${num(stDoi)} days of cover${row.git ? " including goods in transit" : ""} while the warehouse holds ${num(row.whInv)}`, detail: `Store sales run ${(stL30u / 30).toFixed(1)}/day${row.git ? `; ${num(row.git)} units are already in transit and counted` : ""}. Push more warehouse stock to the top-selling stores (${f.stores.filter((s) => s.revenue > 0 && !(s.git ?? 0)).slice(0, 3).map((s) => s.name).join(", ") || "see store distribution"}).` });
   // 3. dead store stock
   const dead = f.stores.filter((s) => s.stock >= 2 && s.l30u === 0 && s.s30 === 0);
   if (dead.length >= 2) {
     const units = dead.reduce((a, s) => a + s.stock, 0);
     const winners = f.stores.filter((s) => s.l30u > 0 && (s.doi ?? 0) < 30).slice(0, 3).map((s) => s.name);
-    out.push({ tone: "warn", title: `${num(units)} units sit in ${dead.length} stores with no sale in 30 days`, detail: `e.g. ${dead.slice(0, 4).map((s) => `${s.name} (${s.stock})`).join(", ")}.${winners.length ? ` Transfer to stores that sell it: ${winners.join(", ")}.` : " Transfer to stores / channels where it sells."}` });
+    const deadGit = dead.reduce((a, s) => a + (s.git ?? 0), 0);
+    out.push({ tone: "warn", title: `${num(units)} units sit in ${dead.length} stores with no sale in 30 days`, detail: `e.g. ${dead.slice(0, 4).map((s) => `${s.name} (${s.stock})`).join(", ")}.${winners.length ? ` Transfer to stores that sell it: ${winners.join(", ")}.` : " Transfer to stores / channels where it sells."}${deadGit ? ` ${num(deadGit)} more units are in transit to these same stores — consider redirecting.` : ""}` });
   }
   // 4. size gaps at the warehouse
   const sized = f.sizes.filter(([s]) => s !== "One size");

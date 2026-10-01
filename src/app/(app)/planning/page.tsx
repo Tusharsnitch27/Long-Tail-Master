@@ -29,13 +29,13 @@ export default async function DemandPlanning({ searchParams }: { searchParams: P
   const nm = cats[0]?.otb.month;
 
   const skuRows = d.skus.filter((s) => s.rate > 0 || s.stock > 0).sort((a, b) => b.rate - a.rate).slice(0, 600).map((s) => ({
-    sku: s.sku, name: s.name, image: s.image, category: catLabel(s.category), l1: s.l1, storeInv: s.storeInv, whInv: s.whInv, stock: s.stock,
+    sku: s.sku, name: s.name, image: s.image, category: catLabel(s.category), l1: s.l1, storeInv: s.storeInv, git: s.git, whInv: s.whInv, stock: s.stock,
     r7: s.l7U / 7, r30: s.l30U / 30, trend: s.trend == null ? null : s.trend - 1, f30: Math.round(s.f30), f60: Math.round(s.f60), f90: Math.round(s.f90),
     doi: s.doi == null ? null : Math.round(s.doi), onOrder: s.onOrder, reorder: s.reorder, reorderValue: s.reorder * (s.asp ?? 0), band: BAND[s.band].label,
   }));
   const cols: Col[] = [
     { key: "name", label: "Product", image: "image", imageSize: 44, sub: "sku", width: 260 }, { key: "category", label: "Category" }, { key: "l1", label: "Type", hidden: !ctx.filters.cat },
-    { key: "storeInv", label: "Stores", type: "num", group: "Stock" }, { key: "whInv", label: "Warehouse", type: "num", group: "Stock" }, { key: "stock", label: "Total", type: "num", group: "Stock" },
+    { key: "storeInv", label: "Stores", type: "num", group: "Stock" }, { key: "git", label: "In transit", type: "num", group: "Stock" }, { key: "whInv", label: "Warehouse", type: "num", group: "Stock" }, { key: "stock", label: "Total", type: "num", group: "Stock" },
     { key: "r7", label: "L7", type: "dec", group: "Units / day" }, { key: "r30", label: "L30", type: "dec", group: "Units / day" }, { key: "trend", label: "Trend", type: "delta", group: "Units / day", tip: "L7 rate vs L30 rate (capped ±20–25%)" },
     { key: "f30", label: "30d", type: "num", group: "Forecast units" }, { key: "f60", label: "60d", type: "num", group: "Forecast units" }, { key: "f90", label: "90d", type: "num", group: "Forecast units" },
     { key: "doi", label: "DOI", type: "num", tip: "Days of inventory = stock ÷ (L30 units ÷ 30)" }, { key: "onOrder", label: "On order", type: "num", tip: "Open future inwards for this SKU group" },

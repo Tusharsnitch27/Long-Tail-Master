@@ -7,6 +7,7 @@ import { ATTR_LABEL } from "./data/metafields";
 import { catLabel } from "./views";
 import { addDays } from "@/lib/dates";
 import { cached } from "@/lib/cache";
+import { gitOrEmpty } from "./scope";
 
 /** Metafields a store × product view can be cut by (value = what the product carries). */
 export const META_KEYS: { key: string; label: string; get: (p: Product) => string | null }[] = [
@@ -20,7 +21,7 @@ export interface StoreSkuRow {
   id: string; b: string; store: string; city: string | null; state: string | null; format: string | null;
   sku: string; name: string; image: string | null; category: string; catName: string;
   l1: string | null; l2: string | null; colour: string | null;
-  revenue: number; units: number; l7Units: number; l30Units: number; l30: number; stock: number; cover: number | null; share: number | null; last: string | null;
+  revenue: number; units: number; l7Units: number; l30Units: number; l30: number; stock: number; git: number; cover: number | null; share: number | null; last: string | null;
 }
 export interface MetaFilter { l1?: string | null; l2?: string | null; colour?: string | null }
 
@@ -33,10 +34,10 @@ const matches = (p: Product, f: MetaFilter) =>
  */
 export async function storeSkuRows(ctx: Ctx): Promise<StoreSkuRow[]> {
   const { range, compare } = ctx.period;
-  const key = `storesku:v1:${ctx.asOf}:${range.from}:${range.to}:${ctx.filters.cats.join(",")}`;
+  const key = `storesku:v2:${ctx.asOf}:${range.from}:${range.to}:${ctx.filters.cats.join(",")}`;
   return cached(key, 600, async () => {
     const [facts, pm] = await Promise.all([getSkuFacts({ range, compare, asOf: ctx.asOf, cats: ctx.filters.cats, ch: "store" }), getProductMap()]);
-    const inv = await getStoreInventory([...pm.keys()]).catch(() => []);
+    const [inv, git] = await Promise.all([getStoreInventory([...pm.keys()]).catch(() => []), gitOrEmpty(new Set(pm.keys()))]);
     const cats = new Set(ctx.filters.cats);
     const out = new Map<string, StoreSkuRow>();
     const row = (b: string, storeName: string, sku: string): StoreSkuRow | null => {
@@ -48,7 +49,7 @@ export async function storeSkuRows(ctx: Ctx): Promise<StoreSkuRow[]> {
         const st = ctx.byCode.get(b);
         r = { id, b, store: st?.short_name ?? storeName, city: st?.city ?? null, state: st?.state ?? null, format: st?.location_type ?? null,
           sku, name: p.name ?? sku, image: p.image, category: p.category, catName: catLabel(p.category), l1: productL1(p), l2: p.l2, colour: p.attrs.colour ?? p.colour,
-          revenue: 0, units: 0, l7Units: 0, l30Units: 0, l30: 0, stock: 0, cover: null, share: null, last: null };
+          revenue: 0, units: 0, l7Units: 0, l30Units: 0, l30: 0, stock: 0, git: 0, cover: null, share: null, last: null };
         out.set(id, r);
       }
       return r;
@@ -61,11 +62,12 @@ export async function storeSkuRows(ctx: Ctx): Promise<StoreSkuRow[]> {
       if (f.last && (!r.last || f.last > r.last)) r.last = f.last;
     }
     for (const s of inv) { const r = row(s.b, s.store, s.sku); if (r) r.stock += s.units; }
+    for (const l of git.lines) { const r = row(l.b, l.store, l.sku); if (r) r.git += l.qty; }
     const storeRev = new Map<string, number>();
     for (const r of out.values()) storeRev.set(`${r.b}|${r.category}`, (storeRev.get(`${r.b}|${r.category}`) ?? 0) + r.revenue);
-    const rows = [...out.values()].filter((r) => r.revenue > 0 || r.l30Units > 0 || r.stock > 0);
+    const rows = [...out.values()].filter((r) => r.revenue > 0 || r.l30Units > 0 || r.stock > 0 || r.git > 0);
     for (const r of rows) {
-      r.cover = r.l30Units > 0 ? r.stock / (r.l30Units / 30) : null;
+      r.cover = r.l30Units > 0 ? (r.stock + r.git) / (r.l30Units / 30) : null;
       const t = storeRev.get(`${r.b}|${r.category}`) ?? 0;
       r.share = t > 0 ? r.revenue / t : null;
     }
@@ -76,12 +78,12 @@ export async function storeSkuRows(ctx: Ctx): Promise<StoreSkuRow[]> {
 /** Per-store totals of the products matching a metafield filter (for the Stores table). */
 export async function storeMetaTotals(ctx: Ctx, f: MetaFilter) {
   const [rows, pm] = await Promise.all([storeSkuRows(ctx), getProductMap()]);
-  const m = new Map<string, { revenue: number; units: number; stock: number; l30Units: number; skus: number; storeRevenue: number }>();
+  const m = new Map<string, { revenue: number; units: number; stock: number; git: number; l30Units: number; skus: number; storeRevenue: number }>();
   for (const r of rows) {
-    const e = m.get(r.b) ?? { revenue: 0, units: 0, stock: 0, l30Units: 0, skus: 0, storeRevenue: 0 };
+    const e = m.get(r.b) ?? { revenue: 0, units: 0, stock: 0, git: 0, l30Units: 0, skus: 0, storeRevenue: 0 };
     e.storeRevenue += r.revenue;
     const p = pm.get(r.sku);
-    if (p && matches(p, f)) { e.revenue += r.revenue; e.units += r.units; e.stock += r.stock; e.l30Units += r.l30Units; if (r.revenue > 0 || r.stock > 0) e.skus++; }
+    if (p && matches(p, f)) { e.revenue += r.revenue; e.units += r.units; e.stock += r.stock; e.git += r.git; e.l30Units += r.l30Units; if (r.revenue > 0 || r.stock > 0) e.skus++; }
     m.set(r.b, e);
   }
   return m;
@@ -106,15 +108,15 @@ export async function metaPivot(ctx: Ctx) {
   const [rows, pm] = await Promise.all([storeSkuRows(ctx), getProductMap()]);
   const keys = META_KEYS.filter((mk) => rows.some((r) => { const p = pm.get(r.sku); return p && mk.get(p); }));
   const stores = new Map<string, { b: string; store: string; city: string | null }>();
-  const cells: Record<string, Record<string, Record<string, [number, number, number]>>> = {}; // attr → store → value → [rev, units, stock]
+  const cells: Record<string, Record<string, Record<string, [number, number, number, number]>>> = {}; // attr → store → value → [rev, units, stock, in transit]
   for (const r of rows) {
     stores.set(r.b, { b: r.b, store: r.store, city: r.city });
     const p = pm.get(r.sku); if (!p) continue;
     for (const mk of keys) {
       const v = mk.get(p) ?? "Not set";
       const c = ((cells[mk.key] ??= {})[r.b] ??= {});
-      const e = (c[v] ??= [0, 0, 0]);
-      e[0] += r.revenue; e[1] += r.units; e[2] += r.stock;
+      const e = (c[v] ??= [0, 0, 0, 0]);
+      e[0] += r.revenue; e[1] += r.units; e[2] += r.stock; e[3] += r.git;
     }
   }
   return { attrs: keys.map((k) => ({ key: k.key, label: k.label })), stores: [...stores.values()], cells, window: { from: ctx.period.range.from, to: ctx.period.range.to, l30From: addDays(ctx.asOf, -29) } };

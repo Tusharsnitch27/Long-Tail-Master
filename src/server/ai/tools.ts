@@ -1,4 +1,5 @@
 import "server-only";
+import { gitOrEmpty } from "../scope";
 import { z } from "zod";
 import { CATEGORIES, IN_SCOPE_NOTE } from "@/lib/categories";
 import { addDays, addMonths, diffDays, endOfMonth, minDate, maxDate, rangeDays, resolvePeriod, startOfMonth, startOfWeek, eachDay, type Preset, type Range } from "@/lib/dates";
@@ -379,12 +380,13 @@ const getInventory = def({
     if (i.level === "network") {
       // Store stock (all stores combined) = Product Master (daily); warehouse = Unicommerce live (current state).
       const wh = await getWarehouseStock(new Set(pm.keys()));
+      const git = await gitOrEmpty(new Set(pm.keys()));
       const bibleTs = (await getFreshness()).tables["LONG_TAIL_MASTER_BIBLE"] ?? null;
       const rows = skuList.map((sku) => {
         const p = pm.get(sku); const w = wh.bySku.get(sku);
         return { key: sku, sku, label: p?.name ?? sku, category: catLabel(p?.category ?? ""), colour: p?.colour ?? null,
-          store_units: p?.invOffline ?? null, stores_stocked: p?.storesStocked ?? null, warehouse_units: w?.units ?? 0,
-          total_units: (p?.invOffline ?? 0) + (w?.units ?? 0), warehouse_north: w?.byZone.North ?? 0, warehouse_south: w?.byZone.South ?? 0, warehouse_updated: w?.updated ?? null,
+          store_units: p?.invOffline ?? null, stores_stocked: p?.storesStocked ?? null, in_transit_units: git.bySku.get(sku)?.units ?? 0, in_transit_to_stores: git.bySku.get(sku)?.stores ?? 0, warehouse_units: w?.units ?? 0,
+          total_units: (p?.invOffline ?? 0) + (git.bySku.get(sku)?.units ?? 0) + (w?.units ?? 0), warehouse_north: w?.byZone.North ?? 0, warehouse_south: w?.byZone.South ?? 0, warehouse_updated: w?.updated ?? null,
           warehouse_by_size: i.group_by === "size" ? w?.bySize ?? {} : undefined, warehouse_by_facility: w?.byFacility ?? {} };
       }).filter((r) => r.total_units > 0 || i.skus?.length).sort((a2, b2) => b2.total_units - a2.total_units);
       if (i.skus?.length) {

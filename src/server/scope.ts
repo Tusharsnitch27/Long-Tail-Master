@@ -6,6 +6,7 @@ import { loadFacts, type Ctx } from "./context";
 import { loadUc, ucChannel, type ChKey } from "./channelData";
 import { getProductMap, type Product } from "./data/products";
 import { getWarehouseStock } from "./data/warehouse";
+import { getGoodsInTransit, type GitData } from "./data/git";
 import { getSkuFacts } from "./data/sku";
 import { getChannelSku } from "./data/channels";
 
@@ -14,15 +15,25 @@ export async function loadScope(ctx: Ctx, extra: Range[] = []) {
   const { range, compare } = ctx.period;
   const ranges = [range, compare, { from: startOfMonth(ctx.asOf), to: ctx.asOf }, ...extra];
   const [facts, uc, pm] = await Promise.all([loadFacts(ctx, extra), loadUc(ctx, ranges), getProductMap()]);
-  const wh = await getWarehouseStock(new Set(pm.keys()));
+  const known = new Set(pm.keys());
+  const [wh, git] = await Promise.all([getWarehouseStock(known), gitOrEmpty(known)]);
   const cats = new Set(ctx.filters.cats);
   const products = [...pm.values()].filter((p) => p.category && cats.has(p.category));
   const inventory = {
     store: products.reduce((a, p) => a + (p.invOffline ?? 0), 0),
     warehouse: products.reduce((a, p) => a + (wh.bySku.get(p.sku)?.units ?? 0), 0),
-    asOf: wh.updated,
+    git: products.reduce((a, p) => a + (git.bySku.get(p.sku)?.units ?? 0), 0),
+    asOf: wh.updated, gitAsOf: git.updated,
   };
-  return { facts, uc, pm, wh, products, inventory };
+  return { facts, uc, pm, wh, git, products, inventory };
+}
+
+/** Goods in transit, never blocking a page if the table is unavailable. */
+export function gitOrEmpty(known: Set<string>): Promise<GitData> {
+  return getGoodsInTransit(known).catch((e) => {
+    console.error("[git] goods in transit unavailable", e);
+    return { lines: [], bySku: new Map(), byStoreSku: new Map(), byStore: new Map(), updated: null } as GitData;
+  });
 }
 
 export interface ProductPerf {
@@ -31,7 +42,7 @@ export interface ProductPerf {
   byChannel: Record<ChKey, { revenue: number; units: number }>;
   byMp: Record<string, { revenue: number; units: number }>;
   l7: number; p7: number; l7Units: number; l30: number; l30Units: number; storesSelling: number; last: string | null;
-  storeInv: number | null; whInv: number; returnPct: number | null; doi: number | null; salesPerStore: number | null;
+  storeInv: number | null; whInv: number; git: number; returnPct: number | null; doi: number | null; salesPerStore: number | null;
 }
 
 /**
@@ -42,9 +53,10 @@ export async function productPerformance(ctx: Ctx, pm: Map<string, Product>, whU
   const { range, compare } = ctx.period;
   const cats = new Set(ctx.filters.cats);
   const storeScope = ctx.filters.stores.length ? new Set(ctx.filters.stores) : null;
-  const [st, uc] = await Promise.all([
+  const [st, uc, git] = await Promise.all([
     channel === "all" || channel === "stores" ? getSkuFacts({ range, compare, asOf: ctx.asOf, cats: ctx.filters.cats, ch: "store" }) : Promise.resolve([]),
     channel === "stores" || storeScope ? Promise.resolve([]) : getChannelSku({ range, compare, asOf: ctx.asOf }),
+    gitOrEmpty(new Set(pm.keys())),
   ]);
   const out = new Map<string, ProductPerf>();
   const get = (sku: string, c: string) => {
@@ -53,7 +65,7 @@ export async function productPerformance(ctx: Ctx, pm: Map<string, Product>, whU
       const p = pm.get(sku);
       out.set(sku, (e = { sku, p, name: p?.name ?? sku, image: p?.image ?? null, category: p?.category ?? c, revenue: 0, units: 0, prev: 0, growth: null,
         byChannel: { stores: { revenue: 0, units: 0 }, online: { revenue: 0, units: 0 }, marketplace: { revenue: 0, units: 0 } }, byMp: {},
-        l7: 0, p7: 0, l7Units: 0, l30: 0, l30Units: 0, storesSelling: 0, last: null, storeInv: p?.invOffline ?? null, whInv: whUnits(sku),
+        l7: 0, p7: 0, l7Units: 0, l30: 0, l30Units: 0, storesSelling: 0, last: null, storeInv: p?.invOffline ?? null, whInv: whUnits(sku), git: git.bySku.get(sku)?.units ?? 0,
         returnPct: channel === "online" ? p?.returnPct.online ?? null : channel === "marketplace" ? p?.returnPct.marketplace ?? null : channel === "stores" ? p?.returnPct.stores ?? null : p?.returnPct.all ?? null,
         doi: null, salesPerStore: null }));
     }
@@ -80,7 +92,7 @@ export async function productPerformance(ctx: Ctx, pm: Map<string, Product>, whU
   }
   for (const e of out.values()) {
     e.growth = growth(e.revenue, e.prev);
-    const stock = (e.storeInv ?? 0) + e.whInv;
+    const stock = (e.storeInv ?? 0) + e.whInv + e.git; // stores + in transit + warehouse
     e.doi = e.l30Units > 0 ? stock / (e.l30Units / 30) : null;
     e.salesPerStore = safeDiv(e.byChannel.stores.revenue, e.storesSelling);
   }

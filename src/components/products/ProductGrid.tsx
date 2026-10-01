@@ -12,7 +12,7 @@ export interface GridRow {
   mrp: number | null; search: string; attrs: string[];
   ltSales: number | null; ltUnits: number | null; inward: number | null; ltStr: number | null; returnPct: number | null; split: [number, number, number] | null;
   l30: number; mom: number | null; l30Units: number; str30: number | null;
-  storeInv: number; storesStocked: number | null; whInv: number; whSouth: number; whNorth: number; doi: number | null; daysLive: number | null; flag: string | null;
+  storeInv: number; storesStocked: number | null; git: number; whInv: number; whSouth: number; whNorth: number; doi: number | null; daysLive: number | null; flag: string | null;
 }
 
 const SORTS: { key: string; label: string; asc?: boolean }[] = [
@@ -31,7 +31,7 @@ export function ProductGrid({ rows, facets, qs, defs }: { rows: GridRow[]; facet
     const terms = queryTerms(q);
     let out = rows.filter((r) => passFacets(r as unknown as Record<string, unknown>, facets, sel) && (!terms.length || matchTerms(normText(r.search), terms)));
     if (sort) {
-      const val = (r: GridRow): number | string | null => (sort.key === "stock" ? r.storeInv + r.whInv : sort.key === "name" ? r.name : (r[sort.key as keyof GridRow] as number | null));
+      const val = (r: GridRow): number | string | null => (sort.key === "stock" ? r.storeInv + r.git + r.whInv : sort.key === "name" ? r.name : (r[sort.key as keyof GridRow] as number | null));
       out = [...out].sort((a, b) => {
         const x = val(a), y = val(b);
         if (x == null && y == null) return 0;
@@ -89,7 +89,7 @@ export function ProductGrid({ rows, facets, qs, defs }: { rows: GridRow[]; facet
 }
 
 function Card({ r, href, defs }: { r: GridRow; href: string; defs: Record<string, string> }) {
-  const stock = r.storeInv + r.whInv;
+  const stock = r.storeInv + r.git + r.whInv;
   const coverTone = r.doi == null ? (stock > 0 ? "text-amber-700" : "text-zinc-400") : r.doi < 21 ? "text-rose-600" : r.doi > 180 ? "text-amber-700" : "text-emerald-700";
   return (
     <Link href={href} className="card card-lift group flex gap-3 rounded-[18px] p-3">
@@ -113,6 +113,7 @@ function Card({ r, href, defs }: { r: GridRow; href: string; defs: Record<string
           <M label="Return %" v={pct(r.returnPct, 1)} tip={defs.ret} />
           <M label="Cover" v={<span className={coverTone}>{r.doi != null ? `${num(r.doi)} days` : stock > 0 ? "no sales" : "—"}</span>} tip={defs.doi} />
           <M label="Stores" v={<>{num(r.storeInv)} <span className="text-zinc-400">· {num(r.storesStocked)} st</span></>} tip={defs.storeInv} />
+          {r.git > 0 && <M label="In transit" v={<span className="text-brand-700">{num(r.git)}</span>} tip={defs.git} />}
           <M label="Warehouse" v={<>{num(r.whInv)} {r.whInv > 0 && <span className="text-zinc-400">· N {num(r.whNorth)}</span>}</>} tip={defs.wh} />
           <div className="min-w-0" title={r.split ? r.split.map((x, i) => `${CHN[i]} ${Math.round(x * 100)}%`).join(" · ") : undefined}>
             <div className="text-[10px] text-zinc-400">Channel mix</div>

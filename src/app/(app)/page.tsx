@@ -10,6 +10,7 @@ import { summarize } from "@/server/analytics";
 import { catColor, catLabel } from "@/server/views";
 import { PageHeader, Kpi, KpiGrid, Section, Delta, DataPrompt, Pill, achTone, Tip, MixBar } from "@/components/ui";
 import { ChartDownload } from "@/components/charts/ChartDownload";
+import { InvMix } from "@/components/InvMix";
 import { InsightList } from "@/components/Insights";
 import { DailyTargetChart } from "@/components/charts/DailyTargetChart";
 import { SkuTabs, type SkuTab } from "@/components/SkuTabs";
@@ -71,19 +72,20 @@ export default async function ExecutiveSummary({ searchParams }: { searchParams:
     const store = prods.reduce((a, x) => a + (x.invOffline ?? 0), 0);
     const wh = prods.reduce((a, x) => a + whUnits(x.sku), 0);
     const north = prods.reduce((a, x) => a + (sc.wh.bySku.get(x.sku)?.byZone.North ?? 0), 0);
+    const git = prods.reduce((a, x) => a + (sc.git.bySku.get(x.sku)?.units ?? 0), 0);
     const l30 = perf.rows.filter((r) => r.category === c).reduce((a, r) => a + r.l30Units, 0);
-    return { c, rev: cm.revenue, units: cm.units, growth: growth(cm.revenue, cp.revenue), asp: cm.asp, disc: mrp > 0 ? 1 - cm.revenue / mrp : null, plan: cplan, split, store, wh, north, l30, doi: l30 > 0 ? (store + wh) / (l30 / 30) : null };
+    return { c, rev: cm.revenue, units: cm.units, growth: growth(cm.revenue, cp.revenue), asp: cm.asp, disc: mrp > 0 ? 1 - cm.revenue / mrp : null, plan: cplan, split, store, git, wh, north, l30, doi: l30 > 0 ? (store + git + wh) / (l30 / 30) : null };
   });
   const catTot = cats.reduce((a, x) => a + x.rev, 0);
 
   // SKU lists
   const byCat = (rows: typeof perf.rows) => ctx.filters.cats.map((c) => ({ key: c, label: catLabel(c), color: catColor(c), rows: rows.filter((r) => r.category === c) }));
   const toRow = (r: (typeof perf.rows)[number], note?: string | null, tone?: "good" | "bad" | "warn" | null) => ({ sku: r.sku, name: r.name, image: r.image, revenue: r.revenue, units: r.units, growth: r.growth, note, tone });
-  const topTabs: SkuTab[] = byCat(perf.rows.filter((r) => r.units > 0)).map((t) => ({ ...t, rows: t.rows.slice(0, 10).map((r) => toRow(r, `${num((r.storeInv ?? 0) + r.whInv)} in stock (${num(r.storeInv ?? 0)} store · ${num(r.whInv)} WH)${r.doi != null ? ` · ${num(r.doi)}d cover` : ""}`, r.doi != null && r.doi < 14 ? "bad" : null)) }));
-  const bottomTabs: SkuTab[] = byCat(perf.rows.filter((r) => (r.storeInv ?? 0) + r.whInv >= 30 && (r.p?.daysSinceLive ?? 999) >= 45))
-    .map((t) => ({ ...t, rows: [...t.rows].sort((a, b) => a.l30Units / ((a.storeInv ?? 0) + a.whInv) - b.l30Units / ((b.storeInv ?? 0) + b.whInv)).slice(0, 10).map((r) => toRow(r, `${num((r.storeInv ?? 0) + r.whInv)} in stock (${num(r.storeInv ?? 0)} store · ${num(r.whInv)} WH) · ${num(r.l30Units)} sold L30`, "warn")) }));
+  const topTabs: SkuTab[] = byCat(perf.rows.filter((r) => r.units > 0)).map((t) => ({ ...t, rows: t.rows.slice(0, 10).map((r) => toRow(r, `${num((r.storeInv ?? 0) + r.git + r.whInv)} in stock (${num(r.storeInv ?? 0)} store${r.git ? ` · ${num(r.git)} GIT` : ""} · ${num(r.whInv)} WH)${r.doi != null ? ` · ${num(r.doi)}d cover` : ""}`, r.doi != null && r.doi < 14 ? "bad" : null)) }));
+  const bottomTabs: SkuTab[] = byCat(perf.rows.filter((r) => (r.storeInv ?? 0) + r.git + r.whInv >= 30 && (r.p?.daysSinceLive ?? 999) >= 45))
+    .map((t) => ({ ...t, rows: [...t.rows].sort((a, b) => a.l30Units / ((a.storeInv ?? 0) + a.git + a.whInv) - b.l30Units / ((b.storeInv ?? 0) + b.git + b.whInv)).slice(0, 10).map((r) => toRow(r, `${num((r.storeInv ?? 0) + r.git + r.whInv)} in stock (${num(r.storeInv ?? 0)} store${r.git ? ` · ${num(r.git)} GIT` : ""} · ${num(r.whInv)} WH) · ${num(r.l30Units)} sold L30`, "warn")) }));
   const riskRows = perf.rows.filter((r) => r.l30Units >= 15 && ((r.doi != null && r.doi < 21) || (r.p7 > 0 && r.l7 / r.p7 < 0.6)));
-  const riskTabs: SkuTab[] = byCat(riskRows).map((t) => ({ ...t, rows: t.rows.slice(0, 10).map((r) => toRow(r, `${r.doi != null && r.doi < 21 ? `only ${num(r.doi)} days of cover` : `L7 ${pct(r.l7 / r.p7 - 1, 0)} vs prior week`} · ${num(r.storeInv ?? 0)} store · ${num(r.whInv)} WH`, "bad")) }));
+  const riskTabs: SkuTab[] = byCat(riskRows).map((t) => ({ ...t, rows: t.rows.slice(0, 10).map((r) => toRow(r, `${r.doi != null && r.doi < 21 ? `only ${num(r.doi)} days of cover` : `L7 ${pct(r.l7 / r.p7 - 1, 0)} vs prior week`} · ${num(r.storeInv ?? 0)} store${r.git ? ` · ${num(r.git)} GIT` : ""} · ${num(r.whInv)} WH`, "bad")) }));
 
   const drv = drivers(ctx, sc.facts, sc.uc, range, compare, ch).slice(0, 3);
   const rsk = risks(ctx, plan, sc.facts, sc.uc, range, act.actions).slice(0, 3);
@@ -197,15 +199,16 @@ export default async function ExecutiveSummary({ searchParams }: { searchParams:
       </div>
 
       <div className="mt-3">
-        <Section title="Inventory and days of cover by category" pad={false} tip="Store = latest store report (live); Warehouse = live (North: SAPL-NORTH-TAURU, South: SAPL-WH1 + SAPL-WH2). Days of cover = total ÷ L30 daily units, all channels.">
+        <Section title="Inventory and days of cover by category" pad={false} tip="Three phases: Store = latest store report (live); In transit = goods allocated to stores and not yet in store stock (JIT_OFFLINE_GOODS); Warehouse = live (North: SAPL-NORTH-TAURU, South: SAPL-WH1 + SAPL-WH2). Days of cover = total ÷ L30 daily units, all channels." right={<Link href={withQs(ctx, "/stores", { tab: "git" })} className="text-[11.5px] font-medium text-brand-700 hover:underline">Goods in transit →</Link>}>
           <table className="w-full whitespace-nowrap text-[12.5px]">
-            <thead><tr className="border-b border-line text-[11px] text-zinc-500">{["Category", "Store", "Warehouse", "North · South", "Total", "L30 units", "Days of cover"].map((h, i) => <th key={h} className={`px-4 py-2 font-medium ${i ? "text-right" : "text-left"}`}>{h}</th>)}</tr></thead>
+            <thead><tr className="border-b border-line text-[11px] text-zinc-500">{["Category", "Store", "In transit", "Warehouse", "North · South", "Total", "Split", "L30 units", "Days of cover"].map((h, i) => <th key={h} className={`px-4 py-2 font-medium ${i ? "text-right" : "text-left"}`}>{h}</th>)}</tr></thead>
             <tbody>{cats.map((c) => (
               <tr key={c.c} className="border-b border-brand-50 last:border-0">
                 <td className="px-4 py-2"><span className="flex items-center gap-2"><span className="size-2 rounded-full" style={{ background: catColor(c.c) }} />{catLabel(c.c)}</span></td>
-                <td className="tabular px-4 text-right">{compactNum(c.store)}</td><td className="tabular px-4 text-right">{compactNum(c.wh)}</td>
+                <td className="tabular px-4 text-right">{compactNum(c.store)}</td><td className="tabular px-4 text-right text-brand-700">{c.git ? compactNum(c.git) : "—"}</td><td className="tabular px-4 text-right">{compactNum(c.wh)}</td>
                 <td className="tabular px-4 text-right text-zinc-500">{compactNum(c.north)} · {compactNum(c.wh - c.north)}</td>
-                <td className="tabular px-4 text-right font-semibold">{compactNum(c.store + c.wh)}</td><td className="tabular px-4 text-right">{num(c.l30)}</td>
+                <td className="tabular px-4 text-right font-semibold">{compactNum(c.store + c.git + c.wh)}</td>
+                <td className="px-4"><InvMix store={c.store} git={c.git} wh={c.wh} title={`${catLabel(c.c)} · inventory`} /></td><td className="tabular px-4 text-right">{num(c.l30)}</td>
                 <td className="px-4 text-right">{c.doi != null ? <Pill tone={c.doi < 21 ? "bad" : c.doi > 180 ? "warn" : "good"}>{num(c.doi)} days</Pill> : "—"}</td>
               </tr>
             ))}</tbody>

@@ -1,10 +1,14 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+import { canOpen, homeFor, ROLE_LABEL } from "@/lib/access";
+import { applyAccess } from "@/server/context";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { MobileNav } from "@/components/shell/MobileNav";
 import { ContextBar, type ContextOptions } from "@/components/shell/ContextBar";
 import { getUser, AuthError, sessionExpiry } from "@/server/auth";
 import { SessionTimer } from "@/components/shell/SessionTimer";
+import { PermissionsProvider } from "@/components/shell/Permissions";
 import { getSettings } from "@/server/settings";
 import { getFreshness } from "@/server/data/freshness";
 import { getChannelDaily, channelFreshness } from "@/server/data/channels";
@@ -38,6 +42,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect(`/login?error=${e instanceof AuthError && e.status === 403 ? "denied" : "session"}`);
   }
   if (!user) redirect("/login");
+  const path = (await headers()).get("x-pathname") ?? "/";
+  const access = applyAccess(user);
+  if (path === "/" && homeFor(user.role) !== "/") redirect(homeFor(user.role));
+  const allowed = canOpen(user.role, path);
 
   let options: ContextOptions | null = null;
   let urgent = 0;
@@ -76,6 +84,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const exp = await sessionExpiry().catch(() => null);
   const nav = { role: user.role, name: user.name, username: user.username, actionCount: urgent };
   return (
+    <PermissionsProvider access={access}>
     <div className="atelier flex h-dvh overflow-hidden">
       {exp && <SessionTimer exp={exp} />}
       <aside className="hidden w-[236px] shrink-0 md:block">
@@ -94,10 +103,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 <div className="font-semibold">Could not reach Snowflake</div>
                 <div className="mt-1 font-mono text-[12px]">{loadError}</div>
               </div>
-            ) : children}
+            ) : allowed ? children : (
+              <div className="card mx-auto mt-10 max-w-lg rounded-[18px] px-6 py-10 text-center">
+                <div className="font-serif text-[20px]">Not available for your access</div>
+                <p className="mt-2 text-[12.5px] text-zinc-500">Your role ({ROLE_LABEL[user.role]}) doesn’t include this page. Ask an admin if you need it.</p>
+              </div>
+            )}
           </div>
         </main>
       </div>
     </div>
+    </PermissionsProvider>
   );
 }

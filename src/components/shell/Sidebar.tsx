@@ -5,15 +5,16 @@ import { useState } from "react";
 import { Gauge, CalendarDays, Sparkles, Layers, Package, Split, Store, Globe, ShoppingBag, Boxes, Zap, Settings, LogOut, ChevronsUpDown, FlaskConical, Paintbrush, LineChart, Truck, Megaphone } from "lucide-react";
 import { NAV, NAV_GROUPS, APP_NAME } from "@/lib/nav";
 import { cn } from "@/lib/cn";
+import { accessFor, canOpen, ROLE_LABEL, type Role } from "@/lib/access";
 
 const ICONS = {
-  executive: Gauge, overview: CalendarDays, harvey: Sparkles, category: Layers, products: Package, channels: Split, stores: Store, online: Globe, marketplace: ShoppingBag,
+  executive: Gauge, overview: CalendarDays, harvey: Sparkles, category: Layers, products: Package, channels: Split, stores: Store, online: Globe, marketplace: ShoppingBag, qcom: Zap,
   merchandising: Boxes, actions: Zap, vm: Paintbrush, lab: FlaskConical, settings: Settings, planning: LineChart, inwards: Truck, ads: Megaphone,
 } as const;
 // Global context carried across sections (page-local params like tab/sort are dropped).
 const CARRY = ["cat", "p", "from", "to", "ch", "mp"];
 
-export function Sidebar({ role, name, username, actionCount }: { role: "viewer" | "admin"; name: string; username: string; actionCount?: number }) {
+export function Sidebar({ role, name, username, actionCount }: { role: Role; name: string; username: string; actionCount?: number }) {
   const path = usePathname();
   const sp = useSearchParams();
   const [menu, setMenu] = useState(false);
@@ -36,7 +37,7 @@ export function Sidebar({ role, name, username, actionCount }: { role: "viewer" 
       </Link>
     );
   };
-  const visible = NAV.filter((i) => !i.minRole || role === "admin");
+  const visible = NAV.filter((i) => canOpen(role, i.href) && (!i.minRole || accessFor(role).admin));
   return (
     <nav className="relative flex h-full flex-col overflow-y-auto bg-side bg-[radial-gradient(460px_300px_at_0%_0%,rgba(192,143,96,.30),transparent_70%),radial-gradient(380px_420px_at_100%_100%,rgba(168,112,63,.16),transparent_70%),linear-gradient(180deg,#261e17_0%,#1b1712_45%,#140f0b_100%)] px-3 py-5 shadow-[inset_-1px_0_0_rgba(211,176,137,.18)] scroll-thin">
       <Link href={qs ? `/?${qs}` : "/"} className="mb-6 block px-2.5 leading-none">
@@ -58,7 +59,7 @@ export function Sidebar({ role, name, username, actionCount }: { role: "viewer" 
         <div className="relative flex items-center gap-1.5">
           <button onClick={() => setMenu((m) => !m)} className="flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-lg bg-white/5 px-2 text-left hover:bg-white/10">
             <span className="flex size-7 items-center justify-center rounded-full bg-gradient-to-br from-[#f3dcb8] to-[#a8703f] font-serif text-[13px] text-brand-900 shadow-[0_0_0_2px_rgba(243,220,184,.15)]">{name.slice(0, 1).toUpperCase()}</span>
-            <span className="min-w-0 flex-1 leading-tight"><span className="block truncate text-[12.5px] font-medium text-white">{name}</span><span className="block text-[10.5px] capitalize text-[#f3ebe1]/50">{role}</span></span>
+            <span className="min-w-0 flex-1 leading-tight"><span className="block truncate text-[12.5px] font-medium text-white">{name}</span><span className="block text-[10.5px] text-[#f3ebe1]/50">{ROLE_LABEL[role]}</span></span>
             <ChevronsUpDown className="size-3.5 text-[#f3ebe1]/40" />
           </button>
           <a href="/api/auth/logout" title="Log out" aria-label="Log out" className="flex h-11 w-10 shrink-0 items-center justify-center rounded-lg bg-white/5 text-[#f3ebe1]/60 hover:bg-rose-500/80 hover:text-white"><LogOut className="size-4" /></a>

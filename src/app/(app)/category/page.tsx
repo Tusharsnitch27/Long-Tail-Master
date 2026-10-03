@@ -12,6 +12,8 @@ import { productRows, rollup, DEF, type ProductRow } from "@/server/productInsig
 import { catColor, catLabel } from "@/server/views";
 import { PageHeader, Tabs, Kpi, KpiGrid, Section, Meter, Delta, ProductCell, Pill, achTone, DataPrompt, Tip, MixBar } from "@/components/ui";
 import { ChartDownload } from "@/components/charts/ChartDownload";
+import { CategoryViews } from "@/components/CategoryViews";
+import { categoryViews } from "@/server/categoryView";
 import { ActionCard } from "@/components/ActionCard";
 import { DataTable, type Col } from "@/components/table/DataTable";
 import { TrendChart } from "@/components/charts/TrendChart";
@@ -85,10 +87,10 @@ export default async function CategoryPerformance({ searchParams }: { searchPara
   // ─────────────── Summary ───────────────
   const ch = ctx.filters.channel as PlanChannel, mp = ctx.filters.mp;
   const histFrom = addDays(ctx.asOf, -59);
-  const [act, statuses, book, storeInv, storeHist, whHist] = await Promise.all([
+  const [act, statuses, book, storeInv, storeHist, whHist, cv] = await Promise.all([
     buildActions(ctx), actionStatuses(), getTargetBook(startOfMonth(ctx.asOf)),
     getStoreInventory([...sc.pm.keys()]).catch(() => []),
-    getStoreInventoryHistory(histFrom, ctx.asOf).catch(() => []), getWarehouseHistory(histFrom, ctx.asOf).catch(() => []),
+    getStoreInventoryHistory(histFrom, ctx.asOf).catch(() => []), getWarehouseHistory(histFrom, ctx.asOf).catch(() => []), categoryViews(ctx, sc),
   ]);
   const th = ctx.settings.thresholds;
   const m = channelMetrics(sc.facts, sc.uc, range, ch, mp), p = channelMetrics(sc.facts, sc.uc, compare, ch, mp);
@@ -180,51 +182,37 @@ export default async function CategoryPerformance({ searchParams }: { searchPara
       </div>
 
       <div className="mt-3">
-        <Section title={`${gl} scorecard`} pad={false} tip={multiCat ? "Revenue and channel split: DSR (Stores) + Unicommerce, same as the Executive Summary. Product metrics from product sales lines. Target / achievement are month-to-date." : "By product type (metafield L1). Revenue from product sales lines (Stores gross) + Unicommerce — may differ slightly from the DSR total."}>
-          {noType && <div className="px-4 pb-2"><DataPrompt compact title="Some products have no product type" href={ctx.user?.role === "admin" ? "/settings?tab=attributes" : undefined} cta="Add types">They are grouped as “Untyped”. Add L1 / L2 metafields to break the category down properly.</DataPrompt></div>}
+        <CategoryViews tables={cv.tables} grouping={cv.grouping} period={fmtRange(range)} qs={ctx.qs}
+          vis={{ revenue: ctx.access.revenue, gp: ctx.access.gp, stores: ctx.access.stores, online: ctx.access.online, marketplace: ctx.access.marketplace, qcom: ctx.access.qcom }} />
+      </div>
+
+      <div className="mt-3">
+        <Section title={`${gl} · channel mix and range concentration`} pad={false} tip="What the category view doesn't show: where each group sells and how concentrated its range is">
+          {noType && <div className="px-4 pb-2"><DataPrompt compact title="Some products have no product type" href={ctx.user?.role === "admin" || ctx.user?.role === "superadmin" ? "/settings?tab=attributes" : undefined} cta="Add types">They are grouped as “Untyped”. Add L1 / L2 metafields to break the category down properly.</DataPrompt></div>}
           <div className="overflow-x-auto scroll-thin">
             <table className="w-full whitespace-nowrap text-[12.5px]">
-              <thead>
-                <tr className="text-[10.5px] uppercase tracking-wide text-zinc-400"><th /><th colSpan={4} className="border-b border-line px-3 pt-2 text-center font-medium">{ctx.period.preset.toUpperCase()} · {chName}</th><th colSpan={3} className="border-b border-line px-3 pt-2 text-center font-medium">Channel share</th>{multiCat && <th colSpan={2} className="border-b border-line px-3 pt-2 text-center font-medium">Target · MTD</th>}<th colSpan={4} className="border-b border-line px-3 pt-2 text-center font-medium">Products</th><th colSpan={2} className="border-b border-line px-3 pt-2 text-center font-medium">Health</th><th colSpan={6} className="border-b border-line px-3 pt-2 text-center font-medium">Inventory · stores · in transit · warehouse</th></tr>
-                <tr className="border-b border-line text-[11px] text-zinc-500">
-                  {[gl, "Revenue", "Growth", "Share", "ASP", "Stores", "Online", "Mktplace", ...(multiCat ? ["Target", "Ach."] : []), "Selling", "Top 10 share", "80% of rev", "L30 vs P30", "Return %", "STR L30", "Store", "In transit", "Warehouse", "WH S · N", "Total", "DOI"].map((h, i) => <th key={h} className={cn(TH, i ? "text-right" : "text-left")}>{h}</th>)}
-                </tr>
-              </thead>
+              <thead><tr className="border-b border-line text-[11px] text-zinc-500">
+                {[gl, "Growth", "Stores", "Online", "Mktplace", "Selling", "Top 10 share", "80% of rev", "L30 vs P30"].map((h, i) => <th key={h} className={cn(TH, i ? "text-right" : "text-left")}>{h}</th>)}
+              </tr></thead>
               <tbody>{groups.map((g) => {
                 const t = g.chRev.reduce((a, x) => a + x, 0);
                 return (
                   <tr key={g.key} className="border-b border-brand-50 last:border-0 hover:bg-brand-50/40">
                     <td className="px-3 py-2">{multiCat ? <Link href={withQs(ctx, "/category", { cat: g.key })} className="flex items-center gap-2 font-medium hover:underline"><span className="size-2 rounded-full" style={{ background: g.color }} />{g.label}</Link>
                       : <Link href={withQs(ctx, "/category", { tab: "products", l1: g.key === "Untyped" ? null : g.key })} className="font-medium hover:underline">{g.label}</Link>}</td>
-                    <td className="tabular px-3 text-right font-semibold">{inr(g.rev)}</td><td className="px-3 text-right"><Delta v={growth(g.rev, g.prev)} /></td>
-                    <td className="tabular px-3 text-right">{pct(safeDiv(g.rev, totRev), 0)}</td><td className="tabular px-3 text-right">{inr(safeDiv(g.agg.revenue, g.agg.units), { compact: false })}</td>
+                    <td className="px-3 text-right"><Delta v={growth(g.rev, g.prev)} /></td>
                     {g.chRev.map((x, i) => <td key={i} className="tabular px-3 text-right text-zinc-600">{t > 0 ? pct(x / t, 0) : "—"}</td>)}
-                    {multiCat && (g.plan?.monthTarget != null ? <><td className="tabular px-3 text-right">{inr(g.plan.mtdTarget)}</td><td className="px-3 text-right"><Pill tone={achTone(g.plan.achievement, th)}>{pct(g.plan.achievement, 0)}</Pill></td></> : <td colSpan={2} className="px-3 text-right text-[11.5px] text-zinc-400">not set</td>)}
                     <td className="tabular px-3 text-right">{num(g.agg.selling)} <span className="text-zinc-400">/ {num(g.agg.products)}</span></td>
                     <td className="tabular px-3 text-right">{pct(g.agg.top10, 0)}</td>
                     <td className="tabular px-3 text-right" title="Fewest products that make 80% of the period revenue">{num(g.agg.n80)} <span className="text-zinc-400">SKUs</span></td>
                     <td className="px-3 text-right"><Delta v={growth(g.agg.l30, g.agg.p30)} /></td>
-                    <td className="tabular px-3 text-right">{pct(g.agg.returnPct, 1)}</td><td className="tabular px-3 text-right">{pct(g.agg.str30, 0)}</td>
-                    <td className="tabular px-3 text-right" title={`${num(stocked.get(g.key)?.size ?? 0)} stores stocked`}>{compactNum(g.agg.storeInv)}</td><td className="tabular px-3 text-right text-brand-700">{g.agg.git ? compactNum(g.agg.git) : "—"}</td><td className="tabular px-3 text-right">{compactNum(g.agg.whInv)}</td>
-                    <td className="tabular px-3 text-right text-zinc-500">{compactNum(g.agg.whSouth)} · {compactNum(g.agg.whNorth)}</td><td className="tabular px-3 text-right font-medium">{compactNum(g.agg.totalInv)}</td>
-                    <td className="px-3 text-right">{g.agg.doi != null ? <Pill tone={g.agg.doi < 21 ? "bad" : g.agg.doi > 180 ? "warn" : "good"}>{num(g.agg.doi)} d</Pill> : "—"}</td>
                   </tr>
                 );
               })}</tbody>
-              <tfoot><tr className="border-t border-line bg-zinc-50 font-semibold">
-                <td className="px-3 py-2">Total</td><td className="tabular px-3 text-right">{inr(totRev)}</td><td className="px-3 text-right"><Delta v={growth(totRev, groups.reduce((a, g) => a + g.prev, 0))} /></td><td className="tabular px-3 text-right">100%</td>
-                <td className="tabular px-3 text-right">{inr(safeDiv(all.revenue, all.units), { compact: false })}</td>
-                {CHS.map((k, i) => { const t = groups.reduce((a, g) => a + g.chRev.reduce((x, y) => x + y, 0), 0); return <td key={k} className="tabular px-3 text-right">{t ? pct(groups.reduce((a, g) => a + g.chRev[i], 0) / t, 0) : "—"}</td>; })}
-                {multiCat && (hasT ? <><td className="tabular px-3 text-right">{inr(plan.mtdTarget)}</td><td className="px-3 text-right"><Pill tone={achTone(plan.achievement, th)}>{pct(plan.achievement, 0)}</Pill></td></> : <td colSpan={2} className="px-3 text-right text-[11.5px] font-normal text-zinc-400">not set</td>)}
-                <td className="tabular px-3 text-right">{num(all.selling)} <span className="font-normal text-zinc-400">/ {num(all.products)}</span></td><td className="tabular px-3 text-right">{pct(all.top10, 0)}</td><td className="tabular px-3 text-right">{num(all.n80)}</td>
-                <td className="px-3 text-right"><Delta v={growth(all.l30, all.p30)} /></td><td className="tabular px-3 text-right">{pct(all.returnPct, 1)}</td><td className="tabular px-3 text-right">{pct(all.str30, 0)}</td>
-                <td className="tabular px-3 text-right">{compactNum(all.storeInv)}</td><td className="tabular px-3 text-right">{compactNum(all.git)}</td><td className="tabular px-3 text-right">{compactNum(all.whInv)}</td><td className="tabular px-3 text-right">{compactNum(all.whSouth)} · {compactNum(all.whNorth)}</td><td className="tabular px-3 text-right">{compactNum(all.totalInv)}</td>
-                <td className="tabular px-3 text-right">{all.doi != null ? `${num(all.doi)} d` : "—"}</td>
-              </tr></tfoot>
             </table>
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-2 text-[11px] text-zinc-500">
-            <span>Top 10 share = revenue of the 10 best products ÷ group revenue</span><span>80% of rev = fewest products making 80% of revenue</span><span>Return %: lifetime, value-based</span><span>STR / cover: {DEF.str30.split("=")[1]?.trim()}</span><span>Inventory: store = latest store report, in transit = allocated to stores and not yet in store stock, warehouse = live; DOI = (store + in transit + warehouse) ÷ L30 daily units, all channels</span>
+            <span>Channel columns = share of the group's revenue</span><span>Top 10 share = revenue of the 10 best products ÷ group revenue</span><span>80% of rev = fewest products making 80% of revenue</span>
           </div>
         </Section>
       </div>
@@ -289,7 +277,7 @@ export default async function CategoryPerformance({ searchParams }: { searchPara
       </div>
 
       <div className="mt-3 grid gap-3 xl:grid-cols-[1.6fr_1fr]">
-        <Section title="Inventory trend · last 60 days" tip="Daily snapshots — store report (all stores) and warehouse history (SNITCH_FINAL_INVENTORY_WH2), never summed across days. Gaps = no snapshot that day.">
+        <Section title="Inventory trend · last 60 days" tip="Daily snapshots — store report (all stores) and warehouse history, never summed across days. Gaps = no snapshot that day.">
           {invTrend.some((x) => x.store != null || x.south != null) ? <>
             <div className="mb-2 flex flex-wrap gap-4 text-[11.5px] text-zinc-500">
               {([["store", "Stores"], ["south", "WH South"], ["north", "WH North"]] as const).map(([k, l]) => <span key={k}>{l} <b className="tabular font-semibold text-zinc-800">{compactNum(lastWith(k))}</b> <Delta v={invDelta(k)} className="text-[11px]" /> <span className="text-zinc-400">in 60d</span></span>)}

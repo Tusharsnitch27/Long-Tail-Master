@@ -6,7 +6,22 @@ import { getFreshness } from "./data/freshness";
 import { getStoreMap, type Store } from "./data/stores";
 import { getFacts, type Fact } from "./data/facts";
 import { filterFacts } from "./analytics";
+import { cache } from "react";
 import { getUser, type User } from "./auth";
+import { accessFor, canOpen, type Access } from "@/lib/access";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { registerMoneyMask } from "@/lib/mask";
+
+/** per-request money mask (React cache = one object per server render) */
+const moneyFlag = cache(() => ({ on: false }));
+registerMoneyMask(moneyFlag);
+/** Apply the signed-in user's revenue access to everything formatted in this request. */
+export function applyAccess(user: User | null): Access {
+  const a = accessFor(user?.role ?? "viewer");
+  moneyFlag().on = !a.revenue;
+  return a;
+}
 
 export type SP = Record<string, string | string[] | undefined>;
 
@@ -22,6 +37,8 @@ export interface Ctx {
   byCode: Map<string, Store>;
   byName: Map<string, Store>;
   user: User | null;
+  /** what the signed-in user may see (revenue, GP, channels, downloads) */
+  access: Access;
 }
 
 export async function pageContext(searchParams: Promise<SP>): Promise<Ctx> {
@@ -31,7 +48,11 @@ export async function pageContext(searchParams: Promise<SP>): Promise<Ctx> {
   const filters = parseFilters(sp, settings.enabledCategories);
   const period = resolvePeriod(filters.preset, fresh.asOf, fresh.today, { from: filters.from, to: filters.to });
   const qs = new URLSearchParams(Object.entries(sp).flatMap(([k, v]) => (v == null ? [] : [[k, Array.isArray(v) ? v.join(",") : v]]))).toString();
-  return { sp, qs, settings, asOf: fresh.asOf, today: fresh.today, filters, period, ...sm, user };
+  const access = applyAccess(user);
+  // page access is enforced here too: the app shell hides a page, this stops it from rendering at all
+  const path = (await headers()).get("x-pathname");
+  if (user && path && !canOpen(user.role, path)) redirect(`/no-access?from=${encodeURIComponent(path)}`);
+  return { sp, qs, settings, asOf: fresh.asOf, today: fresh.today, filters, period, ...sm, user, access };
 }
 
 /** Filtered facts covering the selected range, its comparison, the current month and any extra ranges. */

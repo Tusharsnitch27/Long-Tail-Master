@@ -38,7 +38,12 @@ export default async function Actions({ searchParams }: { searchParams: Promise<
   const stores = ctx.stores.filter((s) => s.last_seen && s.last_seen >= "2000").map((s) => ({ code: s.branch_code, name: s.short_name })).sort((a, b) => a.name.localeCompare(b.name));
 
   // Keep the client payload bounded: all open (≤ 500 by priority/impact) + everything the team closed
-  const payload = [...open.slice(0, 500), ...actions.filter((a) => (statuses[a.key] ?? "open") !== "open")];
+  const raw = [...open.slice(0, 500), ...actions.filter((a) => (statuses[a.key] ?? "open") !== "open")];
+  // roles without revenue access see the actions, never the ₹ amounts in them
+  const hideMoney = (t: string) => t.replace(/[≈~]?\s*₹\s?[\d.,]+\s?(Cr|L|K)?(\/(day|month))?/g, "₹ —");
+  const scrub = (a: Action): Action => ctx.access.revenue ? a : { ...a, title: hideMoney(a.title), reason: hideMoney(a.reason), recommendation: hideMoney(a.recommendation), impactLabel: "Impact in ₹ hidden for your access",
+    evidence: a.evidence.map((e) => ({ ...e, value: hideMoney(e.value) })), notes: a.notes };
+  const payload = raw.map(scrub);
 
   return (
     <>
@@ -72,7 +77,7 @@ export default async function Actions({ searchParams }: { searchParams: Promise<
               )}
             </Notice>
           </div>
-          <ActionBoard actions={payload} hidden={suppressed.slice(0, 200)} statuses={statuses} categories={cats} qs={ctx.qs} initialGroup={typeof ctx.sp.group === "string" ? ctx.sp.group : undefined} />
+          <ActionBoard actions={payload} hidden={suppressed.slice(0, 200).map(scrub)} statuses={statuses} categories={cats} qs={ctx.qs} initialGroup={typeof ctx.sp.group === "string" ? ctx.sp.group : undefined} />
         </>
       ) : (
         <RemarksTab remarks={remarks} actions={[...actions, ...suppressed]} ctx={{ byCode: ctx.byCode, canAdmin: can(ctx.user, "admin"), username: ctx.user?.username ?? null }} stores={stores} cats={cats} db={dbConfigured()} />

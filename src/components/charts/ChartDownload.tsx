@@ -2,12 +2,14 @@
 import Papa from "papaparse";
 import { Download } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { useCanDownload } from "@/components/shell/Permissions";
 
 export interface DownloadCol { key: string; label: string }
 
 /** Downloads the data behind a chart as CSV (raw values: ₹ and units unformatted, ratios as decimals). */
 export function ChartDownload({ data, columns, name, className }: { data: Record<string, unknown>[]; columns?: DownloadCol[]; name: string; className?: string }) {
-  if (!data.length) return null;
+  const can = useCanDownload();
+  if (!can || !data.length) return null;
   const cols = columns ?? Object.keys(data[0]).map((k) => ({ key: k, label: k }));
   const save = () => {
     const csv = Papa.unparse({

@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Plus, ListFilter, ArrowUpDown } from "lucide-react";
 import { MixBar } from "@/components/ui/MixBar";
+import { useAccess } from "@/components/shell/Permissions";
 import { NUM_OPS, TEXT_OPS, needsValue, passRule, encodeRules, decodeRules, type Rule, type Op } from "./rules";
 import { facetOptions, matchTerms, normText, passFacets, queryTerms, type FacetDef } from "@/components/products/search";
 import { useListState, LOCAL_PARAMS } from "@/components/products/useListState";
@@ -82,6 +83,10 @@ export function DataTable({
 }) {
   const router = useRouter();
   const sp = useSearchParams();
+  const access = useAccess();
+  const canDownload = access.download;
+  // roles without revenue access never see ₹ columns or gross profit
+  columns = access.revenue ? columns : columns.filter((c) => c.type !== "inr" && c.type !== "inrFull" && !/^gp/i.test(c.key));
   const fs = useMemo(() => facets ?? [], [facets]);
   const { q, setQ, sel, setFacet, clear, sort, setSort } = useListState({ facets: fs.map((f) => f.key), defaultSort, url: urlState });
   const [hidden, setHidden] = useState<Set<string>>(() => new Set(columns.filter((c) => c.hidden).map((c) => c.key)));
@@ -174,13 +179,26 @@ export function DataTable({
   };
 
   const exportCsv = () => {
+    // every column (hidden ones too) plus the fields shown under a value (SKU group, item code, city …) and image links
+    const SUB_LABEL: Record<string, string> = { sku: "SKU group", item: "Item code", city: "City", b: "Branch code" };
+    type F = { label: string; get: (r: Row) => unknown; c?: Col };
+    const fields: F[] = [];
+    const subKeys = new Set(columns.map((c) => c.sub).filter(Boolean) as string[]);
+    if (!subKeys.has("sku") && rows.some((r) => r.sku != null) && !columns.some((c) => c.key === "sku")) fields.push({ label: "SKU group", get: (r) => r.sku });
+    for (const c of columns) {
+      if (c.type === "image") { fields.push({ label: c.label || "Image URL", get: (r) => r[c.key] }); continue; }
+      if (c.type === "split") { (["Stores", "Online", "Marketplace"] as const).forEach((n, i) => fields.push({ label: `${c.label} · ${n} %`, get: (r) => { const v = (r[c.key] as (number | null)[] | null)?.[i]; return v == null ? null : +(v * 100).toFixed(2); } })); continue; }
+      fields.push({ label: c.group ? `${c.group} ${c.label}` : c.label, get: (r) => r[c.key], c });
+      if (c.sub) fields.push({ label: SUB_LABEL[c.sub] ?? c.sub, get: (r) => r[c.sub!] });
+      if (c.image) fields.push({ label: "Image URL", get: (r) => r[c.image!] });
+    }
     const csv = Papa.unparse({
-      fields: columns.filter((c) => c.type !== "image").map((c) => (c.group ? `${c.group} ${c.label}` : c.label)),
-      data: data.map((r) => columns.filter((c) => c.type !== "image").map((c) => {
-        const v = r[c.key];
+      fields: fields.map((f) => f.label),
+      data: data.map((r) => fields.map(({ get, c }) => {
+        const v = get(r);
         if (v == null) return "";
-        if (c.type === "status") return STATUS_META[v as TargetStatus]?.label ?? v;
-        if (typeof v === "number") return c.type === "pct" || c.type === "ach" || c.type === "delta" ? +(v * 100).toFixed(2) : +v.toFixed(2);
+        if (c?.type === "status") return STATUS_META[v as TargetStatus]?.label ?? v;
+        if (typeof v === "number") return c && (c.type === "pct" || c.type === "ach" || c.type === "delta") ? +(v * 100).toFixed(2) : +v.toFixed(2);
         return v;
       })),
     });
@@ -245,9 +263,9 @@ export function DataTable({
             </div>
           )}
         </div>
-        <button onClick={exportCsv} className="flex h-8 items-center gap-1 rounded-lg border border-line px-2 text-[12px] text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50">
+        {canDownload && <button onClick={exportCsv} className="flex h-8 items-center gap-1 rounded-lg border border-line px-2 text-[12px] text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50">
           <Download className="size-3.5" /> CSV
-        </button>
+        </button>}
       </div>
       {rules.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 border-b border-line bg-brand-50/60 px-3 py-2">

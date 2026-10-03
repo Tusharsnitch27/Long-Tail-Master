@@ -32,7 +32,7 @@ export const DEF = {
   str30: "Sell-through (L30) = L30 units ÷ (L30 units + current store + in-transit + warehouse stock), all channels",
   ltStr: "Lifetime sell-through = lifetime units sold ÷ lifetime inward qty (Product Master)",
   doi: "Days of cover = (store + in transit + warehouse units) ÷ L30 average daily units, all channels",
-  git: "Goods in transit to stores (JIT_OFFLINE_GOODS): allocated to a store and not yet in its stock — from dispatch pending at the warehouse to delivered, inward pending",
+  git: "Goods in transit to stores: allocated to a store and not yet in its stock — from dispatch pending at the warehouse to delivered, inward pending",
   ret: "Lifetime returned ₹ ÷ sold ₹ (Product Master), selected channel",
   storeInv: "Live store inventory (latest store report, all stores)",
   wh: "Live warehouse inventory (Unicommerce): South = SAPL-WH1 + SAPL-WH2, North = SAPL-NORTH-TAURU",
@@ -88,7 +88,7 @@ export async function rollingBySku(asOf: string, cats: string[]): Promise<{ map:
 }
 
 export const pickBucket = (r: Roll | undefined, ch: Channel, mp: string | null): Bucket =>
-  !r ? bucket() : ch === "all" ? r.all : ch === "marketplace" && mp ? r.mp[mp] ?? bucket() : r.ch[ch];
+  !r ? bucket() : ch === "all" ? r.all : (ch === "marketplace" || ch === "online") && mp ? r.mp[mp] ?? bucket() : r.ch[ch];
 
 export interface ProductRow {
   sku: string; name: string; image: string | null; category: string | null; catName: string;

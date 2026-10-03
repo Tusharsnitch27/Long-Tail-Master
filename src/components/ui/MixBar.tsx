@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { compactNum, inr, num, pct } from "@/lib/format";
+import { useAccess } from "@/components/shell/Permissions";
 
 export interface MixPart { label: string; value: number; color: string }
 const FMT = { inr: (v: number) => inr(v), num: (v: number) => num(v), compact: (v: number) => compactNum(v), none: () => "" } as const;
@@ -17,7 +18,8 @@ export function MixBar({ parts, title, format = "inr", className, barClass = "h-
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [pos, setPos] = useState<{ x: number; y: number; up: boolean } | null>(null);
-  const fmt = FMT[format];
+  const access = useAccess();
+  const fmt = FMT[format === "inr" && !access.revenue ? "none" : format];
   const t = parts.reduce((a, p) => a + Math.max(0, p.value), 0);
   if (!t) return <span className="text-zinc-400">—</span>;
   const shown = parts.filter((p) => p.value > 0);
@@ -49,7 +51,7 @@ export function MixBar({ parts, title, format = "inr", className, barClass = "h-
               <span className="tabular text-right font-semibold">{pct(p.value / t, 0)}</span>
             </span>
           ))}
-          {format !== "none" && <span className="mt-1 flex justify-between border-t border-white/15 pt-1 text-canvas/70"><span>Total</span><span className="tabular">{fmt(t)}</span></span>}
+          {fmt !== FMT.none && <span className="mt-1 flex justify-between border-t border-white/15 pt-1 text-canvas/70"><span>Total</span><span className="tabular">{fmt(t)}</span></span>}
         </span>
       )}
     </span>

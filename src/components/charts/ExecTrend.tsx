@@ -5,12 +5,14 @@ import { inr, num, pct } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { ChartDownload } from "./ChartDownload";
 import { TOOLTIP, GRID } from "./theme";
+import { useAccess } from "@/components/shell/Permissions";
 
 type Row = { day: string; revenue: number | null; units: number | null; prevRevenue: number | null; prevUnits: number | null; targetPace: number | null; targetBasis: number | null; achievement: number | null };
 
 /** Cumulative month curves: current vs previous month (same day-of-month) vs target pace. */
 export function ExecTrend({ data, prevLabel, basisLabel }: { data: Row[]; prevLabel: string; basisLabel: string | null }) {
-  const [m, setM] = useState<"revenue" | "units" | "achievement">("revenue");
+  const access = useAccess();
+  const [m, setM] = useState<"revenue" | "units" | "achievement">(access.revenue ? "revenue" : "units");
   const hasTarget = data.some((d) => d.targetPace != null);
   const f = (v: number) => (m === "revenue" ? inr(v, { decimals: 1 }) : m === "units" ? num(v) : pct(v, 0));
   const series = m === "revenue"
@@ -22,7 +24,7 @@ export function ExecTrend({ data, prevLabel, basisLabel }: { data: Row[]; prevLa
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-2"><div className="flex gap-0.5 rounded-lg border border-line bg-white p-0.5 w-fit">
-        {(["revenue", "units", ...(hasTarget ? ["achievement"] : [])] as const).map((k) => (
+        {([...(access.revenue ? ["revenue"] : []), "units", ...(hasTarget ? ["achievement"] : [])] as const).map((k) => (
           <button key={k} onClick={() => setM(k as typeof m)} className={cn("rounded-md px-2.5 py-1 text-[12px] capitalize", m === k ? "bg-ink text-white" : "text-zinc-600 hover:bg-zinc-100")}>{k}</button>
         ))}
       </div><ChartDownload name={`month-trend-${m}`} data={data} columns={[{ key: "day", label: "Day" }, ...series.map((s) => ({ key: s.k, label: s.l }))]} /></div>

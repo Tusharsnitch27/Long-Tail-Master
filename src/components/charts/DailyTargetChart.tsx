@@ -5,6 +5,8 @@ import { fmtDate, weekday } from "@/lib/dates";
 import { ChartDownload } from "./ChartDownload";
 import { useId } from "react";
 import { TOOLTIP, CURSOR, GRID } from "./theme";
+import { useAccess } from "@/components/shell/Permissions";
+import { MoneyHidden } from "./MoneyHidden";
 
 export interface DailyRow { date: string; actual: number; target: number | null; units?: number; lw?: number | null }
 
@@ -13,8 +15,10 @@ const color = (a: number | null, target: number | null) => (target == null || !t
 /** Daily actual vs target: bars coloured by achievement (green ≥95%, amber ≥80%, red below), target as a dashed line. */
 export function DailyTargetChart({ data, height = 260, showLw = true, name = "daily-revenue-vs-target" }: { data: DailyRow[]; height?: number; showLw?: boolean; name?: string }) {
   const uid = useId().replace(/:/g, "");
+  const access = useAccess();
   const rows = data.map((d) => ({ ...d, ach: d.target ? d.actual / d.target : null }));
   const hasT = rows.some((r) => r.target != null);
+  if (!access.revenue) return <MoneyHidden height={height} note="Daily achievement is shown in the tables as a percentage." />;
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-center gap-3 text-[11px] text-zinc-500">

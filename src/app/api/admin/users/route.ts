@@ -8,7 +8,7 @@ import { apiError } from "@/server/api";
 
 const Username = z.string().trim().toLowerCase().refine(validUsername, "Username: 3–80 characters — letters, digits, . _ - @ + (an email address works). No spaces.");
 const Password = z.string().refine(validPassword, `password must be ${PASSWORD_RULE}`);
-const Role = z.enum(["viewer", "admin"]);
+const Role = z.enum(["viewer", "admin", "store_actions", "online_actions", "designer"]);
 const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("create"), username: Username, name: z.string().trim().max(80).nullish(), password: Password, role: Role }),
   z.object({ action: z.literal("update"), username: Username, name: z.string().trim().max(80).nullish(), role: Role.nullish(), active: z.boolean().nullish() }),
@@ -34,8 +34,8 @@ export async function POST(req: Request) {
         [b.username, b.name || null, b.role, await hashPassword(b.password), actor.username]);
       await audit("create", { role: b.role });
     } else if (b.action === "update") {
-      if (self && (b.role === "viewer" || b.active === false)) return NextResponse.json({ error: "You can't remove your own admin access." }, { status: 400 });
-      if ((b.role === "viewer" || b.active === false) && (await otherActiveAdmins()) === 0) return NextResponse.json({ error: "At least one active admin is required." }, { status: 400 });
+      if (self && ((b.role && b.role !== "admin") || b.active === false)) return NextResponse.json({ error: "You can't remove your own admin access." }, { status: 400 });
+      if (((b.role && b.role !== "admin") || b.active === false) && (await otherActiveAdmins()) === 0) return NextResponse.json({ error: "At least one active admin is required." }, { status: 400 });
       const r = await q("update app_users set name = coalesce($2, name), role = coalesce($3, role), active = coalesce($4, active) where username = $1 returning username",
         [b.username, b.name ?? null, b.role ?? null, b.active ?? null]);
       if (!r.length) return NextResponse.json({ error: "User not found" }, { status: 404 });

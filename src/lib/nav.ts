@@ -14,6 +14,7 @@ export const NAV: NavItem[] = [
   { href: "/stores", label: "Store Overview", icon: "stores", group: "analyse" },
   { href: "/online", label: "Online", icon: "online", group: "analyse" },
   { href: "/marketplace", label: "Marketplace", icon: "marketplace", group: "analyse" },
+  { href: "/qcom", label: "Qcom", icon: "qcom", group: "analyse", badge: "New" },
   { href: "/actions", label: "Action Centre", icon: "actions", group: "act" },
   { href: "/vm", label: "VM Revamp", icon: "vm", group: "act" },
   { href: "/lab", label: "Admin Lab", icon: "lab", group: "admin", minRole: "admin" },

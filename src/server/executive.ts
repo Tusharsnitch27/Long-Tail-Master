@@ -1,4 +1,5 @@
 import "server-only";
+import { moneyMasked } from "@/lib/mask";
 import { growth, safeDiv } from "@/lib/metrics";
 import { addDays, type Range } from "@/lib/dates";
 import { catLabel } from "./views";
@@ -12,7 +13,8 @@ import type { Plan, PlanChannel } from "./plan";
 
 /** Every line is computed from data — no generic commentary. */
 export interface Insight { tone: "positive" | "negative" | "neutral"; text: string; href?: string; value?: number }
-const inr = (v: number) => { const a = Math.abs(v); const s = a >= 1e7 ? `₹${(a / 1e7).toFixed(2)} Cr` : a >= 1e5 ? `₹${(a / 1e5).toFixed(1)} L` : a >= 1e3 ? `₹${(a / 1e3).toFixed(1)}K` : `₹${Math.round(a)}`; return v < 0 ? `-${s}` : s; };
+const inrRaw = (v: number) => { const a = Math.abs(v); const s = a >= 1e7 ? `₹${(a / 1e7).toFixed(2)} Cr` : a >= 1e5 ? `₹${(a / 1e5).toFixed(1)} L` : a >= 1e3 ? `₹${(a / 1e3).toFixed(1)}K` : `₹${Math.round(a)}`; return v < 0 ? `-${s}` : s; };
+const inr = (v: number) => (moneyMasked() ? "₹ —" : inrRaw(v)); // hidden for roles without revenue access
 const pc = (v: number | null | undefined, d = 0) => (v == null ? "—" : `${(v * 100).toFixed(d)}%`);
 const sp = (v: number | null) => (v == null ? "—" : `${v > 0 ? "+" : ""}${(v * 100).toFixed(1)}%`);
 

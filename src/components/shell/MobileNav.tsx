@@ -3,8 +3,9 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { Sidebar } from "./Sidebar";
+import type { Role } from "@/lib/access";
 
-export function MobileNav(props: { role: "viewer" | "admin"; name: string; username: string; actionCount?: number }) {
+export function MobileNav(props: { role: Role; name: string; username: string; actionCount?: number }) {
   const [open, setOpen] = useState(false);
   const path = usePathname();
   useEffect(() => setOpen(false), [path]);

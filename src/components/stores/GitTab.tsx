@@ -25,7 +25,7 @@ export async function GitTab({ ctx }: { ctx: Ctx }) {
   const cats = new Set(ctx.filters.cats);
   const only = ctx.filters.stores.length ? new Set(ctx.filters.stores) : null;
   const lines = git.lines.filter((l) => cats.has(pm.get(l.sku)?.category ?? "") && (!only || only.has(l.b)));
-  if (!lines.length) return <DataPrompt title="Nothing in transit for this selection">JIT_OFFLINE_GOODS has no long-tail stock allocated to {only ? "the selected stores" : "stores"} in these categories right now{git.updated ? ` (table updated ${git.updated.slice(0, 16).replace("T", " ")})` : ""}.</DataPrompt>;
+  if (!lines.length) return <DataPrompt title="Nothing in transit for this selection">No long-tail stock is allocated to {only ? "the selected stores" : "stores"} in these categories right now{git.updated ? ` (table updated ${git.updated.slice(0, 16).replace("T", " ")})` : ""}.</DataPrompt>;
 
   const at = new Map(ss.map((r) => [`${r.b}|${r.sku}`, r]));
   const price = (sku: string) => pm.get(sku)?.sellingPrice ?? pm.get(sku)?.mrp ?? 0;
@@ -77,7 +77,7 @@ export async function GitTab({ ctx }: { ctx: Ctx }) {
   const detailCols: Col[] = [
     { key: "name", label: "Product", image: "image", imageSize: 44, sub: "item", width: 260 }, { key: "catName", label: "Category", hidden: ctx.filters.cats.length === 1 },
     { key: "store", label: "Store", sub: "city", width: 180 }, { key: "qty", label: "Qty", type: "num" }, { key: "status", label: "Status", width: 190 },
-    { key: "inward", label: "Allocated", type: "date", tip: "INWARD_DATE in JIT_OFFLINE_GOODS" }, { key: "aging", label: "Age (d)", type: "num" },
+    { key: "inward", label: "Allocated", type: "date", tip: "Date the stock was allocated to the store" }, { key: "aging", label: "Age (d)", type: "num" },
     { key: "storeStock", label: "Store stock", type: "num", group: "At this store" }, { key: "l30", label: "L30 units", type: "num", group: "At this store" }, { key: "cover", label: "Cover after", type: "num", group: "At this store", tip: "(Store stock + in transit) ÷ L30 daily units at this store" },
     { key: "flag", label: "Flag", width: 150 },
   ];
@@ -149,7 +149,7 @@ export async function GitTab({ ctx }: { ctx: Ctx }) {
           searchKeys={["name", "sku", "item", "store", "city"]} searchPlaceholder="Search product, SKU or store" />
       </div>
       <p className="mt-2 text-[11px] text-zinc-500">
-        Source: JIT_OFFLINE_GOODS (warehouse → store allocations not yet in store stock){git.updated ? `, updated ${fmtDate(git.updated.slice(0, 10), true)} ${git.updated.slice(11, 16)}` : ""}. Status order: {GIT_STAGES.map((s) => s.short).join(" → ")}.
+        Warehouse → store allocations not yet in store stock{git.updated ? `, updated ${fmtDate(git.updated.slice(0, 10), true)} ${git.updated.slice(11, 16)}` : ""}. Status order: {GIT_STAGES.map((s) => s.short).join(" → ")}.
         Elsewhere in the tool these units appear as “In transit”, the third inventory phase next to Stores and Warehouse; store actions and allocations net them off. <Link href={withQs(ctx, "/actions", { group: "merchandising" })} className="font-medium text-brand-700 hover:underline">Stuck-in-transit actions →</Link>
       </p>
     </>

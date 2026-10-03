@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { requireUser } from "@/server/auth";
+import { accessFor } from "@/lib/access";
 import { apiError } from "@/server/api";
 import { runTurn } from "@/server/ai/orchestrator";
 
@@ -17,6 +18,7 @@ const PER_HOUR = Number(process.env.AI_QUESTIONS_PER_HOUR ?? 60);
 export async function POST(req: Request) {
   try {
     const user = await requireUser("viewer");
+    if (!accessFor(user.role).harvey) return new Response(JSON.stringify({ error: "Harvey isn’t part of your access." }), { status: 403, headers: { "content-type": "application/json" } });
     const p = Body.safeParse(await req.json());
     if (!p.success) return Response.json({ error: "question required (2–2000 chars)" }, { status: 400 });
     const now = Date.now();

@@ -1,4 +1,5 @@
 import "server-only";
+import { moneyMasked } from "@/lib/mask";
 import { addDays, diffDays, endOfMonth, inRange, rangeDays, startOfMonth, startOfWeek, type Range } from "@/lib/dates";
 import { growth, safeDiv, targetStatus, type TargetStatus, type Thresholds } from "@/lib/metrics";
 import { catByKey, sortCats } from "@/lib/categories";
@@ -313,7 +314,8 @@ export async function buildStoreModel(ctx: Ctx, facts: Fact[]): Promise<StoreMod
 
 const L = (c: string) => catByKey(c)?.label ?? c;
 const r0 = (v: number) => Math.round(v).toLocaleString("en-IN");
-const inrS = (v: number) => (Math.abs(v) >= 1e5 ? `₹${(v / 1e5).toFixed(1)} L` : Math.abs(v) >= 1e3 ? `₹${(v / 1e3).toFixed(1)}K` : `₹${Math.round(v)}`);
+const inrSRaw = (v: number) => (Math.abs(v) >= 1e5 ? `₹${(v / 1e5).toFixed(1)} L` : Math.abs(v) >= 1e3 ? `₹${(v / 1e3).toFixed(1)}K` : `₹${Math.round(v)}`);
+const inrS = (v: number) => (moneyMasked() ? "₹ —" : inrSRaw(v)); // hidden for roles without revenue access
 
 /** Store to-dos, strongest first. Every item is computed from the store's own data (or its format peers). */
 function todosFor(s: StoreInsight, peerPen: StoreModel["peerPen"], asp: Map<string, number | null>, remainingDays: number, th: Thresholds): Todo[] {

@@ -94,7 +94,7 @@ export function FormatsTab({ ctx, model }: { ctx: Ctx; model: StoreModel }) {
       </div>
 
       <div className="mt-3"><Section title="Format × city type" pad={false}><GroupTable rows={byMix} th={th} total={total} first="Segment" /></Section></div>
-      <div className="mt-3"><Section title="High street vs Mall" pad={false} tip="LOCATION_TYPE from the store master (Hs normalised to HS)"><GroupTable rows={byLt} th={th} total={total} first="Format" /></Section></div>
+      <div className="mt-3"><Section title="High street vs Mall" pad={false} tip="Location type from the store master"><GroupTable rows={byLt} th={th} total={total} first="Format" /></Section></div>
       <div className="mt-3"><Section title="Metro vs Non-metro" pad={false}><GroupTable rows={byCt} th={th} total={total} first="City type" /></Section></div>
       <div className="mt-3"><Section title={`State-level performance · ${byState.length} states`} pad={false} tip="Sorted by revenue"><GroupTable rows={byState} th={th} total={total} first="State" /></Section></div>
       <div className="mt-3 grid gap-3 xl:grid-cols-2">

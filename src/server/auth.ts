@@ -5,9 +5,13 @@ import { readSession, SESSION_COOKIE } from "@/lib/session";
 import { dbConfigured, q } from "./db";
 import { hashPassword, verifyPassword } from "./passwords";
 
-export type Role = "viewer" | "admin";
+import type { Role } from "@/lib/access";
+export type { Role };
 export interface User { username: string; name: string; role: Role }
-const RANK: Record<Role, number> = { viewer: 0, admin: 1 };
+const RANK: Record<Role, number> = { viewer: 0, store_actions: 0, online_actions: 0, designer: 0, admin: 1, superadmin: 2 };
+/** Super admin = an admin whose username is in SUPERADMIN_USERNAMES (default: the bootstrap ADMIN_USERNAME). Never assignable in the UI. */
+const superadmins = () => new Set((process.env.SUPERADMIN_USERNAMES ?? process.env.ADMIN_USERNAME ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean));
+const effective = (username: string, role: Role): Role => (role === "admin" && superadmins().has(username.toLowerCase()) ? "superadmin" : role);
 
 export class AuthError extends Error {
   constructor(public status: 401 | 403, message: string) { super(message); }
@@ -43,10 +47,10 @@ export async function getUser(): Promise<User | null> {
 }
 
 async function loadUser(username: string): Promise<User> {
-  if (process.env.AUTH_MODE === "dev") return { username, name: "Developer", role: "admin" };
+  if (process.env.AUTH_MODE === "dev") return { username, name: "Developer", role: (process.env.DEV_ROLE as Role) || "superadmin" };
   const boot = envAdmin();
   if (!dbConfigured()) {
-    if (boot && boot.username === username) return { username, name: "Admin", role: "admin" };
+    if (boot && boot.username === username) return { username, name: "Admin", role: effective(username, "admin") };
     throw new AuthError(401, "Unknown user");
   }
   const rows = await q<{ username: string; name: string | null; role: Role; active: boolean }>(
@@ -54,7 +58,7 @@ async function loadUser(username: string): Promise<User> {
   const u = rows[0];
   if (!u) throw new AuthError(401, "Your account no longer exists.");
   if (!u.active) throw new AuthError(403, "Your account has been disabled. Contact an admin.");
-  return { username: u.username, name: u.name || u.username, role: u.role };
+  return { username: u.username, name: u.name || u.username, role: effective(u.username, u.role) };
 }
 
 /** Creates the ADMIN_USERNAME account on first use if it doesn't exist yet (password from ADMIN_PASSWORD). */
@@ -87,7 +91,7 @@ export async function checkLogin(usernameRaw: string, password: string): Promise
   const username = usernameRaw.trim().toLowerCase();
   const boot = envAdmin();
   if (!dbConfigured()) {
-    return boot && boot.username === username && boot.password === password ? { username, name: "Admin", role: "admin" } : null;
+    return boot && boot.username === username && boot.password === password ? { username, name: "Admin", role: effective(username, "admin") } : null;
   }
   await ensureBootstrapAdmin();
   const rows = await q<{ username: string; name: string | null; role: Role; active: boolean; password_hash: string | null }>(
@@ -97,7 +101,7 @@ export async function checkLogin(usernameRaw: string, password: string): Promise
   const ok = await verifyPassword(password, u?.password_hash ?? "scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA$AAAA");
   if (!u || !ok || !u.active) return null;
   invalidate(`user:${username}`);
-  return { username: u.username, name: u.name || u.username, role: u.role };
+  return { username: u.username, name: u.name || u.username, role: effective(u.username, u.role) };
 }
 
 export async function requireUser(minRole: Role = "viewer"): Promise<User> {

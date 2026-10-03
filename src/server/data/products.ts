@@ -47,6 +47,15 @@ export interface Product {
   returnPct: ChannelSplit; // returned ₹ ÷ sold ₹
   l30Sales: number | null;
   l30Qty: number | null;
+  /** unit cost (SKU master) — used only for gross profit, never shown or edited per product */
+  unitCost: number | null;
+  /** Quick commerce (Qcom) from the SKU master: lifetime and last 30 days */
+  qcom: { tdSales: number | null; tdQty: number | null; tdReturns: number | null; l30Sales: number | null; l30Qty: number | null; l30Mrp: number | null; l30ReturnedQty: number | null };
+  /** last-30-day units sold and returned by channel (SKU master) */
+  l30QtyBy: { all: number | null; stores: number | null; online: number | null; marketplace: number | null; omni?: number | null; qcom?: number | null };
+  l30ReturnedQtyBy: { all: number | null; stores: number | null; online: number | null; marketplace: number | null; omni?: number | null; qcom?: number | null };
+  /** image came from the SKU master (wins over the Shopify catalogue) */
+  masterImage: boolean;
   // legacy aliases used across views
   qtySoldTd: number | null;
   salesTd: number | null;
@@ -68,13 +77,14 @@ const S = "SNITCH_DB.MAPLEMONK";
 const tidyName = (name: string) => name.trim().replace(/\s+/g, " ").replace(/\b\w+/g, (w) => (w.length > 2 && w === w.toUpperCase() ? w[0] + w.slice(1).toLowerCase() : w));
 
 export function getProducts(): Promise<Product[]> {
-  return cached("products:merged:v4", 600, buildProducts);
+  return cached("products:merged:v6", 600, buildProducts);
 }
 
 async function buildProducts(): Promise<Product[]> {
   const rows = await sfCached<Record<string, unknown>>(
-    "products:v2",
-    `with b as (select * from ${S}.LONG_TAIL_MASTER_BIBLE),
+    "products:v4",
+    // SKU_MASTER_V1 (full product master, daily) restricted to long-tail categories; replaces LONG_TAIL_MASTER_BIBLE
+    `with b as (select * from ${S}.SKU_MASTER_V1 where upper(category) in ('PERFUMES','SHOES','FOOTWEAR','SANDALS','BAGS','BELTS','ACCESSORIES','CAPS','SOCKS','SUNGLASSES','LUGGAGE','TROLLEY')),
      m as (select * from ${S}.LONG_TAIL_PRODUCT_INVENTORY_MASTER),
      h as (select sku_group, any_value(category) category, max(price) price, max(image_url) image_url, max_by(product_tags, date) tags
            from ${S}.HORIZONTAL_SALES_CATEGORIES
@@ -83,7 +93,7 @@ async function buildProducts(): Promise<Product[]> {
      select coalesce(b.sku_group, m.sku_group, h.sku_group) sku,
             coalesce(nullif(b.product_name, ''), m.title) name, coalesce(b.category, m.category, h.category) category,
             m.color colour, coalesce(nullif(b.material, 'NO_MATERIAL'), m.material_mapped) material, m.vendor,
-            coalesce(b.image_link, m.image_url, h.image_url) image, coalesce(b.mrp, m.original_price, h.price) mrp, m.current_slashed_price selling_price,
+            coalesce(b.image_link, m.image_url, h.image_url) image, b.image_link master_image, coalesce(b.mrp, m.original_price, h.price) mrp, m.current_slashed_price selling_price,
             coalesce(b.cogs, m.cost_price) cogs, m.status, b.lifecycle_status lifecycle, b.allocation_status allocation,
             to_varchar(coalesce(b.live_date, m.final_live_date)) live_date, coalesce(b.days_since_live, m.days_since_live) days_since_live, b.ageing,
             b.sku_group is not null in_bible, b.total_inv_all inv_total, b.wh_inv_all inv_wh, b.offline_inv_all inv_offline, b.store_count_all stores_stocked,
@@ -92,6 +102,10 @@ async function buildProducts(): Promise<Product[]> {
             b.qty_sold_td_all q_all, b.qty_sold_td_offline q_st, b.qty_sold_td_shopify q_on, b.qty_sold_td_marketplace q_mp,
             b.returns_td_all r_all, b.returns_td_offline r_st, b.returns_td_shopify r_on, b.returns_td_marketplace r_mp,
             b.sales_l30_all l30_s, b.qty_sold_l30_all l30_q, b.gp_pct_td_all gp,
+            b.sales_td_qcom s_qc, b.qty_sold_td_qcom q_qc, b.returns_td_qcom r_qc,
+            b.sales_l30_qcom l30_s_qc, b.qty_sold_l30_qcom l30_q_qc, b.sales_mrp_l30_qcom l30_mrp_qc, b.qty_returned_l30_qcom l30_rq_qc,
+            b.qty_returned_l30_all l30_rq, b.qty_returned_l30_offline l30_rq_st, b.qty_returned_l30_shopify l30_rq_on, b.qty_returned_l30_marketplace l30_rq_mp,
+            b.qty_sold_l30_offline l30_q_st, b.qty_sold_l30_shopify l30_q_on, b.qty_sold_l30_marketplace l30_q_mp, b.qty_sold_l30_omni l30_q_om, b.qty_returned_l30_omni l30_rq_om,
             to_varchar(h.tags) tags
      from b full outer join m on m.sku_group = b.sku_group
      full outer join h on h.sku_group = coalesce(b.sku_group, m.sku_group)`,
@@ -120,7 +134,10 @@ async function buildProducts(): Promise<Product[]> {
       inwardTotal: n(r.inward_total), lastInward: (r.last_inward as string) ?? null,
       sales, qty, returnsValue: ret,
       returnPct: { all: pct(ret.all, sales.all), stores: pct(ret.stores, sales.stores), online: pct(ret.online, sales.online), marketplace: pct(ret.marketplace, sales.marketplace) },
-      l30Sales: n(r.l30_s), l30Qty: n(r.l30_q),
+      l30Sales: n(r.l30_s), l30Qty: n(r.l30_q), unitCost: n(r.cogs), masterImage: !!r.master_image,
+      qcom: { tdSales: n(r.s_qc), tdQty: n(r.q_qc), tdReturns: n(r.r_qc), l30Sales: n(r.l30_s_qc), l30Qty: n(r.l30_q_qc), l30Mrp: n(r.l30_mrp_qc), l30ReturnedQty: n(r.l30_rq_qc) },
+      l30QtyBy: { all: n(r.l30_q), stores: n(r.l30_q_st), online: n(r.l30_q_on), marketplace: n(r.l30_q_mp), omni: n(r.l30_q_om), qcom: n(r.l30_q_qc) },
+      l30ReturnedQtyBy: { all: n(r.l30_rq), stores: n(r.l30_rq_st), online: n(r.l30_rq_on), marketplace: n(r.l30_rq_mp), omni: n(r.l30_rq_om), qcom: n(r.l30_rq_qc) },
       qtySoldTd: qty.all, salesTd: sales.all, returnPctTd: pct(ret.all, sales.all), gpPctTd: n(r.gp), tags,
       l1: null, l2: null, attrs: {}, collection: null, search: "", storeInvSource: null,
     } as Product;
@@ -132,7 +149,8 @@ async function buildProducts(): Promise<Product[]> {
     const empty = { all: null, stores: null, online: null, marketplace: null };
     const p = { sku: m.sku, style: m.sku.split("-")[0], name: m.name ? m.name.replace(/\b\w+/g, (w) => (w.length > 2 && w === w.toUpperCase() ? w[0] + w.slice(1).toLowerCase() : w)) : null, category: m.category, colour: null, material: null, vendor: null, image: m.image, mrp: null, sellingPrice: null, cogs: null,
       status: null, lifecycle: null, allocation: null, liveDate: null, daysSinceLive: null, ageing: null, inBible: false, invTotal: null, invWarehouse: null, invOffline: null, storesStocked: null,
-      inwardTotal: null, lastInward: null, sales: { ...empty }, qty: { ...empty }, returnsValue: { ...empty }, returnPct: { ...empty }, l30Sales: null, l30Qty: null,
+      inwardTotal: null, lastInward: null, sales: { ...empty }, qty: { ...empty }, returnsValue: { ...empty }, returnPct: { ...empty }, l30Sales: null, l30Qty: null, unitCost: null, masterImage: false,
+      qcom: { tdSales: null, tdQty: null, tdReturns: null, l30Sales: null, l30Qty: null, l30Mrp: null, l30ReturnedQty: null }, l30QtyBy: { ...empty }, l30ReturnedQtyBy: { ...empty },
       qtySoldTd: null, salesTd: null, returnPctTd: null, gpPctTd: null, tags: [], l1: null, l2: null, attrs: {}, collection: null, search: "", storeInvSource: null } as Product;
     base.push(p); bySku.set(p.sku, p);
   }
@@ -151,7 +169,7 @@ async function buildProducts(): Promise<Product[]> {
     const s = shop.get(p.sku);
     if (s) {
       if (s.name) p.name = tidyName(s.name);
-      if (s.image) p.image = s.image;
+      if (s.image && !p.masterImage) p.image = s.image; // images: SKU master first, then the Shopify catalogue
       p.mrp = s.mrp ?? p.mrp; p.sellingPrice = s.sellingPrice ?? p.sellingPrice;
       p.liveDate ??= s.liveDate; p.status = s.status ?? p.status;
       if (p.daysSinceLive == null && p.liveDate) p.daysSinceLive = Math.max(0, Math.round((Date.now() - new Date(p.liveDate).getTime()) / 86400_000));

@@ -11,7 +11,7 @@ import { SplitGenerate } from "@/components/control/SplitGenerate";
 import { getStoreInventory } from "@/server/data/inventory";
 import { getProducts } from "@/server/data/products";
 import { channelMetrics, ucChannel, type ChKey } from "@/server/channelData";
-import { ruleBook, TABLES } from "@/server/rulesDoc";
+import { ruleBook } from "@/server/rulesDoc";
 import { catColor, catLabel } from "@/server/views";
 import { CATEGORIES } from "@/lib/categories";
 import { addDays, addMonths, eachDay, endOfMonth, fmtDate, startOfMonth } from "@/lib/dates";
@@ -196,7 +196,7 @@ export default async function ControlCentre({ searchParams }: { searchParams: Pr
               </tr>
             ))}</tbody>
           </table>
-          <p className="mt-2 text-[11.5px] text-zinc-500">Sources: Shopify catalogue (name, image, MRP, live date, status), GS_LONGTAIL_METAFIELD (L1 / L2, image), the Longtail Metafields workbook (shoe attributes; L1 / L2 not taken from it), and uploads here (win over both). Perfumes carry names only.</p>
+          <p className="mt-2 text-[11.5px] text-zinc-500">Edits made here win over every other source. Perfumes carry names only.</p>
         </Section>
         {missing.length > 0 && (
           <div className="mt-3"><Section title={`Products with gaps · ${missing.length}`} pad={false}>
@@ -214,7 +214,6 @@ export default async function ControlCentre({ searchParams }: { searchParams: Pr
       : [];
     body = (<>{ro && <Notice tone="warn">DATABASE_URL is not configured — users can’t be managed.</Notice>}<UsersForm users={users} me={ctx.user!.username} readOnly={ro} /></>);
   } else if (tab === "rules") {
-    const [fresh, ucTs] = await Promise.all([getFreshness(), channelFreshness()]);
     const book = ruleBook(ctx.settings);
     body = (
       <>
@@ -227,17 +226,6 @@ export default async function ControlCentre({ searchParams }: { searchParams: Pr
           </table>
         </Section>
         <div className="mt-3"><SettingsForm initial={ctx.settings} categories={CATEGORIES.map((c) => ({ key: c.key, label: c.label, source: c.source }))} readOnly={ro} /></div>
-        <div className="mt-3 grid gap-3 xl:grid-cols-[1.4fr_1fr]">
-          <Section title="Tables used" pad={false}>
-            <table className="w-full text-[12.5px]"><tbody>{TABLES.map((t) => <tr key={t.table} className="border-b border-brand-50 align-top"><td className="px-4 py-2 font-mono text-[11.5px] text-brand-800">{t.table}</td><td className="px-4 py-2 text-zinc-700">{t.use}</td><td className="px-4 py-2 text-[11.5px] text-zinc-500">{t.grain}</td></tr>)}</tbody></table>
-          </Section>
-          <Section title="Source freshness">
-            <ul className="space-y-1 text-[12px]">
-              {Object.entries(fresh.tables).map(([k, v]) => <li key={k} className="flex justify-between"><span className="font-mono text-zinc-600">{k}</span><span>{new Date(v).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</span></li>)}
-              <li className="flex justify-between"><span className="font-mono text-zinc-600">UNICOMMERCE_FACT_ITEMS (latest item)</span><span>{ucTs ?? "—"}</span></li>
-            </ul>
-          </Section>
-        </div>
       </>
     );
   } else {

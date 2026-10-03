@@ -56,7 +56,7 @@ export default async function ProductMaster({ searchParams }: { searchParams: Pr
         </div>} />
       <KpiGrid cols={7}>
         <Kpi label="Products" value={num(agg.products)} sub={`${num(rows.filter((r) => r.l30Units > 0).length)} sold in L30`} />
-        <Kpi label="Lifetime sales" value={inr(agg.ltSales)} sub="all channels" tip="Product Master (LONG_TAIL_MASTER_BIBLE), to date" />
+        <Kpi label="Lifetime sales" value={inr(agg.ltSales)} sub="all channels" tip="Product master, to date" />
         <Kpi label="L30 sales" value={inr(agg.l30)} delta={agg.p30 ? agg.l30 / agg.p30 - 1 : null} deltaLabel="vs prior 30" tip={`${DEF.l30}`} />
         <Kpi label="Lifetime STR" value={pct(agg.ltStr, 0)} sub={`L30 STR ${pct(agg.str30, 0)}`} tip={`${DEF.ltStr}. ${DEF.str30}`} />
         <Kpi label="Store stock" value={compactNum(agg.storeInv)} sub={agg.git ? <><b className="font-semibold text-brand-700">{compactNum(agg.git)}</b> more in transit</> : undefined} tip={`${DEF.storeInv}. ${DEF.git}`} />

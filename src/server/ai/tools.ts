@@ -1,5 +1,6 @@
 import "server-only";
 import { gitOrEmpty } from "../scope";
+import { accessFor } from "@/lib/access";
 import { z } from "zod";
 import { CATEGORIES, IN_SCOPE_NOTE } from "@/lib/categories";
 import { addDays, addMonths, diffDays, endOfMonth, minDate, maxDate, rangeDays, resolvePeriod, startOfMonth, startOfWeek, eachDay, type Preset, type Range } from "@/lib/dates";
@@ -87,7 +88,7 @@ function buildCtx(b: Base, period: Period, compare: z.infer<typeof CompareSchema
     am: scope?.area_managers ?? [], sst: [], ct: [], lt: [], ch, pb: [],
   };
   return {
-    sp: {}, qs: "", settings: b.settings, asOf: b.asOf, today: b.today, filters, stores: b.stores, byCode: b.byCode, byName: b.byName, user: null,
+    sp: {}, qs: "", settings: b.settings, asOf: b.asOf, today: b.today, filters, stores: b.stores, byCode: b.byCode, byName: b.byName, user: null, access: accessFor("viewer"),
     period: { ...p, compare: cmp ?? { from: addDays(p.range.from, -1), to: addDays(p.range.from, -2) } },
     compareNone: !cmp,
   };

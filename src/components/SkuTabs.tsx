@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Thumb } from "@/components/ui";
+import { useAccess } from "@/components/shell/Permissions";
 import { inr, num, pct } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
@@ -11,6 +12,7 @@ export interface SkuTab { key: string; label: string; color?: string; rows: SkuR
 /** One tab per category (only categories in scope), each listing its products with image, revenue and units. */
 export function SkuTabs({ tabs, qs = "", empty = "No sales in this period.", limit = 10 }: { tabs: SkuTab[]; qs?: string; empty?: string; limit?: number }) {
   const [k, setK] = useState(tabs[0]?.key);
+  const money = useAccess().revenue;
   const cur = tabs.find((t) => t.key === k) ?? tabs[0];
   if (!cur) return <div className="py-6 text-center text-[12.5px] text-zinc-500">{empty}</div>;
   const max = Math.max(...cur.rows.map((r) => r.revenue), 1);
@@ -40,8 +42,8 @@ export function SkuTabs({ tabs, qs = "", empty = "No sales in this period.", lim
                   <span className="mt-0.5 block font-mono text-[10.5px] text-zinc-400">{r.sku}{r.note ? <span className={cn("ml-1.5 font-sans", r.tone === "bad" ? "text-rose-600" : r.tone === "warn" ? "text-amber-700" : r.tone === "good" ? "text-emerald-700" : "text-zinc-500")}>{r.note}</span> : null}</span>
                 </span>
                 <span className="tabular text-right text-[12px]">
-                  <b className="font-semibold">{inr(r.revenue)}</b>
-                  <span className="block text-[11px] text-zinc-500">{num(r.units)} units · {pct(total ? r.revenue / total : null, 0)}</span>
+                  {money ? <b className="font-semibold">{inr(r.revenue)}</b> : <b className="font-semibold">{num(r.units)} units</b>}
+                  <span className="block text-[11px] text-zinc-500">{money ? `${num(r.units)} units · ` : ""}{pct(total ? r.revenue / total : null, 0)} share</span>
                   {r.growth !== undefined && r.growth != null && <span className={cn("block text-[10.5px] font-medium", r.growth >= 0 ? "text-emerald-600" : "text-rose-600")}>{r.growth >= 0 ? "+" : ""}{(r.growth * 100).toFixed(0)}%</span>}
                 </span>
               </Link>

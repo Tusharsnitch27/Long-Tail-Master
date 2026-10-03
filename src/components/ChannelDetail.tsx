@@ -11,6 +11,7 @@ import { SkuTabs } from "@/components/SkuTabs";
 import { computePlan, dailyTarget } from "@/server/plan";
 import { getTargetBook } from "@/server/data/targetBook";
 import { ucChannel } from "@/server/channelData";
+import { ONLINE_SUBS } from "@/lib/categories";
 import { addDays, eachDay, startOfMonth, inRange } from "@/lib/dates";
 import { compactNum } from "@/lib/format";
 import { ActionCard } from "@/components/ActionCard";
@@ -22,12 +23,15 @@ import { growth, safeDiv } from "@/lib/metrics";
 import { CH_COLORS } from "@/lib/colors";
 
 /** Shared body for Online Overview (Shopify) and Marketplace Overview. */
-export async function ChannelDetail({ ctx: base, channel }: { ctx: Ctx; channel: "online" | "marketplace" }) {
+export async function ChannelDetail({ ctx: base, channel, forcedMp }: { ctx: Ctx; channel: "online" | "marketplace"; forcedMp?: string }) {
   const { range, compare } = base.period;
   const trendRange = rangeDays(range) >= 14 ? range : lastNDays(range.to > base.asOf ? base.asOf : range.to, 30);
   const sc = await loadScope(base, [trendRange]);
   const mps = marketplacesWithData(sc.uc);
-  const mp = channel === "marketplace" && typeof base.sp.mp === "string" && mps.includes(base.sp.mp) ? base.sp.mp : null;
+  // sub-channels: marketplaces, or Online = Normal (SAPL Shopify) · Omni · Qcom
+  const subs: { mp: string; label: string }[] = channel === "marketplace" ? mps.map((x) => ({ mp: x, label: x[0] + x.slice(1).toLowerCase() })) : ONLINE_SUBS.filter((s) => sc.uc.some((x) => x.mp === s.mp)).map((s) => ({ ...s }));
+  const mp = forcedMp ?? (typeof base.sp.mp === "string" && subs.some((s) => s.mp === base.sp.mp) ? base.sp.mp : null);
+  const subLabel = (m: string) => subs.find((s) => s.mp === m)?.label ?? m;
   const ctx = { ...base, filters: { ...base.filters, channel, mp } };
   const whUnits = (s: string) => sc.wh.bySku.get(s)?.units ?? 0;
   const [perf, act, statuses] = await Promise.all([productPerformance(ctx, sc.pm, whUnits, channel, mp), buildActions(base), actionStatuses()]);
@@ -44,7 +48,7 @@ export async function ChannelDetail({ ctx: base, channel }: { ctx: Ctx; channel:
   const daily = eachDay(d30.from, d30.to).map((d) => ({ date: d, actual: channelMetrics(sc.facts, sc.uc, { from: d, to: d }, channel, mp).revenue, target: mp ? null : dailyTarget(plan, sc.facts, book, d), lw: channelMetrics(sc.facts, sc.uc, { from: addDays(d, -7), to: addDays(d, -7) }, channel, mp).revenue }));
   const all = channelMetrics(sc.facts, sc.uc, range, "all");
   const ret = sc.products.reduce((a, x) => ({ r: a.r + (x.returnsValue[channel] ?? 0), s: a.s + (x.sales[channel] ?? 0) }), { r: 0, s: 0 });
-  const label = channel === "online" ? "Online" : mp ? mp[0] + mp.slice(1).toLowerCase() : "Marketplace";
+  const label = mp ? (channel === "online" ? (mp === "SHOPIFY" ? "Online · normal" : subLabel(mp)) : subLabel(mp)) : channel === "online" ? "Online" : "Marketplace";
   const series = channelSeries(sc.facts, sc.uc, trendRange, mp).map((r) => ({ date: r.date, value: r[channel] }));
   const cats = ctx.filters.cats.map((c) => {
     const f = sc.facts.filter((x) => x.c === c), u = sc.uc.filter((x) => x.c === c);
@@ -60,8 +64,16 @@ export async function ChannelDetail({ ctx: base, channel }: { ctx: Ctx; channel:
   ];
   const highRet = [...sc.products].filter((x) => (x.sales[channel] ?? 0) >= 100_000 && x.returnPct[channel] != null).sort((a, b) => (b.returnPct[channel] ?? 0) - (a.returnPct[channel] ?? 0)).slice(0, 6);
   const risk = act.actions.filter((a) => (a.type === "channel_decline" && (channel === "online" ? a.key.includes(":online:") : a.key.includes(":marketplace:") || (mps.some((x) => a.key.includes(`:${x}:`)) && (!mp || a.key.includes(`:${mp}:`))))) || (a.type === "return_risk" && a.key.startsWith(`ret:${channel}:`)));
-  const tabsMp = channel === "marketplace" && mps.length > 1
-    ? <Tabs active={mp ?? "all"} tabs={[{ key: "all", label: "All marketplaces", href: withQs(base, "/marketplace", { mp: null }) }, ...mps.map((x) => ({ key: x, label: x[0] + x.slice(1).toLowerCase(), href: withQs(base, "/marketplace", { mp: x }) }))]} /> : null;
+  const page = channel === "online" ? "/online" : "/marketplace";
+  const tabsMp = !forcedMp && subs.length > 1
+    ? <div className="card mb-3 flex flex-wrap items-center gap-2 rounded-[16px] px-3 py-2.5">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-700">{channel === "online" ? "Online channel" : "Marketplace"}</span>
+        {[{ mp: null as string | null, label: channel === "online" ? "All online" : "All marketplaces" }, ...subs].map((s) => (
+          <Link key={s.mp ?? "all"} href={withQs(base, page, { mp: s.mp })} scroll={false}
+            className={`flex h-8 items-center rounded-lg border px-3 text-[12px] transition-colors ${mp === s.mp ? "border-brand-900 bg-brand-900 font-medium text-canvas" : "border-zinc-300 bg-white text-ink hover:border-brand-400"}`}>{s.label}</Link>
+        ))}
+        {channel === "online" && <span className="ml-auto text-[11px] text-zinc-500">Normal = Shopify orders shipped from SAPL warehouses · Omni = store-fulfilled online orders · Qcom = quick commerce from stores</span>}
+      </div> : null;
 
   const whCats = ctx.filters.cats.map((c) => {
     const prods = sc.products.filter((x) => x.category === c);
@@ -78,8 +90,8 @@ export async function ChannelDetail({ ctx: base, channel }: { ctx: Ctx; channel:
 
   return (
     <>
-      <PageHeader title={channel === "online" ? "Online Overview" : "Marketplace Overview"}
-        subtitle={<>{channel === "online" ? "Shopify" : mp ?? `${mps.join(" · ") || "no marketplaces with data"}`} · {fmtRange(range)} <span className="text-zinc-400">· {ctx.period.compareLabel} · Unicommerce, cancellations included</span></>} />
+      <PageHeader title={forcedMp === "QCOM" ? "Qcom Overview" : channel === "online" ? "Online Overview" : "Marketplace Overview"}
+        subtitle={<>{channel === "online" ? (mp ? label : "Normal · Omni · Qcom") : mp ? label : `${mps.join(" · ") || "no marketplaces with data"}`} · {fmtRange(range)} <span className="text-zinc-400">· {ctx.period.compareLabel} · cancellations included</span></>} />
       {tabsMp}
       {!mp && plan.missingPairs.length > 0 && <div className="mb-3"><DataPrompt compact title={`No ${label} target for ${plan.missingPairs.map((x) => x.split(" · ")[1]).join(", ")}`} href={base.user?.role === "admin" ? "/settings?tab=targets" : undefined} cta="Set targets">Target metrics cover only categories that have one.</DataPrompt></div>}
       <KpiGrid cols={8}>
@@ -140,7 +152,14 @@ export async function ChannelDetail({ ctx: base, channel }: { ctx: Ctx; channel:
         </div>
       )}
       <div className="mt-3 grid gap-3 xl:grid-cols-[1fr_1.3fr]">
-        <Section title="Warehouse inventory" tip="Live warehouse stock (UNICOMMERCE_LIVE_INVENTORY). North = SAPL-NORTH-TAURU; South = SAPL-WH1 + SAPL-WH2. Days of cover at this channel's L30 rate.">
+        {mp === "QCOM" || mp === "OMNI" ? (
+          <Section title={`${label} inventory`}>
+            <DataPrompt title={mp === "QCOM" ? "Qcom inventory isn't available in the current data" : "Omni orders ship from store stock"}>
+              {mp === "QCOM" ? "Qcom stock sits in separate Qcom godowns at stores. Share the source that carries the Qcom godown stock and it will be shown here with days of cover." : "See Store Overview for the stock of the stores that fulfil Omni orders."}
+            </DataPrompt>
+          </Section>
+        ) : (
+        <Section title="Warehouse inventory" tip="Live warehouse stock. North = SAPL-NORTH-TAURU; South = SAPL-WH1 + SAPL-WH2. Days of cover at this channel's L30 rate.">
           <table className="w-full text-[12.5px]">
             <thead><tr className="text-[11px] text-zinc-500">{["Category", "Warehouse", "North", "South", `${label} L30 units`, "Cover"].map((h, i) => <th key={h} className={`pb-1.5 font-medium ${i ? "text-right" : "text-left"}`}>{h}</th>)}</tr></thead>
             <tbody>{whCats.map((r) => (
@@ -157,6 +176,7 @@ export async function ChannelDetail({ ctx: base, channel }: { ctx: Ctx; channel:
             <ul className="space-y-1">{oos.slice(0, 5).map((r) => <li key={r.sku} className="flex items-center justify-between gap-2"><ProductCell name={r.name} sku={r.sku} image={r.image} href={withQs(base, `/products/${encodeURIComponent(r.sku)}`)} /><span className="tabular text-right text-[11.5px] text-zinc-600">{num(r.l30Units)} sold L30<span className="block text-rose-600">0 in warehouse</span></span></li>)}</ul>
           </>)}
         </Section>
+        )}
         <Section title={`Top 10 SKUs · ${label}`} tip="By revenue in the selected period"><SkuTabs tabs={topTabs} qs={base.qs} /></Section>
       </div>
       <div className="mt-3">

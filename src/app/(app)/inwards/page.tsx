@@ -122,7 +122,7 @@ export default async function FutureInwards({ searchParams }: { searchParams: Pr
         <InwardsManager rows={rows} cats={ctx.filters.cats.map((c) => ({ key: c, label: catLabel(c) }))} admin={can(ctx.user, "admin")} warehouses={warehouses} />
       </Section>
 
-      <Section className="mt-3" title={`Actual new inwards · last 90 days (${num(recQty)} units, ${rec.length} products)`} tip="PUTAWAY_TRACKING where FINAL_TYPE = 'New Inward' — for context on what landed recently and how it is selling">
+      <Section className="mt-3" title={`Actual new inwards · last 90 days (${num(recQty)} units, ${rec.length} products)`} tip="New inwards completed at the warehouse — for context on what landed recently and how it is selling">
         <MiniTable head={["Product", "Category", "Inwarded", "First", "Last", "Warehouse", "L30 sold", "Stock now", "Sell-through", "DOI"]}
           rows={rec.slice(0, 40).map((r) => [
             <ProductCell key="p" name={r.s.name} sku={r.s.sku} image={r.s.image} href={`/products/${encodeURIComponent(r.s.sku)}`} />,

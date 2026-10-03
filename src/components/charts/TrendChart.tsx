@@ -5,6 +5,8 @@ import { fmtDate, weekday } from "@/lib/dates";
 import { ChartDownload } from "./ChartDownload";
 import { useId } from "react";
 import { TOOLTIP, CURSOR, GRID, gid } from "./theme";
+import { useAccess } from "@/components/shell/Permissions";
+import { MoneyHidden } from "./MoneyHidden";
 
 export interface Series { key: string; label: string; color: string; type?: "bar" | "line"; stack?: string; dashed?: boolean; axis?: "left" | "right" }
 type Fmt = "inr" | "num" | "pct";
@@ -15,6 +17,8 @@ export function TrendChart({ data, series, xKey = "date", yFormat = "inr", right
   /** download file name */ name?: string;
 }) {
   const uid = useId().replace(/:/g, "");
+  const access = useAccess();
+  if (!access.revenue && yFormat === "inr") return <MoneyHidden height={height} />;
   if (!data.length) return <div className="flex items-center justify-center text-[13px] text-zinc-500" style={{ height }}>No data for this period</div>;
   const hasRight = series.some((s) => s.axis === "right");
   return (

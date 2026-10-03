@@ -52,6 +52,10 @@ export const catForProduct = (masterCategory: string | null | undefined, sku: st
 /** Channels in the UI. Marketplace members are fixed by definition; which ones appear depends on the data. */
 export const MARKETPLACES = ["AJIO", "MYNTRA", "FLIPKART", "AMAZON", "NYKAA"] as const;
 export const ONLINE = "SHOPIFY";
+/** Online sub-channels: normal Shopify orders (SAPL warehouses), Omni (store-fulfilled, POS doc prefix OMS) and Qcom (quick commerce, POS doc prefix QCOM). */
+export const OMNI = "OMNI";
+export const QCOM = "QCOM";
+export const ONLINE_SUBS = [{ mp: ONLINE, label: "Normal" }, { mp: OMNI, label: "Omni" }, { mp: QCOM, label: "Qcom" }] as const;
 export type Channel = "all" | "stores" | "online" | "marketplace";
 export const CHANNELS: { key: Channel; label: string }[] = [
   { key: "all", label: "Overall" }, { key: "stores", label: "Stores" }, { key: "online", label: "Online" }, { key: "marketplace", label: "Marketplace" },

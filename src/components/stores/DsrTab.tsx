@@ -119,7 +119,7 @@ export function DsrTab({ ctx, facts, model }: { ctx: Ctx; facts: Fact[]; model: 
             { key: "revenue", label: "Revenue", type: "inr" }, { key: "units", label: "Units", type: "num" }, { key: "bills", label: "Bills", type: "num" },
             { key: "target", label: "Target", type: "inr" }, { key: "ach", label: "Achievement", type: "ach" }, { key: "status", label: "Status", type: "status" }, { key: "asp", label: "ASP", type: "inrFull" }]}
           totals={{ date: "Total", revenue: dS, units: dQ, bills: dN || null, target: dT || null, ach: safeDiv(dTS, dT), asp: safeDiv(dS, dQ) }} />
-        <p className="mt-1.5 text-[11.5px] text-zinc-500">Source: LONG_TAIL_DSR_* (gross sales) for Perfumes / Shoes with store targets; store sales lines for other categories (no bills). Sorted by date, then revenue.</p>
+        <p className="mt-1.5 text-[11.5px] text-zinc-500">Gross sales; bills are reported for Perfumes and Shoes only. Sorted by date, then revenue.</p>
       </div>
     </>
   );

@@ -1,4 +1,5 @@
 "use client";
+import { ASSIGNABLE_ROLES, ROLE_HINT, ROLE_LABEL } from "@/lib/access";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
@@ -57,7 +58,7 @@ export function SettingsForm({ initial, categories, readOnly }: { initial: Setti
       </section>
       <section className="rounded-xl border border-zinc-200 bg-white p-4">
         <h2 className="mb-1 text-[14px] font-semibold">Categories</h2>
-        <p className="mb-3 text-[12px] text-zinc-500">DSR categories have bills and Snowflake targets. Sales-derived categories use HORIZONTAL_SALES_CATEGORIES store sales; set their targets in Target Setup.</p>
+        <p className="mb-3 text-[12px] text-zinc-500">DSR categories have bills and Snowflake targets. Other categories use store sales lines; set their targets in Target Setup.</p>
         <div className="flex flex-wrap gap-2">
           {categories.map((c) => (
             <button key={c.key} onClick={() => setCats((s) => (s.includes(c.key) ? s.filter((k) => k !== c.key) : [...s, c.key]))}
@@ -109,10 +110,11 @@ export function UsersForm({ users, me, readOnly }: { users: UserRow[]; me: strin
               <button type="button" onClick={() => setForm({ ...form, password: genPw() })} className="h-8 rounded-md border border-zinc-300 px-2 text-[12px]">Generate</button></span>
           </label>
           <label className="text-[12px] text-zinc-600">Role
-            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className={`${input} mt-1 block`}><option value="viewer">Viewer</option><option value="admin">Admin</option></select>
+            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className={`${input} mt-1 block`}>{ASSIGNABLE_ROLES.map((r) => <option key={r} value={r} title={ROLE_HINT[r]}>{ROLE_LABEL[r]}</option>)}</select>
           </label>
           <button disabled={readOnly} className="h-8 rounded-md bg-zinc-900 px-3 text-[13px] font-medium text-white disabled:opacity-40">Create user</button>
         </div>
+        <ul className="mt-2 grid gap-x-4 gap-y-0.5 text-[11.5px] text-zinc-600 sm:grid-cols-2">{ASSIGNABLE_ROLES.map((r) => <li key={r}><b className="font-medium text-ink">{ROLE_LABEL[r]}</b> — {ROLE_HINT[r]}</li>)}<li><b className="font-medium text-ink">Super admin</b> — {ROLE_HINT.superadmin} (set on the server; one person)</li></ul>
         <p className="mt-2 text-[11.5px] text-zinc-500">Usernames: 3–80 characters — letters, digits, dot, underscore, hyphen, @ or + (an email address works; no spaces; stored in lowercase). Passwords are stored hashed and can’t be viewed later — copy it before creating.</p>
       </form>
 
@@ -127,7 +129,7 @@ export function UsersForm({ users, me, readOnly }: { users: UserRow[]; me: strin
                 <td className="px-4 py-2"><div className="font-medium">{u.username}{u.username === me && <span className="ml-1 text-[11px] font-normal text-zinc-400">(you)</span>}</div><div className="text-[11.5px] text-zinc-500">{u.name}{u.created_by ? ` · added by ${u.created_by}` : ""}</div></td>
                 <td className="px-2 py-2">
                   <select disabled={readOnly || u.username === me} value={u.role} onChange={(e) => call({ action: "update", username: u.username, role: e.target.value }, `Role updated for ${u.username}`)} className="h-7 rounded border border-zinc-300 px-1 text-[12.5px]">
-                    <option value="viewer">Viewer</option><option value="admin">Admin</option>
+                    {ASSIGNABLE_ROLES.map((r) => <option key={r} value={r} title={ROLE_HINT[r]}>{ROLE_LABEL[r]}</option>)}
                   </select>
                 </td>
                 <td className="px-2 py-2">{!u.active ? <span className="text-rose-700">Disabled</span> : !u.has_password ? <span className="text-amber-700">No password set</span> : "Active"}</td>

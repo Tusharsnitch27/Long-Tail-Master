@@ -15,7 +15,7 @@ export function DistributionTab({ ctx, model }: { ctx: Ctx; model: StoreModel })
   const dcParam = typeof ctx.sp.dc === "string" ? ctx.sp.dc : null;
   const dc = ctx.filters.cat ?? (dcParam && cats.includes(dcParam) ? dcParam : cats.includes("shoes") ? "shoes" : cats[0]);
   if (!dc) return <DataPrompt title="No categories in scope">Enable categories in the Control Centre.</DataPrompt>;
-  if (!model.invDate) return <DataPrompt title="Store report not available">Distribution needs the latest store report (OFFLINE_MASTER_DAILY_REPORT_1) for store stock and store size.</DataPrompt>;
+  if (!model.invDate) return <DataPrompt title="Store report not available">Distribution needs the latest store report for store stock and store size.</DataPrompt>;
 
   const inFeed = model.stores.filter((s) => s.inFeed && s.storeUnits30 > 0);
   const bySize = [...inFeed].sort((a, b) => b.storeUnits30 - a.storeUnits30);

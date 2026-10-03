@@ -1,6 +1,7 @@
+import { moneyMasked, MASK } from "./mask";
 // Indian number formatting: ₹ with K / L / Cr.
 export function inr(v: number | null | undefined, opts: { compact?: boolean; decimals?: number } = {}) {
-  if (v == null || !Number.isFinite(v)) return "—";
+  if (v == null || !Number.isFinite(v) || moneyMasked()) return MASK; // ₹ hidden for roles without revenue access
   const { compact = true } = opts;
   const sign = v < 0 ? "-" : "";
   const a = Math.abs(v);

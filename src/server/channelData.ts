@@ -1,5 +1,5 @@
 import "server-only";
-import { MARKETPLACES, ONLINE, type Channel } from "@/lib/categories";
+import { MARKETPLACES, ONLINE, OMNI, QCOM, type Channel } from "@/lib/categories";
 import { eachDay, inRange, rangeDays, type Range } from "@/lib/dates";
 import { growth, safeDiv } from "@/lib/metrics";
 import type { Fact } from "./data/facts";
@@ -14,10 +14,11 @@ import type { Ctx } from "./context";
 export type ChKey = "stores" | "online" | "marketplace";
 export const CH_LABEL: Record<ChKey, string> = { stores: "Stores", online: "Online", marketplace: "Marketplace" };
 
-export const ucChannel = (mp: string): ChKey | null => (mp === ONLINE ? "online" : (MARKETPLACES as readonly string[]).includes(mp) ? "marketplace" : null);
+/** Online = normal Shopify + Omni + Qcom; Marketplace = AJIO, Myntra, Flipkart, Amazon, Nykaa. */
+export const ucChannel = (mp: string): ChKey | null => (mp === ONLINE || mp === OMNI || mp === QCOM ? "online" : (MARKETPLACES as readonly string[]).includes(mp) ? "marketplace" : null);
 
 export function inChannel(ch: Channel, mp: string | null) {
-  return (k: ChKey, rowMp?: string) => (ch === "all" || ch === k) && (!(ch === "marketplace" && mp) || rowMp === mp);
+  return (k: ChKey, rowMp?: string) => (ch === "all" || ch === k) && (!((ch === "marketplace" || ch === "online") && mp) || rowMp === mp);
 }
 
 export interface ChMetrics { revenue: number; units: number; orders: number | null; target: number | null; ach: number | null; asp: number | null; storesSelling: number | null; days: number }

@@ -112,6 +112,8 @@ All seven are enabled by default (migration v6 sets `enabledCategories`). An adm
 | `UNICOMMERCE_FACT_ITEMS_INTERMEDIATE` | order item (qty 1) | Online = `SHOPIFY`; Marketplace = AJIO, MYNTRA, FLIPKART, AMAZON, **NYKAA** (`NYKAA.COM`, `NYKAA_FASHION` and `NYKAA_SAPL_TAURU` mapped to one NYKAA) | Revenue = Σ `SELLING_PRICE` **including cancelled items** (user decision, 30 Sep). Cancellations are also counted separately. `RETURN_FLAG` is always 0. Amazon has had no long-tail orders since 23 Jul 2026. Franchise, Own Store and B2B channels are **not** counted |
 | `HORIZONTAL_SALES_CATEGORIES` | order line (TYPE Store / Shopify / Marketplace; CHANNEL = store name or web/app/MP) | Store sales for **non-DSR categories**, store × SKU sales, the overall validator / fallback | Includes cancellations and NYKAA. Revenue = `GROSS_SALES`. The user calls it "the real validator for overall numbers" |
 | `NEW_MEAFIELDS_PRODUCT_PRODUCTS_GRAPH_QL` (Shopify catalogue) | product × variant → SKU group | **Primary source of name, image, MRP / selling price, live date, status** (`src/server/data/shopify.ts`, user-supplied query + `TITLE`) | Other sources only fill gaps; Control Centre edits win over all. SKU group = variant SKU minus the last `-size` part. Cost price is never read |
+| `SKU_MASTER_V1` (3 Oct) | SKU group, all categories, daily | **Replaces the Bible as the product master** (restricted to long-tail categories): lifetime / L30 sales, qty, returns by channel incl. OMNI and QCOM, unit COGS (gross profit), inwards, image (images: SKU master first, then the Shopify catalogue) | Category column is upper-case; trousers etc. excluded by the category filter |
+| `STORE_FACT_ITEMS_OFFLINE` (3 Oct) | POS line | **Omni** (`DOC_PREFIX = 'OMS'`) and **Qcom** (`'QCOM'`) sales, `ORDER_STATUS = 'Processed'`, excluding `CB%` / `NT%` SKUs | `SELLING_PRICE` is the line total, `MRP` and `COGS_PRICE` per unit. Store sales (DSR / horizontal) = `ARS` docs only, so Omni / Qcom are not double counted |
 | `LONG_TAIL_MASTER_BIBLE` | SKU group | Product identity, image, MRP, inwards, lifetime sales / qty / returns by channel → **Return %** (lifetime, value-based) | **1 Oct 2026: the table was rebuilt upstream and holds only 44 Perfumes rows** — lifetime sales / returns / inwards are empty for every other category until it is restored (ask the user). Earlier ~619–647 rows. **No Bags or Sunglasses.** 164 legacy `SH…` rows have a null category (→ Shoes). L30 return columns are unreliable (>100%). The `SALES_L30` fields seem filled for Perfumes only |
 | `LONG_TAIL_PRODUCT_INVENTORY_MASTER` | SKU group | Name / colour fallback only | Stale |
 | `GS_LONGTAIL_METAFIELD` (singular) | SKU group | `META1` = L1 type, `META2` = L2 sub-type (colour for bags / belts), `IMAGELINK`, `NAME`, `CATEGORY` (incl. Caps, Sandals, Footwear) | The user wrote "gs_longtail_metafields"; that name doesn't exist or isn't authorised. Socks have no images. State of Mind (`4MSFR0944`, "SOM-Gift box") has no image anywhere |
@@ -133,7 +135,7 @@ Inventory is a snapshot metric: **never sum across days**. **Three phases everyw
 
 | Metric | Definition |
 |---|---|
-| Revenue | **Gross sales before returns.** Stores: DSR `SALES` (Perfumes, Shoes) or horizontal `GROSS_SALES` (other categories); Online / Marketplace: Σ selling price of all items **including cancellations** |
+| Revenue | **Gross sales before returns.** Stores: DSR `SALES` (Perfumes, Shoes) or horizontal `GROSS_SALES` (other categories); Online = **Normal** (Unicommerce Shopify orders with `WAREHOUSE_NAME` like `SAPL%` only) + **Omni** + **Qcom** (POS lines, see §5); Online / Marketplace: Σ selling price of all items **including cancellations**. Online sub-channels use `mp` = SHOPIFY / OMNI / QCOM (`ONLINE_SUBS`) |
 | Overall | Stores + Online + Marketplace (reconciles by construction) |
 | Units | DSR qty; Unicommerce items; horizontal quantity. **Free gifts excluded:** any item or line sold under **₹10 per unit** (e.g. socks given free), all categories. Gifts are counted separately (`ChannelDay.gifts`). DSR totals can't separate gifts |
 | ASP / AOV / ATV / UPT | revenue ÷ units / ÷ orders / ÷ bills; units ÷ bills (bills for Perfumes and Shoes only) |
@@ -266,6 +268,13 @@ Logout: a button next to the user's name at the bottom of the sidebar, and also 
 
 ---
 
+## 10b. Access control (3 Oct)
+
+- Roles (`src/lib/access.ts`): **superadmin** (only role that can download; = admin whose username is in `SUPERADMIN_USERNAMES`, default `ADMIN_USERNAME`; never assignable in the UI), **admin** (no downloads), **viewer**, **store_actions** (store pages + actions; no ₹ revenue / GP), **online_actions** (Online, Marketplace, Qcom, actions; no store pages), **designer** (products, categories, actions; no ₹ / GP). Migration v9 widens the role check.
+- Enforcement: page access in `pageContext` (redirect to `/no-access`) and the app shell; nav filtered by `canOpen`. ₹ masking: server formatting through `inr` reads a per-request React-cache flag (`lib/mask.ts`, set by `applyAccess`); client components read `useAccess()` (DataTable drops ₹/GP columns, ₹ charts show a placeholder, SkuTabs show units); pre-formatted action / to-do text is scrubbed (`scrubMoney`). Harvey is off for store_actions / online_actions / designer (page + API).
+- Downloads: every CSV button checks `useCanDownload()` (super admin only); exports include SKU group, item code, city, image URL and hidden columns.
+- No table / source names are shown anywhere in the UI (the Control Centre tables list and source freshness list were removed).
+
 ## 11. Auth and users
 
 - Username + password only (the user rejected Cloudflare Access and Google SSO). Roles: **admin** (Control Centre, Admin Lab, user management) and **viewer**.
@@ -290,6 +299,8 @@ Logout: a button next to the user's name at the bottom of the sidebar, and also 
 ## 13. Open items and suggested next steps
 
 **Open decisions / data asks**
+- Cut size % for shoes (pivot sizes 8 / 9 / 10): store shoe stock by size exists only in `LOGIC_FINAL_INVENTORY` (EU sizes 39–45); waiting for the user to confirm the UK→EU mapping and rule (any vs all pivot sizes missing) and whether that table may be used.
+- Qcom inventory: the godown carrying Qcom stock isn't in the sources in use; Qcom views show sales only until it is named.
 0. `LONG_TAIL_MASTER_BIBLE` now has Perfumes only (rebuilt 1 Oct) — lifetime sales, return %, inward qty and lifetime STR are blank for other categories until it is restored.
 1. Franchise and B2B sales (~₹1 Cr in Sep) are not counted. Confirm with the user whether their targets include them.
 2. Total store bills are needed for true bill penetration. Return date and reason are needed for period returns.
@@ -327,6 +338,7 @@ Logout: a button next to the user's name at the bottom of the sidebar, and also 
 | `2783504` | Email-style usernames |
 | `239829f` | Rename; product-wall login; split actuals + recommendations |
 | `fdee4e7` → `fcfcf08` | Login collage iterations; name **Long Tail** |
+| (3 Oct) | SKU_MASTER_V1 product master; category views (Overall + Stores / Online normal / Omni / Qcom / Marketplace, GP %, DOI 30D, targets) on Executive Summary and Category Performance; Online = Normal · Omni · Qcom; Qcom page; roles & access; super-admin-only downloads; source names removed from the UI |
 | (1 Oct, 4th) | Goods in transit (JIT_OFFLINE_GOODS) as the third inventory phase everywhere + GIT tab + action double-check; Store Overview filter bar (region, state, city, format, …) |
 | (1 Oct, 2nd) | 8-hour sessions, chart CSV downloads, MixBar hovers, duplicate charts removed, scorecard inventory, Marketing actions, product tags, Shopify catalogue, Control Centre product editor, Store × product tab, Stores metafield filters, table filter builder, target-save verification + cache race fix |
 | (1 Oct) | Mitra renamed **Harvey** ("Ask Harvey", `/harvey`); Atelier theme across the app |

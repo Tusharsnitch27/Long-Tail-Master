@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Store, TrendingDown, Boxes, Truck, Megaphone, Target, MessageSquareText, EyeOff, CalendarDays, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { moneyMasked, scrubMoney } from "@/lib/mask";
 import { catByKey } from "@/lib/categories";
 import type { Action } from "@/server/actions";
 import { Thumb } from "@/components/ui";
@@ -20,6 +21,8 @@ const fmt = (d: string) => new Date(`${d.slice(0, 10)}T00:00:00`).toLocaleDateSt
 
 /** One action: what · why (evidence) · recommended action · impact · confidence · links · team notes · controls. */
 export function ActionCard({ a, compact, qs = "", status }: { a: Action; compact?: boolean; qs?: string; status?: string | null }) {
+  // roles without revenue access: no ₹ amounts in pre-formatted action text
+  if (moneyMasked()) a = { ...a, title: scrubMoney(a.title), reason: scrubMoney(a.reason), recommendation: scrubMoney(a.recommendation), impactLabel: "Impact in ₹ hidden", evidence: a.evidence.map((e) => ({ ...e, value: scrubMoney(e.value) })) };
   const withQs = (h: string) => (qs ? `${h}${h.includes("?") ? "&" : "?"}${qs}` : h);
   const Icon = a.type === "target_mismatch" || a.type === "target_not_live" ? Target : a.type === "category_expansion" ? Sparkles : GROUP_ICON[a.group];
   const cat = a.category ? catByKey(a.category) : null;

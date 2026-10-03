@@ -37,7 +37,7 @@ export default async function ProductDetail({ params, searchParams }: { params: 
   const pm = await getProductMap();
   const p = pm.get(sku);
   const back = withQs(ctx, "/products");
-  if (!p) return <><Link href={back} className="mb-3 inline-flex items-center gap-1 text-[12px] text-zinc-500 hover:text-ink"><ChevronLeft className="size-3.5" />Product Master</Link><Empty title={`Product ${sku} not found`}>It isn’t in the Product Master (LONG_TAIL_MASTER_BIBLE) or the metafield sheet.</Empty></>;
+  if (!p) return <><Link href={back} className="mb-3 inline-flex items-center gap-1 text-[12px] text-zinc-500 hover:text-ink"><ChevronLeft className="size-3.5" />Product Master</Link><Empty title={`Product ${sku} not found`}>It isn’t in the product master or the metafield sheet.</Empty></>;
   const cat = p.category;
   const { range, compare } = ctx.period;
   const asOf = ctx.asOf;
@@ -240,7 +240,7 @@ export default async function ProductDetail({ params, searchParams }: { params: 
             </table>
           </div>
         </Section>
-        <Section title="Inward timeline" tip="New inwards only — PUTAWAY_TRACKING where FINAL_TYPE = 'New Inward' (putaway completion date, warehouse, quantity)"
+        <Section title="Inward timeline" tip="New inwards only (putaway completion date, warehouse, quantity)"
           right={inwards.length ? <span className="text-[11.5px] text-zinc-500">{num(inTot)} units · {inwards.length} putaways</span> : undefined}>
           {inwards.length ? <>
             <div className="mb-3 flex flex-wrap gap-1.5">{inByWh.map((x) => <span key={x.f} className="rounded-md bg-zinc-50 px-2 py-1 text-[11.5px] ring-1 ring-zinc-100">{x.f} <span className="text-zinc-400">{ZONE[x.f] ?? ""}</span> <b className="tabular font-semibold">{num(x.qty)}</b></span>)}</div>
@@ -261,7 +261,7 @@ export default async function ProductDetail({ params, searchParams }: { params: 
             </ol>
             {facts.soldSinceInward != null && lastIn && <div className="mt-3 text-[11.5px] text-zinc-600">Since the latest inward ({fmtDate(lastIn.d.slice(0, 10))}): <b className="font-semibold">{num(facts.soldSinceInward)}</b> units sold, all channels.</div>}
             {p.inwardTotal != null && Math.abs(p.inwardTotal - inTot) > Math.max(5, inTot * 0.05) && <div className="mt-1 text-[11px] text-zinc-400">Product Master inward total is {num(p.inwardTotal)} (includes inwards outside the new-inward putaway feed).</div>}
-          </> : <Empty title="No new-inward putaways">No PUTAWAY_TRACKING rows with FINAL_TYPE = ‘New Inward’ for {sku}.{p.inwardTotal ? ` Product Master shows ${num(p.inwardTotal)} inwarded to date.` : ""}</Empty>}
+          </> : <Empty title="No new-inward putaways">No new inwards recorded for {sku}.{p.inwardTotal ? ` Product Master shows ${num(p.inwardTotal)} inwarded to date.` : ""}</Empty>}
         </Section>
       </div>
 
@@ -309,7 +309,7 @@ export default async function ProductDetail({ params, searchParams }: { params: 
       </div>
 
       <div className="mt-3">
-        <Section title="Inventory history · last 90 days" tip="Daily snapshots: store report (all stores) and warehouse history (SNITCH_FINAL_INVENTORY_WH2). Right axis = stores holding stock.">
+        <Section title="Inventory history · last 90 days" tip="Daily snapshots: store report (all stores) and warehouse history. Right axis = stores holding stock.">
           {hasInvHist ? <TrendChart name={`${sku}-inventory-history-90d`} data={invTrend} height={220} yFormat="num" rightFormat="num" series={[
             { key: "store", label: "Stores", color: CH_COLORS.stores, type: "line" }, { key: "south", label: "WH South", color: "#c08f60", type: "line" },
             { key: "north", label: "WH North", color: "#2e6f73", type: "line", dashed: true }, { key: "stores", label: "Stores stocked", color: "#b8a894", type: "line", dashed: true, axis: "right" },
@@ -335,7 +335,7 @@ export default async function ProductDetail({ params, searchParams }: { params: 
           {!opps.length && !actions.length && <div className="py-4 text-center text-[12.5px] text-zinc-500">Nothing to act on — stock, sizes, returns and sales trend are within normal ranges.</div>}
         </Section>
       </div>
-      <p className="mt-2 text-[11px] text-zinc-500">Lifetime sales, units, inward total and return %: Product Master (daily). Store stock: latest store report ({compactNum(storeInv)} units). Warehouse: Unicommerce live inventory{w?.updated ? ` (updated ${w.updated.slice(0, 16)})` : ""}. Inward timeline: PUTAWAY_TRACKING new inwards. Sales: store sales lines + Unicommerce items incl. cancellations, to {fmtDate(asOf, true)}.</p>
+      <p className="mt-2 text-[11px] text-zinc-500">Store stock: latest store report ({compactNum(storeInv)} units). Warehouse: live{w?.updated ? ` (updated ${w.updated.slice(0, 16)})` : ""}. Sales incl. cancellations, to {fmtDate(asOf, true)}.</p>
     </>
   );
 }

@@ -495,4 +495,13 @@ alter table remarks add column tag text;
 create index remarks_tag on remarks(tag) where active and tag is not null;
 `,
   },
+  {
+    version: 9,
+    name: "access_roles",
+    sql: `
+-- access roles: admin (no downloads), viewer, store_actions, online_actions, designer; super admin is set by env, not stored
+alter table app_users drop constraint if exists app_users_role_check;
+alter table app_users add constraint app_users_role_check check (role in ('viewer','admin','store_actions','online_actions','designer'));
+`,
+  },
 ];
